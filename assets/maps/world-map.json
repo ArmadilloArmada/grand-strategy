@@ -1,0 +1,87 @@
+{
+  "name": "World at War (Classic)",
+  "version": "2.0.0",
+  "width": 1400,
+  "height": 700,
+  "territories": [
+    {
+      "id": "alaska",
+      "name": "Alaska",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": ["northwest_territories", "western_canada"],
+      "polygon": [[30, 50], [100, 40], [120, 80], [90, 110], [40, 100]],
+      "center": [70, 75],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "northwest_territories",
+      "name": "Northwest Territories",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": ["alaska", "western_canada"],
+      "polygon": [[100, 40], [200, 40], [200, 100], [100, 100]],
+      "center": [150, 70],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "western_canada",
+      "name": "Western Canada",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": ["alaska", "northwest_territories", "eastern_canada"],
+      "polygon": [[200, 40], [350, 40], [350, 120], [200, 100]],
+      "center": [275, 80],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "eastern_canada",
+      "name": "Eastern Canada",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": ["western_canada", "eastern_usa"],
+      "polygon": [[350, 40], [500, 40], [500, 130], [350, 120]],
+      "center": [425, 85],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "eastern_usa",
+      "name": "Eastern USA",
+      "type": "coastal",
+      "production": 10,
+      "adjacentTo": ["eastern_canada", "central_usa"],
+      "polygon": [[350, 130], [550, 120], [560, 250], [350, 260]],
+      "center": [455, 195],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "central_usa",
+      "name": "Central USA",
+      "type": "land",
+      "production": 6,
+      "adjacentTo": ["eastern_usa"],
+      "polygon": [[200, 130], [350, 130], [350, 260], [200, 260]],
+      "center": [275, 195],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": {}
+}

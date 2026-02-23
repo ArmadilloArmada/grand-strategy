@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grand Strategy - Board Game</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+</head>
+<body>
+  <!-- Skip link for keyboard navigation - WCAG 2.1 requirement -->
+  <a href="#game-canvas" class="skip-link">Skip to game</a>
+  
+  <div id="app" role="application" aria-label="Grand Strategy Game">
+    <canvas id="game-canvas" tabindex="0" aria-label="Game map - click territories to select"></canvas>
+    
+    <!-- Help Button -->
+    <button id="help-button" title="How to Play (H)" aria-label="Help - How to Play">?</button>
+    
+    <!-- Mini-Map -->
+    <div id="minimap-container">
+      <canvas id="minimap-canvas"></canvas>
+      <div id="minimap-viewport"></div>
+    </div>
+    
+    <!-- Zoom Controls -->
+    <div id="zoom-controls">
+      <button id="btn-zoom-in" title="Zoom In">+</button>
+      <button id="btn-zoom-fit" title="Fit to Screen (F)">⊡</button>
+      <button id="btn-zoom-out" title="Zoom Out">−</button>
+      <button id="btn-overlay" title="Toggle overlays: range / threat (O)">⊞ Overlay</button>
+    </div>
+    
+    <!-- Battle Log Panel -->
+    <div id="battle-log-panel" class="collapsed">
+      <div id="battle-log-header">
+        <span>📜 Battle Log</span>
+        <button id="btn-toggle-log">▼</button>
+      </div>
+      <div id="battle-log-content">
+        <!-- Log entries populated by JS -->
+      </div>
+    </div>
+
+    <!-- Faction Summary Panel -->
+    <div id="faction-panel" class="collapsed">
+      <div id="faction-panel-header">
+        <span>📊 Factions</span>
+        <button id="btn-toggle-factions">▼</button>
+      </div>
+      <div id="faction-panel-content">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+    
+    <!-- HUD -->
+    <div id="hud">
+      <div id="turn-info">
+        <div class="turn-banner">
+          <span id="current-faction">-</span>
+          <span id="current-phase">-</span>
+          <span id="turn-number">Turn 1</span>
+          <span id="turn-indicator" class="your-turn hidden">YOUR TURN</span>
+          <span id="save-indicator" class="save-indicator hidden" title="Game saved">💾 Saved</span>
+        </div>
+        <!-- Phase Progress Bar -->
+        <div id="phase-progress">
+          <div class="phase-step" data-phase="purchase" title="Purchase Units">
+            <span class="phase-icon">🛒</span>
+            <span class="phase-label">Buy</span>
+          </div>
+          <div class="phase-connector"></div>
+          <div class="phase-step" data-phase="combat_move" title="Combat Movement">
+            <span class="phase-icon">⚔️</span>
+            <span class="phase-label">Move</span>
+          </div>
+          <div class="phase-connector"></div>
+          <div class="phase-step" data-phase="combat" title="Resolve Combat">
+            <span class="phase-icon">🎲</span>
+            <span class="phase-label">Combat</span>
+          </div>
+          <div class="phase-connector"></div>
+          <div class="phase-step" data-phase="noncombat_move" title="Non-Combat Movement">
+            <span class="phase-icon">🚶</span>
+            <span class="phase-label">Reposition</span>
+          </div>
+          <div class="phase-connector"></div>
+          <div class="phase-step" data-phase="production" title="Place Units">
+            <span class="phase-icon">🏭</span>
+            <span class="phase-label">Build</span>
+          </div>
+          <div class="phase-connector"></div>
+          <div class="phase-step" data-phase="collect_income" title="Collect Income">
+            <span class="phase-icon">💰</span>
+            <span class="phase-label">Income</span>
+          </div>
+        </div>
+        <div id="turn-order">
+          <!-- Turn order indicators populated by JS -->
+        </div>
+      </div>
+      
+      <div id="resources">
+        <span id="ipc-display">0 IPCs</span>
+      </div>
+      
+      <div id="selection-info">
+        <div id="territory-name">Select a Territory</div>
+        <div id="territory-details">
+          <p style="text-align: center; color: #666; font-style: italic;">
+            Click on any territory to view details and available units.
+          </p>
+        </div>
+      </div>
+      
+      <!-- Contextual Help Banner -->
+      <div id="context-helper" class="context-helper">
+        <span id="context-helper-text">Welcome! Select a territory to begin.</span>
+      </div>
+      
+      <div id="action-buttons" role="toolbar" aria-label="Game actions">
+        <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️ Undo</button>
+        <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
+        <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
+        <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
+        <div class="btn-separator"></div>
+        <button id="btn-research" class="utility-btn" title="Research technologies" aria-label="Research technologies">🔬</button>
+        <button id="btn-diplomacy" class="utility-btn" title="Diplomatic relations" aria-label="Diplomatic relations">🤝</button>
+        <button id="btn-stats" class="utility-btn" title="View game statistics" aria-label="View game statistics">📊</button>
+        <button id="btn-fog-toggle" class="utility-btn" title="Toggle fog of war" aria-label="Toggle fog of war">🌫️</button>
+        <div class="btn-separator"></div>
+        <button id="btn-end-phase" aria-label="End current phase">➡️ End Phase</button>
+        <button id="btn-menu" title="Open main menu" aria-label="Open main menu">☰</button>
+      </div>
+      
+      <!-- Victory Progress Bar -->
+      <div id="victory-progress" class="victory-progress hidden">
+        <div class="victory-progress-header">
+          <span>Victory Progress</span>
+          <span id="victory-condition-text">Capture 2 enemy capitals</span>
+        </div>
+        <div id="victory-bars"></div>
+      </div>
+    </div>
+    
+    <!-- Toast Container with ARIA live region for screen readers -->
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+    
+    <!-- Screen reader announcements -->
+    <div id="sr-announcements" class="sr-only" role="status" aria-live="assertive" aria-atomic="true"></div>
+
+    <!-- Main Menu Modal -->
+    <div id="main-menu-modal" class="modal" role="dialog" aria-labelledby="main-menu-title" aria-modal="true">
+      <div class="main-menu-layout">
+
+        <!-- ── Hero / Branding Panel ── -->
+        <div class="main-menu-hero">
+          <div class="main-menu-logo-area">
+            <span class="main-menu-emblem">🌍</span>
+            <h1 id="main-menu-title" class="main-menu-title">GRAND<br>STRATEGY</h1>
+            <p class="main-menu-tagline">A turn-based game of global conquest</p>
+          </div>
+          <p class="main-menu-version">v1.0.0 · Press H for help</p>
+        </div>
+
+        <!-- ── Navigation Panel ── -->
+        <nav class="main-menu-nav">
+
+          <!-- Quick Start (primary) -->
+          <div class="main-menu-group">
+            <button id="btn-quick-classic" class="menu-btn menu-btn-featured">
+              <span class="menu-btn-icon">🎲</span>
+              <div>
+                <div class="menu-btn-label">Classic Mode</div>
+                <div class="menu-btn-sub">6 phases · Full strategy experience</div>
+              </div>
+            </button>
+            <button id="btn-quick-simple" class="menu-btn">
+              <span class="menu-btn-icon">⚡</span>
+              <div>
+                <div class="menu-btn-label">Quick Mode</div>
+                <div class="menu-btn-sub">4 phases · Beginner friendly</div>
+              </div>
+            </button>
+          </div>
+
+          <div class="menu-rule"></div>
+
+          <!-- Game Modes -->
+          <div class="main-menu-group">
+            <button id="btn-campaign" class="menu-btn">
+              <span class="menu-btn-icon">🎖️</span>
+              <div class="menu-btn-label">Campaign Mode</div>
+            </button>
+            <button id="btn-new-game" class="menu-btn">
+              <span class="menu-btn-icon">🎮</span>
+              <div class="menu-btn-label">Custom Game Setup</div>
+            </button>
+            <button id="btn-continue-game" class="menu-btn">
+              <span class="menu-btn-icon">▶</span>
+              <div class="menu-btn-label">Continue Last Game</div>
+            </button>
+            <button id="btn-load-game" class="menu-btn">
+              <span class="menu-btn-icon">📂</span>
+              <div class="menu-btn-label">Load Saved Game</div>
+            </button>
+            <button id="btn-multiplayer" class="menu-btn" disabled title="Online multiplayer coming soon!">
+              <span class="menu-btn-icon">🌐</span>
+              <div>
+                <div class="menu-btn-label">Multiplayer</div>
+                <div class="menu-btn-sub">Coming Soon</div>
+              </div>
+            </button>
+          </div>
+
+          <div class="menu-rule"></div>
+
+          <!-- Utility Footer -->
+          <div class="main-menu-footer">
+            <button id="btn-achievements" class="menu-btn-icon-only" title="Achievements">🏆</button>
+            <button id="btn-tutorial"     class="menu-btn-icon-only" title="Tutorial">📚</button>
+            <button id="btn-open-settings" class="menu-btn-icon-only" title="Settings">⚙️</button>
+            <a href="/map-editor.html" target="_blank" style="display:contents;">
+              <button class="menu-btn-icon-only" title="Map Editor">🗺️</button>
+            </a>
+          </div>
+
+        </nav>
+      </div>
+    </div>
+
+    <!-- New Game Setup Modal -->
+    <div id="new-game-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 500px;">
+        <h2>🎮 New Game Setup</h2>
+        
+        <div class="settings-section">
+          <h3>Map</h3>
+          <div class="setting-row">
+            <label for="map-select">Map</label>
+            <select id="map-select">
+              <!-- Options filled by JS from map registry -->
+              <option value="grid" selected>World at War (Grid) - Recommended</option>
+              <option value="world">World at War (Classic)</option>
+              <option value="tutorial">Tutorial</option>
+              <optgroup label="── Grid Theater Maps ──">
+                <option value="grid-europe">European Theater (Grid)</option>
+                <option value="grid-pacific">Pacific Ring (Grid)</option>
+                <option value="grid-americas">Western Hemisphere (Grid)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="preset-hold10">Short game (10 turns)</label>
+            <input type="checkbox" id="preset-hold10" title="Override turn limit to 10">
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Unit Era</h3>
+          <div class="setting-row">
+            <label for="unit-era">Technology Era</label>
+            <select id="unit-era">
+              <option value="wwi">🎖️ World War I (1914)</option>
+              <option value="wwii" selected>⚔️ World War II (1942)</option>
+              <option value="coldwar">☢️ Cold War (1970)</option>
+              <option value="modern">🛰️ Modern (2020)</option>
+            </select>
+          </div>
+          <p id="unit-era-description" style="font-size: 0.8rem; color: #666; margin-top: 0.5rem; font-style: italic;">
+            Classic combined arms. Balanced mobility.
+          </p>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Game Mode</h3>
+          <div class="setting-row">
+            <label for="game-mode">Play Mode</label>
+            <select id="game-mode">
+              <option value="vs-ai">🤖 vs AI (Single Player)</option>
+              <option value="hotseat">👥 Hot Seat (Local Multiplayer)</option>
+            </select>
+          </div>
+          
+          <div id="vs-ai-options" class="setting-row">
+            <label for="player-faction">Your Faction</label>
+            <select id="player-faction">
+              <option value="atlantic_alliance" selected>🔵 Atlantic Alliance</option>
+              <option value="eastern_coalition">🔴 Eastern Coalition</option>
+              <option value="pacific_union">🟢 Pacific Union</option>
+              <option value="southern_federation">🟠 Southern Federation</option>
+              <option value="random">🎲 Random</option>
+            </select>
+          </div>
+          <div id="hotseat-options" class="hidden">
+            <div class="setting-row">
+              <label for="human-factions">Human Players</label>
+              <select id="human-factions" multiple size="4" style="width: 100%;">
+                <option value="atlantic_alliance" selected>🔵 Atlantic Alliance</option>
+                <option value="eastern_coalition">🔴 Eastern Coalition</option>
+                <option value="pacific_union">🟢 Pacific Union</option>
+                <option value="southern_federation">🟠 Southern Federation</option>
+              </select>
+            </div>
+            <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+              Hold Ctrl/Cmd to select multiple factions
+            </p>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Turn Style</h3>
+          <div class="setting-row">
+            <label for="turn-style">Game Style</label>
+            <select id="turn-style">
+              <option value="quick">⚡ Simple (Recommended)</option>
+              <option value="classic">🎲 Classic (6 phases)</option>
+              <option value="spectator">👀 Spectator AI (watch AI)</option>
+              <option value="civilization">🏛️ Civilization (move OR attack)</option>
+            </select>
+          </div>
+          <p id="turn-style-description" class="turn-style-desc">
+            3 phases: Build → Move/Attack → End. Best for beginners!
+          </p>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Victory Conditions</h3>
+          <div class="setting-row">
+            <label for="victory-type">Win Condition</label>
+            <select id="victory-type">
+              <option value="capitals">🏰 Capital Capture</option>
+              <option value="domination">🌍 Domination (% territories)</option>
+              <option value="economic">💰 Economic (total IPCs)</option>
+              <option value="elimination">💀 Elimination (destroy all enemies)</option>
+            </select>
+          </div>
+          <div class="setting-row" id="victory-capitals-row">
+            <label for="victory-capitals">Capitals to win</label>
+            <input type="number" id="victory-capitals" min="1" max="10" value="3" style="width: 4rem;">
+          </div>
+          <div class="setting-row hidden" id="victory-domination-row">
+            <label for="victory-domination">Domination %</label>
+            <input type="number" id="victory-domination" min="50" max="100" value="75" style="width: 4rem;"> %
+          </div>
+          <div class="setting-row hidden" id="victory-economic-row">
+            <label for="victory-economic">Economic target (IPCs)</label>
+            <input type="number" id="victory-economic" min="100" max="2000" value="500" style="width: 5rem;">
+          </div>
+          <div class="setting-row">
+            <label for="turn-limit">Turn Limit</label>
+            <select id="turn-limit">
+              <option value="0">♾️ Unlimited</option>
+              <option value="25">25 Turns</option>
+              <option value="50" selected>50 Turns</option>
+              <option value="100">100 Turns</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Game Options</h3>
+          <div class="setting-row">
+            <label for="fog-of-war">Fog of War</label>
+            <input type="checkbox" id="fog-of-war" checked>
+          </div>
+          <div class="setting-row">
+            <label for="auto-save">Auto-Save Each Turn</label>
+            <input type="checkbox" id="auto-save" checked>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 1.5rem;">
+          <button id="btn-start-game" class="primary" style="font-size: 1.1rem; padding: 0.8rem 2rem;">
+            ⚔️ Start Game
+          </button>
+          <button id="btn-cancel-new-game">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- In-Game Menu Modal -->
+    <div id="game-menu-modal" class="modal hidden">
+      <div class="modal-content" style="text-align: center;">
+        <h2>☰ Game Menu</h2>
+        
+        <div class="menu-button-group">
+          <button id="btn-resume" class="primary">▶️ Resume Game</button>
+          <button id="btn-save-game">💾 Save Game</button>
+          <button id="btn-load-game-ingame">📂 Load Game</button>
+          <button id="btn-settings-ingame">⚙️ Settings</button>
+          <button id="btn-how-to-play">❓ How to Play</button>
+          <button id="btn-main-menu" class="danger">🏠 Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save/Load Modal -->
+    <div id="save-load-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 id="save-load-title">💾 Save Game</h2>
+        
+        <div id="save-slots" style="display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0;">
+          <!-- Slots populated by JS -->
+        </div>
+        
+        <div style="text-align: center; margin-top: 1rem;">
+          <button id="btn-close-save-load">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>⚙️ Settings</h2>
+        
+        <div class="settings-section">
+          <h3>Gameplay</h3>
+          
+          <div class="setting-row">
+            <label>Game Speed</label>
+            <select id="setting-game-speed">
+              <option value="slow">Slow</option>
+              <option value="normal" selected>Normal</option>
+              <option value="fast">Fast</option>
+            </select>
+          </div>
+          
+          <div class="setting-row">
+            <label>AI Difficulty</label>
+            <select id="setting-ai-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label>AI Personality</label>
+            <select id="setting-ai-personality">
+              <option value="default" selected>Default</option>
+              <option value="turtle">Turtle (defensive)</option>
+              <option value="rusher">Rusher (aggressive)</option>
+              <option value="economic">Economic (builds up)</option>
+              <option value="opportunist">Opportunist (strikes when weak)</option>
+            </select>
+          </div>
+          
+          <div class="setting-row">
+            <label>Show Move Highlights</label>
+            <input type="checkbox" id="setting-move-highlights" checked>
+          </div>
+          
+          <div class="setting-row">
+            <label>Confirm End Turn</label>
+            <input type="checkbox" id="setting-confirm-end" checked>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Audio</h3>
+          
+          <div class="setting-row">
+            <label>Music</label>
+            <input type="checkbox" id="setting-music-enabled" checked>
+          </div>
+          
+          <div class="setting-row">
+            <label>Sound Effects</label>
+            <input type="checkbox" id="setting-sfx-enabled" checked>
+          </div>
+          
+          <div class="setting-row">
+            <label>Master Volume</label>
+            <input type="range" id="setting-master-volume" min="0" max="100" value="80">
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Display</h3>
+          
+          <div class="setting-row">
+            <label>Animations</label>
+            <input type="checkbox" id="setting-animations" checked>
+          </div>
+          
+          <div class="setting-row">
+            <label>Show Territory Names</label>
+            <input type="checkbox" id="setting-territory-names" checked>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 1.5rem;">
+          <button id="btn-save-settings" class="primary">Save Settings</button>
+          <button id="btn-reset-settings">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div id="tutorial-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>How to Play</h2>
+
+        <!-- Step 1: Welcome -->
+        <div class="tutorial-step active" data-step="0">
+          <div class="tutorial-image">🌍</div>
+          <div class="tutorial-text">
+            <strong>Welcome, Commander!</strong><br><br>
+            Grand Strategy is a turn-based wargame for 2–4 players (vs AI or hot-seat).
+            Choose a map &amp; era, pick your faction, then conquer the world through industry, diplomacy, and force.<br><br>
+            <strong>Victory conditions</strong> (set before the game):<br>
+            🏰 Capture 3 enemy capitals &nbsp;|&nbsp; 🌍 Control 75% of territories<br>
+            💰 Dominate the economy &nbsp;|&nbsp; 💀 Eliminate all enemies
+          </div>
+        </div>
+
+        <!-- Step 2: Maps & Eras -->
+        <div class="tutorial-step" data-step="1">
+          <div class="tutorial-image">🗺️</div>
+          <div class="tutorial-text">
+            <strong>Maps &amp; Technology Eras</strong><br><br>
+            <strong>Maps</strong> — Choose your theater of war:<br>
+            &nbsp;• <em>World at War (Grid)</em> — Full global campaign (recommended)<br>
+            &nbsp;• <em>European / Pacific / Western Hemisphere</em> — Theater-focused grids<br>
+            &nbsp;• Classic, tutorial, and regional maps also available<br><br>
+            <strong>Unit Eras</strong> — Changes every unit's stats and cost:<br>
+            🎖️ WWI (1914) &nbsp;|&nbsp; ⚔️ WWII (1942) &nbsp;|&nbsp; ☢️ Cold War (1970) &nbsp;|&nbsp; 🛰️ Modern (2020)
+          </div>
+        </div>
+
+        <!-- Step 3: Factions -->
+        <div class="tutorial-step" data-step="2">
+          <div class="tutorial-image">🎖️</div>
+          <div class="tutorial-text">
+            <strong>Choose Your Faction</strong><br><br>
+            <strong style="color:#4a90d9">🔵 Atlantic Alliance</strong> — Industrial Powerhouse.<br>
+            &nbsp;Factories produce +1 unit per turn. Strong economy.<br><br>
+            <strong style="color:#e85d75">🔴 Eastern Coalition</strong> — Defensive Juggernaut.<br>
+            &nbsp;Infantry defend at +1; bonus in home territories.<br><br>
+            <strong style="color:#00a896">🟢 Pacific Union</strong> — Rapid Expansion.<br>
+            &nbsp;All land units get +1 movement; tanks can blitz 2 territories.<br><br>
+            <strong style="color:#f5a623">🟠 Southern Federation</strong> — Guerrilla Warfare.<br>
+            &nbsp;All units cost 1 IPC less; first casualty ignored when defending.
+          </div>
+        </div>
+
+        <!-- Step 4: Map Navigation -->
+        <div class="tutorial-step" data-step="3">
+          <div class="tutorial-image">🧭</div>
+          <div class="tutorial-text">
+            <strong>Navigating the Map</strong><br><br>
+            <strong>Click</strong> — Select a territory; see details in the side panel<br>
+            <strong>Drag</strong> — Pan around the map<br>
+            <strong>Scroll</strong> — Zoom in / out<br>
+            <strong>F</strong> — Fit entire map to screen<br>
+            <strong>C</strong> — Centre view on your capital<br><br>
+            <strong>Fog of War</strong> — Toggle with 🌫️ in the toolbar. Enemy units in
+            unexplored territory are hidden. Move into a region to reveal it.<br><br>
+            Hover any territory for a tooltip showing its IPC value, owner, and all units present.
+          </div>
+        </div>
+
+        <!-- Step 5: Turn Phases -->
+        <div class="tutorial-step" data-step="4">
+          <div class="tutorial-image">🔄</div>
+          <div class="tutorial-text">
+            <strong>Turn Structure — 6 Phases</strong><br><br>
+            <strong>1. Purchase</strong> — Spend IPCs to queue units at your factories<br>
+            <strong>2. Combat Move</strong> — Move units into enemy-held territories<br>
+            <strong>3. Combat</strong> — Battles are resolved with animated dice rolls<br>
+            <strong>4. Non-Combat Move</strong> — Reposition remaining units freely<br>
+            <strong>5. Production</strong> — Deploy purchased units at factories<br>
+            <strong>6. Collect Income</strong> — Gain IPCs for every territory you hold<br><br>
+            Press <strong>Enter</strong> or the <strong>→ End Phase</strong> button to advance.
+            The phase progress bar at the top shows where you are in the turn.
+          </div>
+        </div>
+
+        <!-- Step 6: Combat -->
+        <div class="tutorial-step" data-step="5">
+          <div class="tutorial-image">⚔️</div>
+          <div class="tutorial-text">
+            <strong>Combat System</strong><br><br>
+            Each unit rolls a d6 — score a <span style="color:#dc2626;font-weight:bold">HIT</span> if the result is ≤ its attack/defense value.
+            Dice are animated on screen. Key land units (WWII era):<br><br>
+            Infantry &nbsp;— Atk <strong>1</strong>, Def <strong>2</strong>, Cost <strong>4</strong> IPC<br>
+            Artillery — Atk <strong>2</strong>, Def <strong>2</strong>, Cost <strong>5</strong> IPC &nbsp;<em>(pairs with infantry for +1 atk)</em><br>
+            Tank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— Atk <strong>3</strong>, Def <strong>2</strong>, Cost <strong>8</strong> IPC &nbsp;<em>(can blitz empty territories)</em><br>
+            Fighter &nbsp;&nbsp;— Atk <strong>3</strong>, Def <strong>4</strong>, Cost <strong>14</strong> IPC<br>
+            Bomber &nbsp;&nbsp;&nbsp;— Atk <strong>4</strong>, Def <strong>1</strong>, Cost <strong>16</strong> IPC<br><br>
+            Rolling a <strong>1</strong> when Atk/Def ≥ 3 = <span style="color:#f59e0b;font-weight:bold">CRITICAL HIT</span> (counts as 2 hits!)
+          </div>
+        </div>
+
+        <!-- Step 7: Naval -->
+        <div class="tutorial-step" data-step="6">
+          <div class="tutorial-image">⚓</div>
+          <div class="tutorial-text">
+            <strong>Naval Warfare</strong><br><br>
+            Naval units move through <strong>sea zones</strong> — the blue tiles on the grid.
+            Sea zones form connected chains across oceans; plan your route!<br><br>
+            Submarine &nbsp;— Atk <strong>2</strong>, Def <strong>1</strong>, Cost <strong>8</strong> &nbsp;<em>(convoy raider)</em><br>
+            Destroyer &nbsp;— Atk <strong>2</strong>, Def <strong>2</strong>, Cost <strong>10</strong> <em>(hunts subs)</em><br>
+            Cruiser &nbsp;&nbsp;&nbsp;— Atk <strong>3</strong>, Def <strong>3</strong>, Cost <strong>14</strong> <em>(shore bombardment)</em><br>
+            Carrier &nbsp;&nbsp;&nbsp;— Atk <strong>1</strong>, Def <strong>2</strong>, 2 HP, Cost <strong>18</strong> &nbsp;<em>(hosts 2 fighters)</em><br>
+            Battleship — Atk <strong>4</strong>, Def <strong>4</strong>, 2 HP, Cost <strong>24</strong><br>
+            Transport &nbsp;— Cost <strong>8</strong> &nbsp;<em>(carries 2 land units; no combat)</em><br><br>
+            Use transports to invade coastal territories from the sea.
+          </div>
+        </div>
+
+        <!-- Step 8: Economy -->
+        <div class="tutorial-step" data-step="7">
+          <div class="tutorial-image">🏭</div>
+          <div class="tutorial-text">
+            <strong>Economy &amp; Production</strong><br><br>
+            <strong>IPCs</strong> (Industrial Production Certificates) are your currency.
+            Each owned territory produces IPCs equal to its printed value every turn.<br><br>
+            <strong>Factories</strong> (🏭) are where units are built. You can only place
+            units in territories with a factory — and only up to the territory's IPC value
+            per turn.<br><br>
+            Capture enemy factories to boost your own production. Bombers can
+            <strong>strategic bomb</strong> enemy factories to reduce their output.<br><br>
+            More territory → more income → bigger army. Snowball carefully!
+          </div>
+        </div>
+
+        <!-- Step 9: Diplomacy & Events -->
+        <div class="tutorial-step" data-step="8">
+          <div class="tutorial-image">🤝</div>
+          <div class="tutorial-text">
+            <strong>Diplomacy &amp; World Events</strong><br><br>
+            Open the <strong>🤝 Diplomacy</strong> panel to send proposals to other factions:<br>
+            &nbsp;• <em>Non-Aggression Pact</em> — pause hostilities for several turns<br>
+            &nbsp;• <em>Trade Agreement</em> — both sides gain bonus IPCs each turn<br>
+            &nbsp;• <em>Alliance</em> — share vision and fight as partners<br>
+            &nbsp;• <em>Demand Tribute</em> — force an IPC payment from a weaker rival<br><br>
+            <strong>World Events</strong> fire automatically during the game — resource
+            discoveries, rebellions, natural disasters, and more. Each event grants
+            bonuses or penalties and is announced with a banner. Check the
+            <strong>📋 Battle Log</strong> to review past events.
+          </div>
+        </div>
+
+        <!-- Step 10: Tips -->
+        <div class="tutorial-step" data-step="9">
+          <div class="tutorial-image">⌨️</div>
+          <div class="tutorial-text">
+            <strong>Keyboard Shortcuts &amp; Tips</strong><br><br>
+            <strong>Enter / Space</strong> — End current phase<br>
+            <strong>Escape</strong> — Clear selection / open menu<br>
+            <strong>Tab / Shift+Tab</strong> — Cycle through your territories<br>
+            <strong>H</strong> — Open this help &nbsp;|&nbsp; <strong>F</strong> — Fit map to screen<br>
+            <strong>C</strong> — Centre on capital &nbsp;|&nbsp; <strong>B</strong> — Build menu<br>
+            <strong>A</strong> — Attack selected territory (combat phase)<br>
+            <strong>Ctrl+S</strong> — Quick save &nbsp;|&nbsp; <strong>Ctrl+L</strong> — Quick load<br><br>
+            <strong>Tips:</strong> Always buy infantry first — cheapest per IPC.
+            Secure a factory early. Use naval transports to open second fronts.
+            Watch for diplomacy proposals from the AI!
+          </div>
+        </div>
+
+        <div class="tutorial-nav">
+          <button id="btn-tutorial-prev" disabled>← Back</button>
+          <div class="tutorial-dots">
+            <div class="tutorial-dot active"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+          </div>
+          <button id="btn-tutorial-next" class="primary">Next →</button>
+        </div>
+
+        <div style="text-align: center; margin-top: 1rem;">
+          <button id="btn-skip-tutorial" style="background: transparent; border: none; color: #666; text-decoration: underline; cursor: pointer;">
+            Skip Tutorial
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Battle Preview Modal -->
+    <div id="battle-preview-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 450px;">
+        <h2>⚔️ Battle Preview</h2>
+        <div id="preview-territory" style="text-align: center; font-family: 'Cinzel', serif; margin-bottom: 1rem;"></div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div id="preview-attackers" style="background: rgba(37, 99, 235, 0.1); padding: 1rem; border-radius: 8px;">
+            <h3 style="color: #2563eb; margin-bottom: 0.5rem;">🗡️ Your Forces</h3>
+            <div id="preview-attacker-units"></div>
+            <div id="preview-attacker-power" style="margin-top: 0.5rem; font-weight: bold;"></div>
+          </div>
+          <div id="preview-defenders" style="background: rgba(220, 38, 38, 0.1); padding: 1rem; border-radius: 8px;">
+            <h3 style="color: #dc2626; margin-bottom: 0.5rem;">🛡️ Defenders</h3>
+            <div id="preview-defender-units"></div>
+            <div id="preview-defender-power" style="margin-top: 0.5rem; font-weight: bold;"></div>
+          </div>
+        </div>
+        
+        <div id="preview-odds" style="text-align: center; padding: 1rem; background: rgba(0,0,0,0.1); border-radius: 8px; margin-bottom: 1rem;">
+          <div style="font-size: 1.5rem; font-weight: bold;" id="odds-display">~50%</div>
+          <div style="font-size: 0.9rem; color: #666;">Estimated Victory Chance</div>
+        </div>
+        
+        <div style="text-align: center;">
+          <button id="btn-confirm-attack" class="primary">⚔️ Attack!</button>
+          <button id="btn-cancel-attack">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unit Tooltip -->
+    <div id="unit-tooltip" class="tooltip hidden">
+      <div id="tooltip-content"></div>
+    </div>
+    <!-- Territory Tooltip (on hover) -->
+    <div id="territory-tooltip" class="tooltip hidden" style="pointer-events: none;">
+      <div id="territory-tooltip-content"></div>
+    </div>
+
+    <!-- Combat Modal -->
+    <div id="combat-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>⚔️ Battle!</h2>
+        <div id="combat-territory" style="text-align: center; margin-bottom: 1rem; font-family: 'Cinzel', serif; font-size: 1.2rem;"></div>
+        <div id="combat-odds" style="text-align: center; margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span id="odds-text" style="font-size: 0.9rem; color: #aaa;">Calculating odds...</span>
+        </div>
+        <div id="combat-attacker">
+          <h3>🗡️ Attacking Forces</h3>
+          <div id="attacker-units"></div>
+        </div>
+        <div id="combat-defender">
+          <h3>🛡️ Defending Forces</h3>
+          <div id="defender-units"></div>
+        </div>
+        <!-- Animated dice display — populated by JS on each roll -->
+        <div id="combat-dice-row" class="hidden">
+          <div class="dice-side-label">⚔️ Attack rolls</div>
+          <div id="attacker-dice" class="dice-group"></div>
+          <div class="dice-side-label">🛡️ Defense rolls</div>
+          <div id="defender-dice" class="dice-group"></div>
+        </div>
+        <div id="combat-log"></div>
+        <div style="text-align: center; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+          <button id="btn-roll-combat" class="primary">🎲 Roll Dice</button>
+          <button id="btn-auto-resolve" style="background: linear-gradient(135deg, #7c3aed, #6366f1); color: #fff;">⚡ Auto-Resolve</button>
+          <button id="btn-retreat" disabled>🏃 Retreat</button>
+          <button id="btn-close-combat" disabled>✓ Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Technology Modal -->
+    <div id="tech-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 700px;">
+        <h2>🔬 Technology Research</h2>
+        <p style="text-align: center; color: #888; margin-bottom: 1rem;">
+          Spend IPCs to unlock permanent upgrades for your faction
+        </p>
+        
+        <div id="tech-categories" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <button class="tech-cat-btn active" data-cat="all">All</button>
+          <button class="tech-cat-btn" data-cat="infantry">🎖️ Infantry</button>
+          <button class="tech-cat-btn" data-cat="armor">🛡️ Armor</button>
+          <button class="tech-cat-btn" data-cat="air">✈️ Air</button>
+          <button class="tech-cat-btn" data-cat="naval">🚢 Naval</button>
+          <button class="tech-cat-btn" data-cat="economy">💰 Economy</button>
+          <button class="tech-cat-btn" data-cat="special">⭐ Special</button>
+        </div>
+        
+        <div id="tech-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; max-height: 400px; overflow-y: auto;"></div>
+        
+        <div id="researched-tech" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+          <h3>✓ Researched Technologies</h3>
+          <div id="researched-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 1rem;">
+          <button id="btn-close-tech">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Modal -->
+    <div id="stats-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 800px;">
+        <h2>📊 Game Statistics</h2>
+        
+        <div id="stats-overview" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-turns">0</div>
+            <div class="stat-label">Turns</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-battles">0</div>
+            <div class="stat-label">Battles</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-duration">0m</div>
+            <div class="stat-label">Duration</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-veterans">0</div>
+            <div class="stat-label">Veterans</div>
+          </div>
+        </div>
+        
+        <h3>🏆 Leaderboard</h3>
+        <div id="stats-leaderboard" style="margin-bottom: 1.5rem;"></div>
+        
+        <h3>📈 Your Statistics</h3>
+        <div id="stats-player" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;"></div>
+        
+        <h3>📊 All-Time Stats</h3>
+        <div id="stats-persistent" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+        
+        <h3>📜 Turn Log</h3>
+        <textarea id="stats-turn-log" readonly style="width: 100%; height: 120px; font-size: 0.8rem; background: rgba(0,0,0,0.2); color: #f4e4bc; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 0.5rem; resize: vertical;"></textarea>
+        <div style="margin-top: 0.5rem;">
+          <button id="btn-export-turn-log" style="font-size: 0.9rem;">📋 Copy turn log</button>
+        </div>
+        
+        <div style="text-align: center; margin-top: 1.5rem;">
+          <button id="btn-close-stats">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Build Modal - Mobilization System -->
+    <div id="build-modal" class="modal hidden" role="dialog" aria-labelledby="build-modal-title">
+      <div class="modal-content" style="max-width: 750px;">
+        <h2 id="build-modal-title">⚔️ Mobilize Forces</h2>
+        <p class="modal-subtitle">Click territories to mobilize defenders. Units spawn immediately!</p>
+        
+        <!-- Mobilization Status -->
+        <div class="modal-status-bar">
+          <div class="modal-status-item">
+            <div class="modal-status-value" id="ipc-remaining">0</div>
+            <div class="modal-status-label">IPCs Available</div>
+          </div>
+          <div class="modal-status-item">
+            <div class="modal-status-value success" id="mobilized-count">0</div>
+            <div class="modal-status-label">Mobilized This Turn</div>
+          </div>
+          <div class="modal-status-item">
+            <div class="modal-status-value muted" id="spent-ipcs">0</div>
+            <div class="modal-status-label">IPCs Spent</div>
+          </div>
+        </div>
+        
+        <!-- Territory Types Legend -->
+        <div class="modal-legend">
+          <span class="modal-legend-item"><span class="icon-factory">🏭</span> Factory: Tanks+Artillery</span>
+          <span class="modal-legend-item"><span class="icon-capital">⭐</span> Capital: Mixed Forces</span>
+          <span class="modal-legend-item"><span class="icon-coastal">🌊</span> Coastal: Infantry+Ships</span>
+          <span class="modal-legend-item"><span class="icon-land">🏠</span> Land: Infantry</span>
+        </div>
+        
+        <!-- Mobilization Options -->
+        <div id="mobilization-options" class="modal-scroll-container">
+          <div id="mobilize-factories" class="mobilize-group"></div>
+          <div id="mobilize-capital" class="mobilize-group"></div>
+          <div id="mobilize-coastal" class="mobilize-group"></div>
+          <div id="mobilize-land" class="mobilize-group"></div>
+        </div>
+        
+        <!-- Info Box -->
+        <div class="modal-tip">
+          <p>💡 <strong>Tip:</strong> Each territory can only be mobilized once per turn. Newly spawned units cannot move until next turn. Factories and capitals produce the best units!</p>
+        </div>
+        
+        <div class="modal-actions">
+          <button id="btn-cancel-build" class="primary" aria-label="Done mobilizing">✓ Done</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Deployment Modal (new phase) -->
+    <div id="deployment-modal" class="modal hidden" role="dialog" aria-labelledby="deployment-modal-title">
+      <div class="modal-content" style="max-width: 800px;">
+        <h2 id="deployment-modal-title">🚀 Deploy Reserves</h2>
+        <p style="color: #888; font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
+          Select a territory, then use +/- buttons to assign units
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <!-- Left: Deployment Zones -->
+          <div>
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">🎯 Select Deployment Zone</h3>
+            <div id="deployment-zones-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 350px; overflow-y: auto; padding-right: 0.5rem;"></div>
+          </div>
+          
+          <!-- Right: Unit Assignment -->
+          <div>
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">⚔️ Assign Units</h3>
+            <div id="deploy-zone-info" style="padding: 0.5rem; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 0.5rem;">
+              <p style="color: #666; font-size: 0.85rem; text-align: center;">← Select a zone first</p>
+            </div>
+            <div id="deploy-unit-controls" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto;"></div>
+          </div>
+        </div>
+        
+        <!-- Bottom: Reserve Summary & Pending -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div style="padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="font-size: 0.85rem; color: #888; margin-bottom: 0.25rem;">📦 Units in Reserve</div>
+            <div id="reserve-summary" style="font-weight: bold; font-size: 1.1rem;">0 units</div>
+          </div>
+          <div style="padding: 0.75rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px;">
+            <div style="font-size: 0.85rem; color: #888; margin-bottom: 0.25rem;">📍 Pending Deployments</div>
+            <div id="pending-deploy-count" style="font-weight: bold; font-size: 1.1rem; color: #22c55e;">0 units</div>
+          </div>
+        </div>
+        
+        <!-- Pending Deployments List -->
+        <div id="pending-deployments-list" style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; max-height: 100px; overflow-y: auto; display: none;">
+          <div style="font-size: 0.85rem; color: #888; margin-bottom: 0.25rem;">Queued:</div>
+          <div id="pending-deploy-items"></div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 1rem;">
+          <button id="btn-clear-deploy" style="margin-right: 0.5rem;" aria-label="Clear all pending deployments">🗑️ Clear</button>
+          <button id="btn-auto-deploy" style="margin-right: 0.5rem;" aria-label="Auto-deploy all reserves">⚡ Auto-Deploy</button>
+          <button id="btn-confirm-deploy" class="primary" aria-label="Confirm deployments">✓ Deploy Units</button>
+          <button id="btn-skip-deploy" aria-label="Skip deployment phase">Skip →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multiplayer Modal -->
+    <div id="multiplayer-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 600px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>🌐 Multiplayer</h2>
+          <button id="btn-close-multiplayer" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="multiplayer-content">
+          <!-- Populated by MultiplayerUI -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Achievements Modal -->
+    <div id="achievements-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>🏆 Achievements</h2>
+          <button id="btn-close-achievements" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="achievements-content">
+          <!-- Populated by AchievementsUI -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Campaign Modal -->
+    <div id="campaign-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 900px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>🎖️ Campaign Mode</h2>
+          <button id="btn-close-campaign" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="campaign-content">
+          <!-- Populated by CampaignUI -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Tutorial Modal -->
+    <div id="interactive-tutorial-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 500px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>📚 Tutorials</h2>
+          <button id="btn-close-interactive-tutorial" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="interactive-tutorial-content">
+          <p style="color: #888; margin-bottom: 1rem;">Select a tutorial to learn the game mechanics:</p>
+          <div id="tutorial-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategic Event Modal -->
+    <div id="event-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <div id="event-icon" style="font-size: 4rem; margin-bottom: 0.5rem;">📜</div>
+        <h2 id="event-title" style="margin-bottom: 0.5rem;">Event Title</h2>
+        <p id="event-description" style="color: #ccc; margin-bottom: 1.5rem; line-height: 1.5;">
+          Event description text goes here.
+        </p>
+        
+        <!-- Effects Summary -->
+        <div id="event-effects" style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+          <!-- Populated by JS -->
+        </div>
+        
+        <!-- Choice Buttons (for choice events) -->
+        <div id="event-choices" style="display: none; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+          <!-- Populated by JS -->
+        </div>
+        
+        <!-- OK Button (for non-choice events) -->
+        <div id="event-ok-container">
+          <button id="btn-event-ok" class="primary" style="padding: 0.8rem 2rem; font-size: 1rem;">
+            ✓ Acknowledge
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Faction Ability Info Modal -->
+    <div id="faction-ability-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 450px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 id="faction-ability-title">🎖️ Faction Abilities</h2>
+          <button id="btn-close-faction-ability" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="faction-ability-content">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Event Announcement Overlay -->
+  <div id="event-announcement" class="hidden" style="
+    position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+    min-width: 360px; max-width: 500px; z-index: 1200;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 2px solid #ffd700; border-radius: 12px;
+    padding: 1.25rem 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    text-align: center; pointer-events: none;">
+    <div id="event-ann-icon" style="font-size: 2rem; margin-bottom: 0.25rem;"></div>
+    <div id="event-ann-title" style="font-weight: bold; font-size: 1.1rem; color: #ffd700; font-family: 'Cinzel', serif;"></div>
+    <div id="event-ann-desc" style="color: #ccc; font-size: 0.9rem; margin-top: 0.4rem;"></div>
+    <div id="event-ann-faction" style="color: #aaa; font-size: 0.8rem; margin-top: 0.5rem;"></div>
+  </div>
+
+  <!-- Diplomacy Modal -->
+  <div id="diplomacy-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 560px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>🤝 Diplomatic Relations</h2>
+        <button id="btn-close-diplomacy" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+      </div>
+      <p style="color: #888; font-size: 0.85rem; margin-bottom: 1rem;">
+        Propose non-aggression pacts to pause hostilities for several turns. Both sides cannot attack each other while a pact is active.
+      </p>
+      <div id="diplomacy-relations" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
+    </div>
+  </div>
+
+  <!-- Diplomacy Proposal Toast (incoming AI offers) -->
+  <div id="diplomacy-proposal-toast" class="hidden" style="
+    position: fixed; bottom: 11.5rem; left: 50%; transform: translateX(-50%); z-index: 1300;
+    background: linear-gradient(135deg, #1e3a5f, #0f2d4a);
+    border: 2px solid #3b82f6; border-radius: 10px;
+    padding: 0.75rem 1.25rem; max-width: 340px; width: max-content;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);">
+    <div id="dp-toast-text" style="color: #e2e8f0; font-size: 0.9rem; margin-bottom: 0.75rem;"></div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button id="btn-accept-pact" class="primary" style="flex: 1; padding: 0.4rem;">✓ Accept</button>
+      <button id="btn-decline-pact" style="flex: 1; padding: 0.4rem; background: #374151; color: #fff; border: none; border-radius: 4px; cursor: pointer;">✗ Decline</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

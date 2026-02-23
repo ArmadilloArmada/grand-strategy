@@ -1,0 +1,132 @@
+{
+  "name": "Tutorial",
+  "version": "1.0.0",
+  "width": 800,
+  "height": 600,
+  "territories": [
+    {
+      "id": "player_capital",
+      "name": "Your Capital",
+      "type": "land",
+      "production": 5,
+      "adjacentTo": [
+        "contested_territory"
+      ],
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        300
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "contested_territory",
+      "name": "Contested Territory",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "player_capital",
+        "enemy_capital"
+      ],
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        400,
+        300
+      ],
+      "owner": null,
+      "originalOwner": null,
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "enemy_capital",
+      "name": "Enemy Capital",
+      "type": "land",
+      "production": 5,
+      "adjacentTo": [
+        "contested_territory"
+      ],
+      "polygon": [
+        [
+          500,
+          200
+        ],
+        [
+          750,
+          200
+        ],
+        [
+          750,
+          400
+        ],
+        [
+          500,
+          400
+        ]
+      ],
+      "center": [
+        625,
+        300
+      ],
+      "owner": "eastern_bloc",
+      "originalOwner": "eastern_bloc",
+      "hasFactory": true,
+      "isCapital": true
+    }
+  ],
+  "startingUnits": {
+    "player_capital": [
+      {
+        "typeId": "infantry",
+        "count": 3
+      },
+      {
+        "typeId": "tank",
+        "count": 1
+      }
+    ],
+    "enemy_capital": [
+      {
+        "typeId": "infantry",
+        "count": 3
+      }
+    ]
+  }
+}

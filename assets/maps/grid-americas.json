@@ -1,0 +1,3750 @@
+{
+  "name": "Western Hemisphere",
+  "version": "1.0.0",
+  "width": 900,
+  "height": 950,
+  "territories": [
+    {
+      "id": "beaufort_sea",
+      "name": "Beaufort Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "beaufort_e",
+        "alaska"
+      ],
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "beaufort_e",
+      "name": "Beaufort Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "beaufort_sea",
+        "arctic_can",
+        "yukon"
+      ],
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arctic_can",
+      "name": "Arctic Canada",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "beaufort_e",
+        "baffin_bay",
+        "nwt",
+        "hudson_bay"
+      ],
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "baffin_bay",
+      "name": "Baffin Bay",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "arctic_can",
+        "labrador_sea",
+        "nunavut",
+        "hudson_bay"
+      ],
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "labrador_sea",
+      "name": "Labrador Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "baffin_bay",
+        "greenland_sea",
+        "hudson_bay",
+        "w_atlantic",
+        "quebec",
+        "maritimes",
+        "greenland"
+      ],
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "greenland_sea",
+      "name": "Greenland Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "labrador_sea",
+        "greenland"
+      ],
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "greenland",
+      "name": "Greenland",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "hudson_bay",
+        "greenland_sea",
+        "ontario",
+        "labrador_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          50
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          250,
+          100
+        ]
+      ],
+      "center": [
+        275,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "alaska",
+      "name": "Alaska",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "yukon",
+        "beaufort_sea",
+        "pac_alaska"
+      ],
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "yukon",
+      "name": "Yukon",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "alaska",
+        "nwt",
+        "beaufort_e",
+        "bc"
+      ],
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "nwt",
+      "name": "NW Territories",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "yukon",
+        "nunavut",
+        "arctic_can",
+        "alberta"
+      ],
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "nunavut",
+      "name": "Nunavut",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "nwt",
+        "hudson_bay",
+        "baffin_bay",
+        "saskatchewan"
+      ],
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "hudson_bay",
+      "name": "Hudson Bay",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "nunavut",
+        "greenland",
+        "labrador_sea",
+        "manitoba",
+        "baffin_bay",
+        "great_lakes",
+        "arctic_can"
+      ],
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bc",
+      "name": "British Columbia",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "pac_alaska",
+        "alberta",
+        "yukon",
+        "washington"
+      ],
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "alberta",
+      "name": "Alberta",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "bc",
+        "saskatchewan",
+        "nwt",
+        "montana_idaho"
+      ],
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "saskatchewan",
+      "name": "Saskatchewan",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "alberta",
+        "manitoba",
+        "nunavut",
+        "dakotas"
+      ],
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "manitoba",
+      "name": "Manitoba",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "saskatchewan",
+        "ontario",
+        "hudson_bay",
+        "great_lakes"
+      ],
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ontario",
+      "name": "Ontario",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "manitoba",
+        "quebec",
+        "greenland",
+        "new_england",
+        "great_lakes"
+      ],
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "quebec",
+      "name": "Quebec",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "ontario",
+        "maritimes",
+        "labrador_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          100
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          300,
+          150
+        ]
+      ],
+      "center": [
+        325,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "maritimes",
+      "name": "Maritime Provinces",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "quebec",
+        "labrador_sea"
+      ],
+      "polygon": [
+        [
+          350,
+          100
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          350,
+          150
+        ]
+      ],
+      "center": [
+        375,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "great_lakes",
+      "name": "Great Lakes",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "dakotas",
+        "new_england",
+        "manitoba",
+        "great_lakes_s",
+        "hudson_bay",
+        "ontario"
+      ],
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_alaska",
+      "name": "Pacific (Alaska)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "bc",
+        "alaska",
+        "pac_nw_us"
+      ],
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_nw_us",
+      "name": "Pacific (NW US)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "washington",
+        "pac_alaska",
+        "pac_cal"
+      ],
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_cal",
+      "name": "Pacific (California)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "california",
+        "pac_nw_us",
+        "pac_mex"
+      ],
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_mex",
+      "name": "Pacific (Mexico)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "oregon",
+        "pac_cal",
+        "pac_c_am",
+        "mexico_s"
+      ],
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_c_am",
+      "name": "Pacific (C America)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_mex",
+        "pac_col",
+        "c_america"
+      ],
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_col",
+      "name": "Pacific (Colombia)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_c_am",
+        "pac_peru",
+        "ecuador"
+      ],
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          0,
+          400
+        ]
+      ],
+      "center": [
+        25,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_peru",
+      "name": "Pacific (Peru)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_col",
+        "pac_chile",
+        "chile_n",
+        "peru"
+      ],
+      "polygon": [
+        [
+          0,
+          400
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          50,
+          450
+        ],
+        [
+          0,
+          450
+        ]
+      ],
+      "center": [
+        25,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_chile",
+      "name": "Pacific (Chile)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_peru",
+        "pac_s",
+        "chile_c"
+      ],
+      "polygon": [
+        [
+          0,
+          450
+        ],
+        [
+          50,
+          450
+        ],
+        [
+          50,
+          500
+        ],
+        [
+          0,
+          500
+        ]
+      ],
+      "center": [
+        25,
+        475
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s",
+      "name": "South Pacific",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_chile",
+        "pac_far_s"
+      ],
+      "polygon": [
+        [
+          0,
+          500
+        ],
+        [
+          50,
+          500
+        ],
+        [
+          50,
+          550
+        ],
+        [
+          0,
+          550
+        ]
+      ],
+      "center": [
+        25,
+        525
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_far_s",
+      "name": "Far South Pacific",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_s",
+        "southern_ocean",
+        "chile_s"
+      ],
+      "polygon": [
+        [
+          0,
+          550
+        ],
+        [
+          50,
+          550
+        ],
+        [
+          50,
+          600
+        ],
+        [
+          0,
+          600
+        ]
+      ],
+      "center": [
+        25,
+        575
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "washington",
+      "name": "Washington",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "pac_nw_us",
+        "montana_idaho",
+        "bc",
+        "california"
+      ],
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "montana_idaho",
+      "name": "Montana / Idaho",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "washington",
+        "dakotas",
+        "alberta",
+        "nevada_utah"
+      ],
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "california",
+      "name": "California",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "pac_cal",
+        "nevada_utah",
+        "washington",
+        "oregon"
+      ],
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "nevada_utah",
+      "name": "Nevada / Utah",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "california",
+        "heartland",
+        "montana_idaho",
+        "arizona_nm"
+      ],
+      "polygon": [
+        [
+          100,
+          200
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          100,
+          250
+        ]
+      ],
+      "center": [
+        125,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "dakotas",
+      "name": "The Dakotas",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "montana_idaho",
+        "great_lakes",
+        "saskatchewan",
+        "heartland"
+      ],
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "heartland",
+      "name": "Heartland",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "nevada_utah",
+        "great_lakes_s",
+        "dakotas",
+        "texas"
+      ],
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arizona_nm",
+      "name": "Arizona / New Mexico",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "oregon",
+        "texas",
+        "nevada_utah",
+        "mexico_n"
+      ],
+      "polygon": [
+        [
+          100,
+          250
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          100,
+          300
+        ]
+      ],
+      "center": [
+        125,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "oregon",
+      "name": "Oregon",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "pac_mex",
+        "arizona_nm",
+        "california"
+      ],
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "great_lakes_s",
+      "name": "Great Lakes South",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "heartland",
+        "new_york",
+        "great_lakes",
+        "south_central"
+      ],
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "new_england",
+      "name": "New England",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "great_lakes",
+        "ontario",
+        "new_york",
+        "atlantic_ocean"
+      ],
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "new_york",
+      "name": "New York",
+      "type": "coastal",
+      "production": 6,
+      "adjacentTo": [
+        "great_lakes_s",
+        "atlantic_ocean",
+        "new_england",
+        "mid_atlantic"
+      ],
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "mid_atlantic",
+      "name": "Mid-Atlantic",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "south_central",
+        "new_york",
+        "southeast",
+        "atlantic_ocean"
+      ],
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "atlantic_ocean",
+      "name": "North Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "new_york",
+        "c_atlantic",
+        "w_atlantic",
+        "new_england",
+        "mid_atlantic"
+      ],
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "texas",
+      "name": "Texas",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "arizona_nm",
+        "south_central",
+        "heartland",
+        "mexico_c",
+        "gulf_mexico"
+      ],
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "south_central",
+      "name": "South Central US",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "texas",
+        "mid_atlantic",
+        "great_lakes_s",
+        "gulf_mexico"
+      ],
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "southeast",
+      "name": "Southeast US",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "gulf_mexico",
+        "w_atlantic",
+        "mid_atlantic"
+      ],
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_mexico",
+      "name": "Gulf of Mexico",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "mexico_c",
+        "southeast",
+        "south_central",
+        "caribbean_w",
+        "texas"
+      ],
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "w_atlantic",
+      "name": "West Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "southeast",
+        "c_atlantic",
+        "caribbean_e",
+        "labrador_sea",
+        "atlantic_ocean",
+        "e_atlantic"
+      ],
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "c_atlantic",
+      "name": "Central Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "w_atlantic",
+        "caribbean_e",
+        "atlantic_ocean"
+      ],
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "mexico_n",
+      "name": "Northern Mexico",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "mexico_c",
+        "arizona_nm"
+      ],
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "mexico_c",
+      "name": "Central Mexico",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "mexico_n",
+        "gulf_mexico",
+        "texas",
+        "mexico_s"
+      ],
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "mexico_s",
+      "name": "Southern Mexico",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "caribbean_w",
+        "mexico_c",
+        "c_america",
+        "pac_mex"
+      ],
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "c_america",
+      "name": "Central America",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "colombia",
+        "mexico_s",
+        "ecuador",
+        "caribbean_w",
+        "caribbean",
+        "pac_c_am"
+      ],
+      "polygon": [
+        [
+          150,
+          400
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          150,
+          450
+        ]
+      ],
+      "center": [
+        175,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "caribbean_w",
+      "name": "Caribbean (W)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "mexico_s",
+        "caribbean",
+        "gulf_mexico",
+        "colombia",
+        "c_america"
+      ],
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "caribbean",
+      "name": "Caribbean Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "caribbean_w",
+        "caribbean_e",
+        "cuba",
+        "c_america",
+        "colombia"
+      ],
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "caribbean_e",
+      "name": "Caribbean (E)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "caribbean",
+        "w_atlantic",
+        "hispaniola",
+        "c_atlantic",
+        "venezuela"
+      ],
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cuba",
+      "name": "Cuba",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "colombia",
+        "hispaniola",
+        "caribbean",
+        "venezuela"
+      ],
+      "polygon": [
+        [
+          250,
+          400
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          250,
+          450
+        ]
+      ],
+      "center": [
+        275,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "hispaniola",
+      "name": "Hispaniola",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "cuba",
+        "lesser_ant",
+        "caribbean_e",
+        "trinidad"
+      ],
+      "polygon": [
+        [
+          300,
+          400
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        325,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "lesser_ant",
+      "name": "Lesser Antilles",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "hispaniola",
+        "suriname",
+        "e_atlantic"
+      ],
+      "polygon": [
+        [
+          350,
+          400
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          350,
+          450
+        ]
+      ],
+      "center": [
+        375,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "colombia",
+      "name": "Colombia",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "c_america",
+        "cuba",
+        "caribbean_w",
+        "peru",
+        "caribbean"
+      ],
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          200,
+          450
+        ]
+      ],
+      "center": [
+        225,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "venezuela",
+      "name": "Venezuela",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "peru",
+        "trinidad",
+        "cuba",
+        "brazil_n",
+        "caribbean_e"
+      ],
+      "polygon": [
+        [
+          250,
+          450
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          300,
+          500
+        ],
+        [
+          250,
+          500
+        ]
+      ],
+      "center": [
+        275,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "trinidad",
+      "name": "Trinidad & Guyana",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "venezuela",
+        "suriname",
+        "hispaniola",
+        "brazil_e",
+        "s_atlantic_e"
+      ],
+      "polygon": [
+        [
+          300,
+          450
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          350,
+          500
+        ],
+        [
+          300,
+          500
+        ]
+      ],
+      "center": [
+        325,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "suriname",
+      "name": "Suriname",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "trinidad",
+        "lesser_ant",
+        "brazil_ne",
+        "s_atlantic_e"
+      ],
+      "polygon": [
+        [
+          350,
+          450
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          400,
+          500
+        ],
+        [
+          350,
+          500
+        ]
+      ],
+      "center": [
+        375,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ecuador",
+      "name": "Ecuador",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "peru",
+        "c_america",
+        "bolivia",
+        "pac_col"
+      ],
+      "polygon": [
+        [
+          150,
+          450
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          200,
+          500
+        ],
+        [
+          150,
+          500
+        ]
+      ],
+      "center": [
+        175,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "peru",
+      "name": "Peru",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "ecuador",
+        "venezuela",
+        "colombia",
+        "brazil_w",
+        "pac_peru"
+      ],
+      "polygon": [
+        [
+          200,
+          450
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          200,
+          500
+        ]
+      ],
+      "center": [
+        225,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "brazil_n",
+      "name": "Northern Brazil",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "brazil_w",
+        "brazil_e",
+        "venezuela",
+        "paraguay"
+      ],
+      "polygon": [
+        [
+          250,
+          500
+        ],
+        [
+          300,
+          500
+        ],
+        [
+          300,
+          550
+        ],
+        [
+          250,
+          550
+        ]
+      ],
+      "center": [
+        275,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "brazil_e",
+      "name": "Eastern Brazil",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "brazil_n",
+        "brazil_ne",
+        "trinidad",
+        "s_atlantic_e",
+        "e_atlantic"
+      ],
+      "polygon": [
+        [
+          300,
+          500
+        ],
+        [
+          350,
+          500
+        ],
+        [
+          350,
+          550
+        ],
+        [
+          300,
+          550
+        ]
+      ],
+      "center": [
+        325,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "brazil_ne",
+      "name": "NE Brazil",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "brazil_e",
+        "suriname",
+        "e_atlantic"
+      ],
+      "polygon": [
+        [
+          350,
+          500
+        ],
+        [
+          400,
+          500
+        ],
+        [
+          400,
+          550
+        ],
+        [
+          350,
+          550
+        ]
+      ],
+      "center": [
+        375,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "e_atlantic",
+      "name": "East Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "s_atlantic_e",
+        "brazil_ne",
+        "w_atlantic",
+        "brazil_e",
+        "lesser_ant"
+      ],
+      "polygon": [
+        [
+          350,
+          550
+        ],
+        [
+          400,
+          550
+        ],
+        [
+          400,
+          600
+        ],
+        [
+          350,
+          600
+        ]
+      ],
+      "center": [
+        375,
+        575
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bolivia",
+      "name": "Bolivia",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "brazil_w",
+        "ecuador",
+        "chile_n"
+      ],
+      "polygon": [
+        [
+          150,
+          500
+        ],
+        [
+          200,
+          500
+        ],
+        [
+          200,
+          550
+        ],
+        [
+          150,
+          550
+        ]
+      ],
+      "center": [
+        175,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "brazil_w",
+      "name": "Western Brazil",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "bolivia",
+        "brazil_n",
+        "peru",
+        "brazil_s"
+      ],
+      "polygon": [
+        [
+          200,
+          500
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          250,
+          550
+        ],
+        [
+          200,
+          550
+        ]
+      ],
+      "center": [
+        225,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "brazil_s",
+      "name": "Southern Brazil",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "chile_n",
+        "paraguay",
+        "brazil_w",
+        "argentina_n",
+        "s_atlantic"
+      ],
+      "polygon": [
+        [
+          200,
+          550
+        ],
+        [
+          250,
+          550
+        ],
+        [
+          250,
+          600
+        ],
+        [
+          200,
+          600
+        ]
+      ],
+      "center": [
+        225,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "chile_n",
+      "name": "Northern Chile",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "brazil_s",
+        "bolivia",
+        "chile_c",
+        "pac_peru"
+      ],
+      "polygon": [
+        [
+          150,
+          550
+        ],
+        [
+          200,
+          550
+        ],
+        [
+          200,
+          600
+        ],
+        [
+          150,
+          600
+        ]
+      ],
+      "center": [
+        175,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "chile_c",
+      "name": "Central Chile",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "argentina_n",
+        "chile_n",
+        "chile_s",
+        "pac_chile"
+      ],
+      "polygon": [
+        [
+          150,
+          600
+        ],
+        [
+          200,
+          600
+        ],
+        [
+          200,
+          650
+        ],
+        [
+          150,
+          650
+        ]
+      ],
+      "center": [
+        175,
+        625
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "argentina_n",
+      "name": "Northern Argentina",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "chile_c",
+        "s_atlantic",
+        "brazil_s",
+        "argentina_s"
+      ],
+      "polygon": [
+        [
+          200,
+          600
+        ],
+        [
+          250,
+          600
+        ],
+        [
+          250,
+          650
+        ],
+        [
+          200,
+          650
+        ]
+      ],
+      "center": [
+        225,
+        625
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "argentina_s",
+      "name": "Patagonia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "chile_s",
+        "s_atlantic_s",
+        "argentina_n",
+        "southern_oc_e",
+        "drake_passage"
+      ],
+      "polygon": [
+        [
+          200,
+          650
+        ],
+        [
+          250,
+          650
+        ],
+        [
+          250,
+          700
+        ],
+        [
+          200,
+          700
+        ]
+      ],
+      "center": [
+        225,
+        675
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "chile_s",
+      "name": "Southern Chile",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "drake_passage",
+        "argentina_s",
+        "chile_c",
+        "southern_ocean",
+        "pac_far_s"
+      ],
+      "polygon": [
+        [
+          150,
+          650
+        ],
+        [
+          200,
+          650
+        ],
+        [
+          200,
+          700
+        ],
+        [
+          150,
+          700
+        ]
+      ],
+      "center": [
+        175,
+        675
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "paraguay",
+      "name": "Paraguay / Uruguay",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "brazil_s",
+        "s_atlantic_e",
+        "brazil_n",
+        "s_atlantic"
+      ],
+      "polygon": [
+        [
+          250,
+          550
+        ],
+        [
+          300,
+          550
+        ],
+        [
+          300,
+          600
+        ],
+        [
+          250,
+          600
+        ]
+      ],
+      "center": [
+        275,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_atlantic",
+      "name": "South Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "argentina_n",
+        "s_atlantic_far",
+        "paraguay",
+        "s_atlantic_s",
+        "s_atlantic_e",
+        "brazil_s"
+      ],
+      "polygon": [
+        [
+          250,
+          600
+        ],
+        [
+          300,
+          600
+        ],
+        [
+          300,
+          650
+        ],
+        [
+          250,
+          650
+        ]
+      ],
+      "center": [
+        275,
+        625
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_atlantic_s",
+      "name": "S Atlantic South",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "argentina_s",
+        "s_atlantic",
+        "s_atlantic_far",
+        "drake_passage"
+      ],
+      "polygon": [
+        [
+          250,
+          650
+        ],
+        [
+          300,
+          650
+        ],
+        [
+          300,
+          700
+        ],
+        [
+          250,
+          700
+        ]
+      ],
+      "center": [
+        275,
+        675
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_atlantic_e",
+      "name": "S Atlantic E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "paraguay",
+        "e_atlantic",
+        "brazil_e",
+        "s_atlantic_far",
+        "s_atlantic",
+        "trinidad",
+        "suriname"
+      ],
+      "polygon": [
+        [
+          300,
+          550
+        ],
+        [
+          350,
+          550
+        ],
+        [
+          350,
+          600
+        ],
+        [
+          300,
+          600
+        ]
+      ],
+      "center": [
+        325,
+        575
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_atlantic_far",
+      "name": "S Atlantic Far",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "s_atlantic",
+        "s_atlantic_e",
+        "s_atlantic_s"
+      ],
+      "polygon": [
+        [
+          300,
+          600
+        ],
+        [
+          350,
+          600
+        ],
+        [
+          350,
+          650
+        ],
+        [
+          300,
+          650
+        ]
+      ],
+      "center": [
+        325,
+        625
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "drake_passage",
+      "name": "Drake Passage",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "chile_s",
+        "s_atlantic_s",
+        "argentina_s",
+        "southern_ocean"
+      ],
+      "polygon": [
+        [
+          100,
+          650
+        ],
+        [
+          150,
+          650
+        ],
+        [
+          150,
+          700
+        ],
+        [
+          100,
+          700
+        ]
+      ],
+      "center": [
+        125,
+        675
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "southern_ocean",
+      "name": "Southern Ocean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "southern_oc_e",
+        "chile_s",
+        "drake_passage",
+        "pac_far_s"
+      ],
+      "polygon": [
+        [
+          150,
+          700
+        ],
+        [
+          200,
+          700
+        ],
+        [
+          200,
+          750
+        ],
+        [
+          150,
+          750
+        ]
+      ],
+      "center": [
+        175,
+        725
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "southern_oc_e",
+      "name": "Southern Ocean E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "southern_ocean",
+        "argentina_s"
+      ],
+      "polygon": [
+        [
+          200,
+          700
+        ],
+        [
+          250,
+          700
+        ],
+        [
+          250,
+          750
+        ],
+        [
+          200,
+          750
+        ]
+      ],
+      "center": [
+        225,
+        725
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": [
+    {
+      "territoryId": "greenland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "alaska",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "yukon",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "nwt",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "nunavut",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "bc",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "alberta",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "saskatchewan",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "manitoba",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ontario",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "quebec",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "maritimes",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "washington",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "montana_idaho",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "california",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "nevada_utah",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "dakotas",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "heartland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "arizona_nm",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "oregon",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "great_lakes_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "new_england",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "new_york",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "mid_atlantic",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "texas",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "south_central",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "southeast",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "mexico_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "mexico_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "mexico_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "c_america",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "cuba",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "hispaniola",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "lesser_ant",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "colombia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "venezuela",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "trinidad",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "suriname",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ecuador",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "peru",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "brazil_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "brazil_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "brazil_ne",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "bolivia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "brazil_w",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "brazil_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "chile_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "chile_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "argentina_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "argentina_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "chile_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "paraguay",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

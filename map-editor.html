@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grand Strategy - Map Editor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      overflow: hidden;
+    }
+
+    .editor-container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      width: 60px;
+      background: #16213e;
+      padding: 10px 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      border-right: 2px solid #0f3460;
+    }
+
+    .tool-btn {
+      width: 50px;
+      height: 50px;
+      border: none;
+      border-radius: 8px;
+      background: #0f3460;
+      color: #eee;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: all 0.2s;
+    }
+
+    .tool-btn:hover {
+      background: #1a5c9c;
+    }
+
+    .tool-btn.active {
+      background: #e94560;
+      box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+    }
+
+    .tool-btn span {
+      font-size: 8px;
+      margin-top: 2px;
+    }
+
+    .toolbar-separator {
+      height: 2px;
+      background: #0f3460;
+      margin: 5px 0;
+    }
+
+    /* Canvas area */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #editor-canvas {
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* Side panel */
+    .side-panel {
+      width: 320px;
+      background: #16213e;
+      border-left: 2px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      background: #0f3460;
+      padding: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      border-bottom: 2px solid #1a5c9c;
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+    }
+
+    .panel-section {
+      margin-bottom: 20px;
+    }
+
+    .panel-section h3 {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      background: #1a1a2e;
+      color: #eee;
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #e94560;
+    }
+
+    .form-group input[type="color"] {
+      height: 35px;
+      padding: 2px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Territory list */
+    .territory-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+    }
+
+    .territory-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid #0f3460;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .territory-item:hover {
+      background: #0f3460;
+    }
+
+    .territory-item.selected {
+      background: #e94560;
+    }
+
+    .territory-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid #fff;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #e94560;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #ff6b6b;
+    }
+
+    .btn-secondary {
+      background: #0f3460;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #1a5c9c;
+    }
+
+    .btn-danger {
+      background: #c0392b;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #e74c3c;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn-group .btn {
+      flex: 1;
+    }
+
+    /* Status bar */
+    .status-bar {
+      background: #0f3460;
+      padding: 8px 15px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #1a5c9c;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Connection editor */
+    .connection-list {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .connection-item {
+      padding: 6px 10px;
+      border-bottom: 1px solid #0f3460;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .connection-item .remove-btn {
+      background: #c0392b;
+      border: none;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    /* Help overlay */
+    .help-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .help-overlay.visible {
+      display: flex;
+    }
+
+    .help-content {
+      background: #16213e;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .help-content h2 {
+      margin-bottom: 20px;
+      color: #e94560;
+    }
+
+    .help-content h3 {
+      margin: 15px 0 10px;
+      color: #1a5c9c;
+    }
+
+    .help-content ul {
+      padding-left: 20px;
+    }
+
+    .help-content li {
+      margin-bottom: 5px;
+    }
+
+    .help-content kbd {
+      background: #0f3460;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    .close-help {
+      margin-top: 20px;
+    }
+
+    /* Grid overlay */
+    .grid-settings {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .grid-settings input {
+      width: 60px;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal.visible {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #16213e;
+      padding: 25px;
+      border-radius: 10px;
+      min-width: 400px;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 15px;
+    }
+
+    .modal-content textarea {
+      width: 100%;
+      height: 300px;
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      color: #eee;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="editor-container">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="tool-btn active" id="tool-select" title="Select (V)">
+        <span style="font-size: 24px;">↖</span>
+        <span>Select</span>
+      </button>
+      <button class="tool-btn" id="tool-polygon" title="Draw Polygon (P)">
+        <span style="font-size: 24px;">⬡</span>
+        <span>Polygon</span>
+      </button>
+      <button class="tool-btn" id="tool-rect" title="Draw Rectangle (R)">
+        <span style="font-size: 24px;">▢</span>
+        <span>Rect</span>
+      </button>
+      <button class="tool-btn" id="tool-connect" title="Connect Territories (C)">
+        <span style="font-size: 24px;">⟷</span>
+        <span>Connect</span>
+      </button>
+      
+      <div class="toolbar-separator"></div>
+      
+      <button class="tool-btn" id="tool-pan" title="Pan View (Space+Drag)">
+        <span style="font-size: 24px;">✋</span>
+        <span>Pan</span>
+      </button>
+      <button class="tool-btn" id="tool-zoom-in" title="Zoom In (+)">
+        <span style="font-size: 24px;">🔍+</span>
+        <span>Zoom+</span>
+      </button>
+      <button class="tool-btn" id="tool-zoom-out" title="Zoom Out (-)">
+        <span style="font-size: 24px;">🔍-</span>
+        <span>Zoom-</span>
+      </button>
+      
+      <div class="toolbar-separator"></div>
+      
+      <button class="tool-btn" id="tool-undo" title="Undo (Ctrl+Z)">
+        <span style="font-size: 24px;">↩</span>
+        <span>Undo</span>
+      </button>
+      <button class="tool-btn" id="tool-redo" title="Redo (Ctrl+Y)">
+        <span style="font-size: 24px;">↪</span>
+        <span>Redo</span>
+      </button>
+      
+      <div style="flex: 1;"></div>
+      
+      <button class="tool-btn" id="tool-help" title="Help (F1)">
+        <span style="font-size: 24px;">❓</span>
+        <span>Help</span>
+      </button>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-container">
+      <canvas id="editor-canvas"></canvas>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+      <div class="panel-header">Map Editor</div>
+      
+      <div class="panel-content">
+        <!-- Map Settings -->
+        <div class="panel-section">
+          <h3>Map Settings</h3>
+          <div class="form-group">
+            <label>Map Name</label>
+            <input type="text" id="map-name" value="New Map" />
+          </div>
+          <div class="form-group">
+            <label>Canvas Size</label>
+            <div style="display: flex; gap: 10px;">
+              <input type="number" id="canvas-width" value="2000" style="width: 50%;" />
+              <span style="line-height: 35px;">×</span>
+              <input type="number" id="canvas-height" value="1500" style="width: 50%;" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Background Color</label>
+            <input type="color" id="bg-color" value="#1a4d2e" />
+          </div>
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="show-grid" />
+            <label>Show Grid</label>
+            <input type="number" id="grid-size" value="50" style="width: 50px; margin-left: 10px;" />
+          </div>
+        </div>
+
+        <!-- Territory Properties -->
+        <div class="panel-section">
+          <h3>Selected Territory</h3>
+          <div id="territory-properties" style="display: none;">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="territory-name" />
+            </div>
+            <div class="form-group">
+              <label>ID (unique)</label>
+              <input type="text" id="territory-id" />
+            </div>
+            <div class="form-group">
+              <label>Type</label>
+              <select id="territory-type">
+                <option value="land">Land</option>
+                <option value="sea">Sea</option>
+                <option value="coastal">Coastal</option>
+                <option value="impassable">Impassable</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Production Value</label>
+              <input type="number" id="territory-production" value="0" min="0" />
+            </div>
+            <div class="form-group">
+              <label>Fill Color</label>
+              <input type="color" id="territory-color" value="#4a7c59" />
+            </div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="territory-capital" />
+              <label>Is Capital</label>
+            </div>
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="territory-factory" />
+              <label>Has Factory</label>
+            </div>
+            
+            <!-- Connections -->
+            <div class="form-group">
+              <label>Connections</label>
+              <div class="connection-list" id="connection-list"></div>
+              <select id="add-connection" style="margin-top: 5px;">
+                <option value="">Add connection...</option>
+              </select>
+            </div>
+            
+            <div class="btn-group">
+              <button class="btn btn-primary" id="btn-apply-territory">Apply</button>
+              <button class="btn btn-danger" id="btn-delete-territory">Delete</button>
+            </div>
+          </div>
+          <p id="no-selection" style="color: #666;">No territory selected</p>
+        </div>
+
+        <!-- Territory List -->
+        <div class="panel-section">
+          <h3>Territories (<span id="territory-count">0</span>)</h3>
+          <div class="territory-list" id="territory-list"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="panel-section">
+          <h3>Actions</h3>
+          <div class="btn-group" style="flex-direction: column;">
+            <button class="btn btn-primary" id="btn-new-map">New Map</button>
+            <button class="btn btn-secondary" id="btn-load-map">Load Map</button>
+            <button class="btn btn-secondary" id="btn-import-image">Import Background</button>
+          </div>
+          <div class="btn-group" style="flex-direction: column; margin-top: 10px;">
+            <button class="btn btn-primary" id="btn-export-json">Export JSON</button>
+            <button class="btn btn-secondary" id="btn-preview">Preview in Game</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <span class="status-item" id="status-tool">Tool: Select</span>
+        <span class="status-item" id="status-coords">X: 0, Y: 0</span>
+        <span class="status-item" id="status-zoom">Zoom: 100%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Overlay -->
+  <div class="help-overlay" id="help-overlay">
+    <div class="help-content">
+      <h2>Map Editor Help</h2>
+      
+      <h3>Tools</h3>
+      <ul>
+        <li><kbd>V</kbd> - Select tool: Click to select territories</li>
+        <li><kbd>P</kbd> - Polygon tool: Click to add points, double-click to finish</li>
+        <li><kbd>R</kbd> - Rectangle tool: Click and drag to draw</li>
+        <li><kbd>C</kbd> - Connect tool: Click two territories to connect them</li>
+      </ul>
+      
+      <h3>Navigation</h3>
+      <ul>
+        <li><kbd>Space</kbd> + Drag - Pan the view</li>
+        <li><kbd>+</kbd> / <kbd>-</kbd> - Zoom in/out</li>
+        <li>Mouse wheel - Zoom in/out</li>
+        <li><kbd>0</kbd> - Reset zoom to 100%</li>
+      </ul>
+      
+      <h3>Editing</h3>
+      <ul>
+        <li><kbd>Ctrl+Z</kbd> - Undo</li>
+        <li><kbd>Ctrl+Y</kbd> - Redo</li>
+        <li><kbd>Delete</kbd> - Delete selected territory</li>
+        <li><kbd>Ctrl+D</kbd> - Duplicate selected territory</li>
+        <li><kbd>Escape</kbd> - Cancel current operation</li>
+      </ul>
+      
+      <h3>File Operations</h3>
+      <ul>
+        <li><kbd>Ctrl+N</kbd> - New map</li>
+        <li><kbd>Ctrl+O</kbd> - Load map</li>
+        <li><kbd>Ctrl+S</kbd> - Export map</li>
+      </ul>
+      
+      <h3>Tips</h3>
+      <ul>
+        <li>Use the grid for precise alignment</li>
+        <li>Import a reference image to trace over</li>
+        <li>Save frequently while working</li>
+        <li>Connect territories before exporting</li>
+      </ul>
+      
+      <button class="btn btn-primary close-help" onclick="document.getElementById('help-overlay').classList.remove('visible')">Close</button>
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div class="modal" id="export-modal">
+    <div class="modal-content">
+      <h3>Export Map JSON</h3>
+      <textarea id="export-json" readonly></textarea>
+      <div class="btn-group" style="margin-top: 15px;">
+        <button class="btn btn-primary" id="btn-copy-json">Copy to Clipboard</button>
+        <button class="btn btn-secondary" id="btn-download-json">Download File</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('export-modal').classList.remove('visible')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Modal -->
+  <div class="modal" id="load-modal">
+    <div class="modal-content">
+      <h3>Load Map JSON</h3>
+      <textarea id="load-json" placeholder="Paste map JSON here..."></textarea>
+      <div class="btn-group" style="margin-top: 15px;">
+        <button class="btn btn-primary" id="btn-import-json">Import</button>
+        <button class="btn btn-secondary" id="btn-load-file">Load from File</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('load-modal').classList.remove('visible')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/editor/MapEditor.ts"></script>
+</body>
+</html>

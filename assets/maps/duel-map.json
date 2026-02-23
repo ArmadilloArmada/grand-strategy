@@ -1,0 +1,20 @@
+{
+  "name": "Duel",
+  "version": "1.0.0",
+  "width": 700,
+  "height": 400,
+  "territories": [
+    {"id": "central_usa", "name": "Blue Capital", "type": "land", "production": 6, "adjacentTo": ["blue_front", "center_left"], "polygon": [[40,120],[180,80],[200,200],[80,240]], "center": [130,160], "owner": "atlantic_alliance", "originalOwner": "atlantic_alliance", "hasFactory": true, "isCapital": true},
+    {"id": "blue_front", "name": "Blue Front", "type": "land", "production": 3, "adjacentTo": ["blue_home", "center_left", "center_right"], "polygon": [[200,80],[340,60],[360,200],[220,220]], "center": [280,140], "owner": "atlantic_alliance", "originalOwner": "atlantic_alliance", "hasFactory": false, "isCapital": false},
+    {"id": "center_left", "name": "Central Valley", "type": "land", "production": 2, "adjacentTo": ["central_usa", "blue_front", "center_right", "red_front", "russia_west"], "polygon": [[220,220],[360,200],[380,320],[300,380],[200,360],[160,280]], "center": [280,300], "owner": null, "originalOwner": null, "hasFactory": false, "isCapital": false},
+    {"id": "center_right", "name": "Central Hills", "type": "land", "production": 2, "adjacentTo": ["blue_front", "center_left", "red_front"], "polygon": [[360,60],[500,80],[520,200],[380,200]], "center": [440,130], "owner": null, "originalOwner": null, "hasFactory": false, "isCapital": false},
+    {"id": "red_front", "name": "Red Front", "type": "land", "production": 3, "adjacentTo": ["center_left", "center_right", "red_home"], "polygon": [[500,80],[660,100],[680,220],[520,200]], "center": [590,150], "owner": "eastern_coalition", "originalOwner": "eastern_coalition", "hasFactory": false, "isCapital": false},
+    {"id": "russia_west", "name": "Red Capital", "type": "land", "production": 6, "adjacentTo": ["center_left", "red_front"], "polygon": [[520,200],[680,220],[660,340],[500,320],[380,280]], "center": [570,260], "owner": "eastern_coalition", "originalOwner": "eastern_coalition", "hasFactory": true, "isCapital": true}
+  ],
+  "startingUnits": [
+    {"territoryId": "central_usa", "units": [{"unitTypeId": "infantry", "count": 2}, {"unitTypeId": "tank", "count": 1}]},
+    {"territoryId": "blue_front", "units": [{"unitTypeId": "infantry", "count": 2}]},
+    {"territoryId": "red_front", "units": [{"unitTypeId": "infantry", "count": 2}]},
+    {"territoryId": "russia_west", "units": [{"unitTypeId": "infantry", "count": 2}, {"unitTypeId": "tank", "count": 1}]}
+  ]
+}

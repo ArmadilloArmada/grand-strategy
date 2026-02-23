@@ -1,0 +1,190 @@
+{
+  "name": "Western Hemisphere",
+  "version": "1.0.0",
+  "width": 900,
+  "height": 950,
+  "territories": [
+    {
+      "id": "north_america",
+      "name": "North America",
+      "type": "land",
+      "production": 8,
+      "adjacentTo": [
+        "central_america",
+        "caribbean"
+      ],
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          800,
+          50
+        ],
+        [
+          800,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "central_america",
+      "name": "Central America",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "north_america",
+        "south_america_north",
+        "caribbean"
+      ],
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          550
+        ],
+        [
+          200,
+          550
+        ]
+      ],
+      "center": [
+        400,
+        475
+      ],
+      "owner": "latin_coalition",
+      "originalOwner": "latin_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "caribbean",
+      "name": "Caribbean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "north_america",
+        "central_america",
+        "south_america_north"
+      ],
+      "polygon": [
+        [
+          600,
+          350
+        ],
+        [
+          900,
+          350
+        ],
+        [
+          900,
+          550
+        ],
+        [
+          600,
+          550
+        ]
+      ],
+      "center": [
+        750,
+        450
+      ],
+      "owner": null,
+      "originalOwner": null,
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "south_america_north",
+      "name": "Northern South America",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "central_america",
+        "south_america_south"
+      ],
+      "polygon": [
+        [
+          150,
+          550
+        ],
+        [
+          750,
+          550
+        ],
+        [
+          750,
+          720
+        ],
+        [
+          150,
+          720
+        ]
+      ],
+      "center": [
+        450,
+        635
+      ],
+      "owner": "latin_coalition",
+      "originalOwner": "latin_coalition",
+      "hasFactory": false,
+      "isCapital": true
+    },
+    {
+      "id": "south_america_south",
+      "name": "Southern South America",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "south_america_north"
+      ],
+      "polygon": [
+        [
+          200,
+          720
+        ],
+        [
+          700,
+          720
+        ],
+        [
+          700,
+          920
+        ],
+        [
+          200,
+          920
+        ]
+      ],
+      "center": [
+        450,
+        820
+      ],
+      "owner": "latin_coalition",
+      "originalOwner": "latin_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": {}
+}

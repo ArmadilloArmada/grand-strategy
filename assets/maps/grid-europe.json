@@ -1,0 +1,4769 @@
+{
+  "name": "European Theater",
+  "version": "1.0.0",
+  "width": 1000,
+  "height": 700,
+  "territories": [
+    {
+      "id": "e_arctic",
+      "name": "East Arctic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "norwegian_sea",
+        "n_atlantic",
+        "barents_n"
+      ],
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "norwegian_sea",
+      "name": "Norwegian Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "e_arctic",
+        "nor_sea_e",
+        "iceland",
+        "n_atlantic",
+        "north_sea"
+      ],
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "nor_sea_e",
+      "name": "Norwegian Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "norwegian_sea",
+        "barents_sea",
+        "scotland",
+        "north_sea_e"
+      ],
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_sea",
+      "name": "Barents Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "nor_sea_e",
+        "barents_e",
+        "norway"
+      ],
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_e",
+      "name": "Barents Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "barents_sea",
+        "barents_n",
+        "sweden"
+      ],
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_n",
+      "name": "Barents Sea N",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "barents_e",
+        "finland",
+        "e_arctic"
+      ],
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "n_atlantic",
+      "name": "North Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "iceland",
+        "e_arctic",
+        "c_atlantic",
+        "norwegian_sea"
+      ],
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "c_atlantic",
+      "name": "Central Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "ireland",
+        "n_atlantic",
+        "celtic_sea"
+      ],
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "celtic_sea",
+      "name": "Celtic Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "portugal",
+        "c_atlantic",
+        "bay_biscay",
+        "english_ch"
+      ],
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bay_biscay",
+      "name": "Bay of Biscay",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "spain_n",
+        "celtic_sea",
+        "bay_biscay_s",
+        "iberian_atl"
+      ],
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bay_biscay_s",
+      "name": "Bay of Biscay S",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "spain_s",
+        "bay_biscay",
+        "iberian_atl"
+      ],
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "iberian_atl",
+      "name": "Iberian Atlantic",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_w1",
+        "bay_biscay_s",
+        "bay_biscay"
+      ],
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "iceland",
+      "name": "Iceland",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "n_atlantic",
+        "norwegian_sea",
+        "ireland"
+      ],
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ireland",
+      "name": "Ireland",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "c_atlantic",
+        "england",
+        "iceland",
+        "portugal"
+      ],
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "scotland",
+      "name": "Scotland",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "nor_sea_e",
+        "england"
+      ],
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "england",
+      "name": "England",
+      "type": "coastal",
+      "production": 6,
+      "adjacentTo": [
+        "ireland",
+        "north_sea",
+        "scotland",
+        "france_n"
+      ],
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "north_sea",
+      "name": "North Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "england",
+        "north_sea_e",
+        "norway",
+        "benelux",
+        "norwegian_sea"
+      ],
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "north_sea_e",
+      "name": "North Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "north_sea",
+        "baltic_sea",
+        "sweden",
+        "germany_n",
+        "nor_sea_e"
+      ],
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "baltic_sea",
+      "name": "Baltic Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "north_sea_e",
+        "baltic_e",
+        "finland",
+        "poland"
+      ],
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "baltic_e",
+      "name": "Baltic Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "baltic_sea",
+        "estonia",
+        "leningrad",
+        "brest_litovsk"
+      ],
+      "polygon": [
+        [
+          300,
+          100
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          300,
+          150
+        ]
+      ],
+      "center": [
+        325,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "english_ch",
+      "name": "English Channel",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "portugal",
+        "benelux",
+        "england",
+        "celtic_sea"
+      ],
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "norway",
+      "name": "Norway",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "sweden",
+        "barents_sea",
+        "north_sea"
+      ],
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sweden",
+      "name": "Sweden",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "norway",
+        "finland",
+        "barents_e",
+        "north_sea_e"
+      ],
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "finland",
+      "name": "Finland",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "sweden",
+        "leningrad",
+        "barents_n",
+        "baltic_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          50
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          250,
+          100
+        ]
+      ],
+      "center": [
+        275,
+        75
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "leningrad",
+      "name": "Leningrad",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "finland",
+        "russia_nw",
+        "baltic_e"
+      ],
+      "polygon": [
+        [
+          300,
+          50
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          300,
+          100
+        ]
+      ],
+      "center": [
+        325,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "portugal",
+      "name": "Portugal",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "celtic_sea",
+        "france_n",
+        "ireland",
+        "spain_n"
+      ],
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "spain_n",
+      "name": "Northern Spain",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "bay_biscay",
+        "portugal",
+        "spain_s"
+      ],
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "spain_s",
+      "name": "Southern Spain",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "bay_biscay_s",
+        "spain_n",
+        "med_w1"
+      ],
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "france_n",
+      "name": "Northern France",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "portugal",
+        "benelux",
+        "england"
+      ],
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "benelux",
+      "name": "Benelux",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "france_n",
+        "germany_n",
+        "north_sea",
+        "france_c"
+      ],
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "france_c",
+      "name": "Central France",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "germany_s",
+        "benelux",
+        "france_s"
+      ],
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "france_s",
+      "name": "Southern France",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "switzerland",
+        "france_c",
+        "med_c1"
+      ],
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "germany_n",
+      "name": "Northern Germany",
+      "type": "coastal",
+      "production": 6,
+      "adjacentTo": [
+        "benelux",
+        "poland",
+        "north_sea_e",
+        "germany_s"
+      ],
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "germany_s",
+      "name": "Southern Germany",
+      "type": "land",
+      "production": 5,
+      "adjacentTo": [
+        "france_c",
+        "czechoslovakia",
+        "germany_n",
+        "switzerland"
+      ],
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "switzerland",
+      "name": "Switzerland",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "france_s",
+        "austria",
+        "germany_s",
+        "med_c2"
+      ],
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "poland",
+      "name": "Poland",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "germany_n",
+        "brest_litovsk",
+        "baltic_sea",
+        "czechoslovakia"
+      ],
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "czechoslovakia",
+      "name": "Czechoslovakia",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "germany_s",
+        "hungary",
+        "poland",
+        "austria"
+      ],
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "austria",
+      "name": "Austria",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "switzerland",
+        "albania",
+        "czechoslovakia",
+        "italy_n"
+      ],
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "estonia",
+      "name": "Estonia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "baltic_e",
+        "latvia",
+        "russia_nw",
+        "ukraine_n"
+      ],
+      "polygon": [
+        [
+          350,
+          100
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          350,
+          150
+        ]
+      ],
+      "center": [
+        375,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "latvia",
+      "name": "Latvia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "estonia",
+        "lithuania",
+        "russia_n",
+        "russia_c"
+      ],
+      "polygon": [
+        [
+          400,
+          100
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          400,
+          150
+        ]
+      ],
+      "center": [
+        425,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "lithuania",
+      "name": "Lithuania",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "latvia",
+        "russia_ne",
+        "russia_e"
+      ],
+      "polygon": [
+        [
+          450,
+          100
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          450,
+          150
+        ]
+      ],
+      "center": [
+        475,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "brest_litovsk",
+      "name": "Brest-Litovsk",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "poland",
+        "ukraine_n",
+        "baltic_e",
+        "hungary"
+      ],
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          300,
+          200
+        ]
+      ],
+      "center": [
+        325,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "hungary",
+      "name": "Hungary",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "czechoslovakia",
+        "ukraine_s",
+        "brest_litovsk",
+        "albania"
+      ],
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "yugoslavia",
+      "name": "Yugoslavia",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "austria",
+        "romania",
+        "hungary",
+        "greece"
+      ],
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ukraine_n",
+      "name": "Northern Ukraine",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "brest_litovsk",
+        "russia_c",
+        "estonia",
+        "ukraine_s"
+      ],
+      "polygon": [
+        [
+          350,
+          150
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          350,
+          200
+        ]
+      ],
+      "center": [
+        375,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ukraine_s",
+      "name": "Southern Ukraine",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "hungary",
+        "moldova",
+        "ukraine_n",
+        "romania"
+      ],
+      "polygon": [
+        [
+          350,
+          200
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          350,
+          250
+        ]
+      ],
+      "center": [
+        375,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "romania",
+      "name": "Romania",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "albania",
+        "bulgaria",
+        "ukraine_s",
+        "aegean_sea"
+      ],
+      "polygon": [
+        [
+          350,
+          250
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          350,
+          300
+        ]
+      ],
+      "center": [
+        375,
+        275
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bulgaria",
+      "name": "Bulgaria",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "romania",
+        "black_sea",
+        "moldova",
+        "turkey_w"
+      ],
+      "polygon": [
+        [
+          400,
+          250
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          400,
+          300
+        ]
+      ],
+      "center": [
+        425,
+        275
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "russia_nw",
+      "name": "Russia (NW)",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "leningrad",
+        "russia_n",
+        "estonia"
+      ],
+      "polygon": [
+        [
+          350,
+          50
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          350,
+          100
+        ]
+      ],
+      "center": [
+        375,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "russia_n",
+      "name": "Russia (North)",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "russia_nw",
+        "russia_ne",
+        "latvia"
+      ],
+      "polygon": [
+        [
+          400,
+          50
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          400,
+          100
+        ]
+      ],
+      "center": [
+        425,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "russia_c",
+      "name": "Russia (Central)",
+      "type": "land",
+      "production": 8,
+      "adjacentTo": [
+        "ukraine_n",
+        "russia_e",
+        "latvia",
+        "moldova"
+      ],
+      "polygon": [
+        [
+          400,
+          150
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          400,
+          200
+        ]
+      ],
+      "center": [
+        425,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "russia_ne",
+      "name": "Russia (NE)",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "russia_n",
+        "lithuania"
+      ],
+      "polygon": [
+        [
+          450,
+          50
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          450,
+          100
+        ]
+      ],
+      "center": [
+        475,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "russia_e",
+      "name": "Russia (East)",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "russia_c",
+        "russia_s",
+        "lithuania",
+        "ukraine_far"
+      ],
+      "polygon": [
+        [
+          450,
+          150
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          450,
+          200
+        ]
+      ],
+      "center": [
+        475,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "moldova",
+      "name": "Moldova",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "ukraine_s",
+        "ukraine_far",
+        "russia_c",
+        "bulgaria"
+      ],
+      "polygon": [
+        [
+          400,
+          200
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          400,
+          250
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "black_sea",
+      "name": "Black Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "bulgaria",
+        "black_sea_e",
+        "ukraine_far",
+        "turkey_e",
+        "turkey_w"
+      ],
+      "polygon": [
+        [
+          450,
+          250
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          450,
+          300
+        ]
+      ],
+      "center": [
+        475,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "black_sea_e",
+      "name": "Black Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "black_sea",
+        "persia_n",
+        "caucasus",
+        "syria"
+      ],
+      "polygon": [
+        [
+          500,
+          250
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          500,
+          300
+        ]
+      ],
+      "center": [
+        525,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ukraine_far",
+      "name": "East Ukraine",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "moldova",
+        "caucasus",
+        "russia_e",
+        "black_sea"
+      ],
+      "polygon": [
+        [
+          450,
+          200
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          450,
+          250
+        ]
+      ],
+      "center": [
+        475,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "caucasus",
+      "name": "Caucasus",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "ukraine_far",
+        "caspian",
+        "russia_s",
+        "black_sea_e"
+      ],
+      "polygon": [
+        [
+          500,
+          200
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          500,
+          250
+        ]
+      ],
+      "center": [
+        525,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "caspian",
+      "name": "Caspian Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "caucasus",
+        "persia_n"
+      ],
+      "polygon": [
+        [
+          550,
+          200
+        ],
+        [
+          600,
+          200
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          550,
+          250
+        ]
+      ],
+      "center": [
+        575,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "italy_n",
+      "name": "Northern Italy",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "med_c2",
+        "greece",
+        "austria",
+        "egypt"
+      ],
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "italy_s",
+      "name": "Southern Italy",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "med_e1",
+        "italy_n",
+        "med_c3"
+      ],
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": true
+    },
+    {
+      "id": "albania",
+      "name": "Albania",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "austria",
+        "romania",
+        "hungary",
+        "greece"
+      ],
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "greece",
+      "name": "Greece",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "italy_n",
+        "aegean_sea",
+        "albania",
+        "med_e1"
+      ],
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "aegean_sea",
+      "name": "Aegean Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "greece",
+        "turkey_w",
+        "romania",
+        "med_e2",
+        "med_e3"
+      ],
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "turkey_w",
+      "name": "Western Turkey",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "aegean_sea",
+        "turkey_e",
+        "bulgaria",
+        "med_e3",
+        "black_sea"
+      ],
+      "polygon": [
+        [
+          400,
+          300
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          400,
+          350
+        ]
+      ],
+      "center": [
+        425,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "turkey_e",
+      "name": "Eastern Turkey",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "turkey_w",
+        "syria",
+        "black_sea",
+        "med_e4"
+      ],
+      "polygon": [
+        [
+          450,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          450,
+          350
+        ]
+      ],
+      "center": [
+        475,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "russia_s",
+      "name": "Russia (South)",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "russia_e",
+        "caucasus"
+      ],
+      "polygon": [
+        [
+          500,
+          150
+        ],
+        [
+          550,
+          150
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          500,
+          200
+        ]
+      ],
+      "center": [
+        525,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "syria",
+      "name": "Syria",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "turkey_e",
+        "iraq",
+        "black_sea_e",
+        "levant"
+      ],
+      "polygon": [
+        [
+          500,
+          300
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          500,
+          350
+        ]
+      ],
+      "center": [
+        525,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "persia_n",
+      "name": "Northern Persia",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "black_sea_e",
+        "persia_s",
+        "caspian",
+        "iraq"
+      ],
+      "polygon": [
+        [
+          550,
+          250
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          550,
+          300
+        ]
+      ],
+      "center": [
+        575,
+        275
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "iraq",
+      "name": "Iraq",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "syria",
+        "persia_e",
+        "persia_n",
+        "palestine"
+      ],
+      "polygon": [
+        [
+          550,
+          300
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          550,
+          350
+        ]
+      ],
+      "center": [
+        575,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "persia_s",
+      "name": "Southern Persia",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "persia_n",
+        "persia_e"
+      ],
+      "polygon": [
+        [
+          600,
+          250
+        ],
+        [
+          650,
+          250
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          600,
+          300
+        ]
+      ],
+      "center": [
+        625,
+        275
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "persia_e",
+      "name": "Eastern Persia",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "iraq",
+        "persian_gulf",
+        "persia_s",
+        "transjordan"
+      ],
+      "polygon": [
+        [
+          600,
+          300
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          600,
+          350
+        ]
+      ],
+      "center": [
+        625,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "levant",
+      "name": "Levant",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "med_e4",
+        "palestine",
+        "syria"
+      ],
+      "polygon": [
+        [
+          500,
+          350
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          500,
+          400
+        ]
+      ],
+      "center": [
+        525,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "palestine",
+      "name": "Palestine",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "levant",
+        "transjordan",
+        "iraq",
+        "gulf_aden"
+      ],
+      "polygon": [
+        [
+          550,
+          350
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          550,
+          400
+        ]
+      ],
+      "center": [
+        575,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "transjordan",
+      "name": "Transjordan",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "palestine",
+        "arabia_n",
+        "persia_e",
+        "red_sea"
+      ],
+      "polygon": [
+        [
+          600,
+          350
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          600,
+          400
+        ]
+      ],
+      "center": [
+        625,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "persian_gulf",
+      "name": "Persian Gulf",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "persia_e",
+        "arabia_n"
+      ],
+      "polygon": [
+        [
+          650,
+          300
+        ],
+        [
+          700,
+          300
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          650,
+          350
+        ]
+      ],
+      "center": [
+        675,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arabia_n",
+      "name": "Northern Arabia",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "transjordan",
+        "persian_gulf",
+        "arabia_s"
+      ],
+      "polygon": [
+        [
+          650,
+          350
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          650,
+          400
+        ]
+      ],
+      "center": [
+        675,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arabia_s",
+      "name": "Southern Arabia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "red_sea",
+        "arabia_n"
+      ],
+      "polygon": [
+        [
+          650,
+          400
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          700,
+          450
+        ],
+        [
+          650,
+          450
+        ]
+      ],
+      "center": [
+        675,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "red_sea",
+      "name": "Red Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "gulf_aden",
+        "arabia_s",
+        "transjordan",
+        "egypt",
+        "sinai"
+      ],
+      "polygon": [
+        [
+          600,
+          400
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          600,
+          450
+        ]
+      ],
+      "center": [
+        625,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_aden",
+      "name": "Gulf of Aden",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "red_sea",
+        "palestine",
+        "yemen"
+      ],
+      "polygon": [
+        [
+          550,
+          400
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          550,
+          450
+        ]
+      ],
+      "center": [
+        575,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "yemen",
+      "name": "Yemen",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "gulf_aden"
+      ],
+      "polygon": [
+        [
+          550,
+          450
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          600,
+          500
+        ],
+        [
+          550,
+          500
+        ]
+      ],
+      "center": [
+        575,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_w1",
+      "name": "W Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "iberian_atl",
+        "med_w2",
+        "spain_s",
+        "morocco"
+      ],
+      "polygon": [
+        [
+          50,
+          300
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          50,
+          350
+        ]
+      ],
+      "center": [
+        75,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_w2",
+      "name": "W Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_w1",
+        "med_c1",
+        "algeria"
+      ],
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_c1",
+      "name": "C Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_w2",
+        "med_c2",
+        "france_s",
+        "tunisia"
+      ],
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_c2",
+      "name": "C Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_c1",
+        "italy_n",
+        "switzerland",
+        "libya",
+        "med_e1",
+        "med_c3"
+      ],
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_c3",
+      "name": "C Mediterranean S",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "libya_s",
+        "sinai",
+        "egypt",
+        "med_c2"
+      ],
+      "polygon": [
+        [
+          250,
+          400
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          250,
+          450
+        ]
+      ],
+      "center": [
+        275,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e1",
+      "name": "E Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "egypt",
+        "med_e2",
+        "greece",
+        "sinai",
+        "med_c2"
+      ],
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e2",
+      "name": "E Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_e1",
+        "med_e3",
+        "aegean_sea",
+        "sudan"
+      ],
+      "polygon": [
+        [
+          350,
+          350
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          350,
+          400
+        ]
+      ],
+      "center": [
+        375,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e3",
+      "name": "E Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_e2",
+        "med_e4",
+        "turkey_w",
+        "ethiopia",
+        "aegean_sea"
+      ],
+      "polygon": [
+        [
+          400,
+          350
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          400,
+          400
+        ]
+      ],
+      "center": [
+        425,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e4",
+      "name": "E Mediterranean",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "med_e3",
+        "levant",
+        "turkey_e",
+        "somalia"
+      ],
+      "polygon": [
+        [
+          450,
+          350
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          450,
+          400
+        ]
+      ],
+      "center": [
+        475,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "morocco",
+      "name": "Morocco",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "algeria",
+        "med_w1",
+        "w_sahara"
+      ],
+      "polygon": [
+        [
+          50,
+          350
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        75,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "algeria",
+      "name": "Algeria",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "morocco",
+        "tunisia",
+        "med_w2",
+        "sahara_c"
+      ],
+      "polygon": [
+        [
+          100,
+          350
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          100,
+          400
+        ]
+      ],
+      "center": [
+        125,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "tunisia",
+      "name": "Tunisia",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "algeria",
+        "libya",
+        "med_c1",
+        "sahara_e"
+      ],
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "libya",
+      "name": "Libya",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "tunisia",
+        "egypt",
+        "med_c2",
+        "libya_s"
+      ],
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "egypt",
+      "name": "Egypt",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "libya",
+        "med_e1",
+        "italy_n",
+        "med_c3",
+        "red_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "w_sahara",
+      "name": "Western Sahara",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "sahara_c",
+        "morocco",
+        "w_africa"
+      ],
+      "polygon": [
+        [
+          50,
+          400
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          100,
+          450
+        ],
+        [
+          50,
+          450
+        ]
+      ],
+      "center": [
+        75,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sahara_c",
+      "name": "Sahara",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "w_sahara",
+        "sahara_e",
+        "algeria",
+        "c_africa"
+      ],
+      "polygon": [
+        [
+          100,
+          400
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          150,
+          450
+        ],
+        [
+          100,
+          450
+        ]
+      ],
+      "center": [
+        125,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sahara_e",
+      "name": "Eastern Sahara",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "sahara_c",
+        "libya_s",
+        "tunisia",
+        "chad"
+      ],
+      "polygon": [
+        [
+          150,
+          400
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          150,
+          450
+        ]
+      ],
+      "center": [
+        175,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "libya_s",
+      "name": "Southern Libya",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "sahara_e",
+        "med_c3",
+        "libya",
+        "sudan_s"
+      ],
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          200,
+          450
+        ]
+      ],
+      "center": [
+        225,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sinai",
+      "name": "Sinai",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "med_c3",
+        "sudan",
+        "med_e1",
+        "red_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          400
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        325,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sudan",
+      "name": "Sudan",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "sinai",
+        "ethiopia",
+        "med_e2"
+      ],
+      "polygon": [
+        [
+          350,
+          400
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          350,
+          450
+        ]
+      ],
+      "center": [
+        375,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ethiopia",
+      "name": "Ethiopia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "sudan",
+        "somalia",
+        "med_e3",
+        "e_africa"
+      ],
+      "polygon": [
+        [
+          400,
+          400
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          400,
+          450
+        ]
+      ],
+      "center": [
+        425,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "somalia",
+      "name": "Somalia",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "ethiopia",
+        "med_e4"
+      ],
+      "polygon": [
+        [
+          450,
+          400
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          450,
+          450
+        ]
+      ],
+      "center": [
+        475,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "e_africa",
+      "name": "East Africa",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "ethiopia"
+      ],
+      "polygon": [
+        [
+          400,
+          450
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          450,
+          500
+        ],
+        [
+          400,
+          500
+        ]
+      ],
+      "center": [
+        425,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "w_africa",
+      "name": "West Africa",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "c_africa",
+        "w_sahara"
+      ],
+      "polygon": [
+        [
+          50,
+          450
+        ],
+        [
+          100,
+          450
+        ],
+        [
+          100,
+          500
+        ],
+        [
+          50,
+          500
+        ]
+      ],
+      "center": [
+        75,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "c_africa",
+      "name": "Central Africa",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "w_africa",
+        "chad",
+        "sahara_c"
+      ],
+      "polygon": [
+        [
+          100,
+          450
+        ],
+        [
+          150,
+          450
+        ],
+        [
+          150,
+          500
+        ],
+        [
+          100,
+          500
+        ]
+      ],
+      "center": [
+        125,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "chad",
+      "name": "Chad",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "c_africa",
+        "sudan_s",
+        "sahara_e"
+      ],
+      "polygon": [
+        [
+          150,
+          450
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          200,
+          500
+        ],
+        [
+          150,
+          500
+        ]
+      ],
+      "center": [
+        175,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sudan_s",
+      "name": "South Sudan",
+      "type": "land",
+      "production": 1,
+      "adjacentTo": [
+        "chad",
+        "libya_s"
+      ],
+      "polygon": [
+        [
+          200,
+          450
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          200,
+          500
+        ]
+      ],
+      "center": [
+        225,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": [
+    {
+      "territoryId": "iceland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ireland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "scotland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "england",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "norway",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sweden",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "finland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "leningrad",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "portugal",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "spain_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "spain_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "france_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "benelux",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "france_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "france_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "germany_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "germany_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "switzerland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "poland",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "czechoslovakia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "austria",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "estonia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "latvia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "lithuania",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "brest_litovsk",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "hungary",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "yugoslavia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ukraine_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ukraine_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "romania",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "bulgaria",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_nw",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_ne",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "moldova",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ukraine_far",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "caucasus",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "italy_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "italy_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "albania",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "greece",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "turkey_w",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "turkey_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "russia_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "syria",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "persia_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "iraq",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "persia_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "persia_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "levant",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "palestine",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "transjordan",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "arabia_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "arabia_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "yemen",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "morocco",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "algeria",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "tunisia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "libya",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "egypt",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "w_sahara",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sahara_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sahara_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "libya_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sinai",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sudan",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "ethiopia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "somalia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "e_africa",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "w_africa",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "c_africa",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "chad",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sudan_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

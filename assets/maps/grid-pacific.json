@@ -1,0 +1,3982 @@
+{
+  "name": "Pacific Ring of Fire",
+  "version": "1.0.0",
+  "width": 1300,
+  "height": 700,
+  "territories": [
+    {
+      "id": "bering_sea",
+      "name": "Bering Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "bering_e",
+        "pac_n_alaska"
+      ],
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "bering_e",
+      "name": "Bering Sea E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "bering_sea",
+        "sea_okhotsk",
+        "kamchatka"
+      ],
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sea_okhotsk",
+      "name": "Sea of Okhotsk",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "bering_e",
+        "okhotsk_e",
+        "sakhalin"
+      ],
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "okhotsk_e",
+      "name": "Sea of Okhotsk E",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "sea_okhotsk",
+        "sea_japan_n",
+        "manchuria_n"
+      ],
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sea_japan_n",
+      "name": "Sea of Japan (N)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "okhotsk_e",
+        "sea_japan",
+        "hokkaido"
+      ],
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sea_japan",
+      "name": "Sea of Japan",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "sea_japan_n"
+      ],
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_n_alaska",
+      "name": "N Pacific (Alaska)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "kamchatka",
+        "bering_sea",
+        "pac_nw"
+      ],
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_nw",
+      "name": "N Pacific (W)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "yakutia",
+        "pac_n_alaska",
+        "pac_mid"
+      ],
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_mid",
+      "name": "Pacific (Mid)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "india_nw",
+        "pac_nw",
+        "pac_sw"
+      ],
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_sw",
+      "name": "S Pacific (SW)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "india_n",
+        "pac_mid",
+        "pac_hawaii"
+      ],
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_hawaii",
+      "name": "Pacific (Hawaii)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "india_ne",
+        "pac_sw",
+        "pac_s"
+      ],
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s",
+      "name": "South Pacific",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_hawaii",
+        "pac_far_s"
+      ],
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_far_s",
+      "name": "Far South Pacific",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_s",
+        "pac_s2"
+      ],
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          0,
+          400
+        ]
+      ],
+      "center": [
+        25,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "kamchatka",
+      "name": "Kamchatka",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "pac_n_alaska",
+        "sakhalin",
+        "bering_e",
+        "yakutia"
+      ],
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sakhalin",
+      "name": "Sakhalin",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "kamchatka",
+        "manchuria_n",
+        "sea_okhotsk",
+        "siberia_e"
+      ],
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "yakutia",
+      "name": "Yakutia",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "pac_nw",
+        "siberia_e",
+        "kamchatka",
+        "india_nw"
+      ],
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "siberia_e",
+      "name": "Eastern Siberia",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "yakutia",
+        "vladivostok",
+        "sakhalin",
+        "mongolia"
+      ],
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "vladivostok",
+      "name": "Vladivostok",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "siberia_e",
+        "honshu_n",
+        "manchuria_n",
+        "korea_n"
+      ],
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "mongolia",
+      "name": "Mongolia",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "india_nw",
+        "siberia_e",
+        "china_w"
+      ],
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "hokkaido",
+      "name": "Hokkaido",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "manchuria_n",
+        "sea_japan_n",
+        "honshu_n"
+      ],
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "honshu_n",
+      "name": "Honshu (North)",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "vladivostok",
+        "honshu_s",
+        "hokkaido",
+        "korea_s"
+      ],
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "honshu_s",
+      "name": "Honshu (South)",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "honshu_n",
+        "kyushu"
+      ],
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "kyushu",
+      "name": "Kyushu",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "korea_s",
+        "okinawa",
+        "honshu_s",
+        "e_china_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "okinawa",
+      "name": "Okinawa",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "kyushu",
+        "pac_japan"
+      ],
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          300,
+          200
+        ]
+      ],
+      "center": [
+        325,
+        175
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "manchuria_n",
+      "name": "Northern Manchuria",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "sakhalin",
+        "hokkaido",
+        "okhotsk_e",
+        "vladivostok"
+      ],
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "korea_n",
+      "name": "Northern Korea",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "korea_s",
+        "vladivostok",
+        "manchuria_s"
+      ],
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "korea_s",
+      "name": "Southern Korea",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "korea_n",
+        "kyushu",
+        "honshu_n",
+        "yellow_sea"
+      ],
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "manchuria_s",
+      "name": "Southern Manchuria",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "china_w",
+        "yellow_sea",
+        "korea_n",
+        "china_n"
+      ],
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "china_n",
+      "name": "Northern China",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "tibet",
+        "china_e",
+        "manchuria_s",
+        "china_c"
+      ],
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "yellow_sea",
+      "name": "Yellow Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "manchuria_s",
+        "e_china_sea",
+        "korea_s",
+        "china_e"
+      ],
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "e_china_sea",
+      "name": "East China Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "yellow_sea",
+        "pac_japan",
+        "kyushu",
+        "taiwan",
+        "s_china_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "china_c",
+      "name": "Central China",
+      "type": "land",
+      "production": 5,
+      "adjacentTo": [
+        "burma_n",
+        "china_s",
+        "china_n",
+        "yunnan"
+      ],
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "china_e",
+      "name": "Eastern China",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "china_n",
+        "taiwan",
+        "yellow_sea",
+        "china_s"
+      ],
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "china_s",
+      "name": "Southern China",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "china_c",
+        "luzon_str",
+        "china_e",
+        "indochina_n"
+      ],
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "yunnan",
+      "name": "Yunnan",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "indochina_n",
+        "china_c",
+        "burma_s"
+      ],
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "china_w",
+      "name": "Western China",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "india_n",
+        "manchuria_s",
+        "mongolia",
+        "tibet"
+      ],
+      "polygon": [
+        [
+          100,
+          200
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          100,
+          250
+        ]
+      ],
+      "center": [
+        125,
+        225
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "tibet",
+      "name": "Tibet",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "india_ne",
+        "china_n",
+        "china_w",
+        "burma_n"
+      ],
+      "polygon": [
+        [
+          100,
+          250
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          100,
+          300
+        ]
+      ],
+      "center": [
+        125,
+        275
+      ],
+      "owner": "eastern_coalition",
+      "originalOwner": "eastern_coalition",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "burma_n",
+      "name": "Northern Burma",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": [
+        "china_c",
+        "tibet",
+        "india_ne",
+        "burma_s"
+      ],
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "india_ne",
+      "name": "NE India",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "pac_hawaii",
+        "tibet",
+        "india_n",
+        "burma_n"
+      ],
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "india_n",
+      "name": "Northern India",
+      "type": "land",
+      "production": 4,
+      "adjacentTo": [
+        "pac_sw",
+        "china_w",
+        "india_nw",
+        "india_ne"
+      ],
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "india_nw",
+      "name": "NW India",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "pac_mid",
+        "mongolia",
+        "yakutia",
+        "india_n"
+      ],
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "taiwan",
+      "name": "Taiwan",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "china_e",
+        "philippine_sea",
+        "e_china_sea",
+        "luzon_str"
+      ],
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "luzon_str",
+      "name": "Luzon Strait",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "china_s",
+        "luzon",
+        "taiwan",
+        "s_china_sea",
+        "philippine_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "philippine_sea",
+      "name": "Philippine Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "taiwan",
+        "pac_japan",
+        "luzon",
+        "s_china_sea",
+        "luzon_str"
+      ],
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "luzon",
+      "name": "Luzon (Philippines)",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "luzon_str",
+        "visayas",
+        "philippine_sea",
+        "manila_bay"
+      ],
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "visayas",
+      "name": "Visayas",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "luzon",
+        "mindanao"
+      ],
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "mindanao",
+      "name": "Mindanao",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "visayas",
+        "marianas"
+      ],
+      "polygon": [
+        [
+          400,
+          300
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          400,
+          350
+        ]
+      ],
+      "center": [
+        425,
+        325
+      ],
+      "owner": "pacific_union",
+      "originalOwner": "pacific_union",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_japan",
+      "name": "Pacific (Japan)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "e_china_sea",
+        "pac_mid_w",
+        "okinawa",
+        "philippine_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_mid_w",
+      "name": "Pacific (Mid-W)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_japan",
+        "pac_mid_e"
+      ],
+      "polygon": [
+        [
+          350,
+          200
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          350,
+          250
+        ]
+      ],
+      "center": [
+        375,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_mid_e",
+      "name": "Pacific (Mid)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_mid_w",
+        "wake_island"
+      ],
+      "polygon": [
+        [
+          400,
+          200
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          400,
+          250
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "burma_s",
+      "name": "Southern Burma",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "thailand",
+        "yunnan",
+        "burma_n"
+      ],
+      "polygon": [
+        [
+          150,
+          400
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          150,
+          450
+        ]
+      ],
+      "center": [
+        175,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indochina_n",
+      "name": "North Indochina",
+      "type": "land",
+      "production": 3,
+      "adjacentTo": [
+        "yunnan",
+        "s_china_sea",
+        "china_s",
+        "thailand"
+      ],
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "thailand",
+      "name": "Thailand",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "burma_s",
+        "vietnam",
+        "indochina_n",
+        "malaya"
+      ],
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          200,
+          450
+        ]
+      ],
+      "center": [
+        225,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_china_sea",
+      "name": "South China Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "indochina_n",
+        "manila_bay",
+        "luzon_str",
+        "vietnam",
+        "e_china_sea",
+        "java_sea",
+        "sulu_sea",
+        "philippine_sea"
+      ],
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "vietnam",
+      "name": "Vietnam",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "thailand",
+        "sulu_sea",
+        "s_china_sea",
+        "gulf_thailand"
+      ],
+      "polygon": [
+        [
+          250,
+          400
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          250,
+          450
+        ]
+      ],
+      "center": [
+        275,
+        425
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_thailand",
+      "name": "Gulf of Thailand",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "malaya",
+        "celebes_sea",
+        "vietnam",
+        "sumatra_n"
+      ],
+      "polygon": [
+        [
+          250,
+          450
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          300,
+          500
+        ],
+        [
+          250,
+          500
+        ]
+      ],
+      "center": [
+        275,
+        475
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "manila_bay",
+      "name": "Manila Bay",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "s_china_sea",
+        "luzon",
+        "sulu_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sulu_sea",
+      "name": "Sulu Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "vietnam",
+        "manila_bay",
+        "celebes_sea",
+        "s_china_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          400
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        325,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "celebes_sea",
+      "name": "Celebes Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "gulf_thailand",
+        "sulu_sea",
+        "java_sea",
+        "banda_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          450
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          350,
+          500
+        ],
+        [
+          300,
+          500
+        ]
+      ],
+      "center": [
+        325,
+        475
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "malaya",
+      "name": "Malaya",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "gulf_thailand",
+        "thailand",
+        "singapore"
+      ],
+      "polygon": [
+        [
+          200,
+          450
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          200,
+          500
+        ]
+      ],
+      "center": [
+        225,
+        475
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "singapore",
+      "name": "Singapore",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": [
+        "sumatra_n",
+        "malaya"
+      ],
+      "polygon": [
+        [
+          200,
+          500
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          250,
+          550
+        ],
+        [
+          200,
+          550
+        ]
+      ],
+      "center": [
+        225,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "sumatra_n",
+      "name": "Northern Sumatra",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "singapore",
+        "java_sea",
+        "gulf_thailand",
+        "sumatra_s"
+      ],
+      "polygon": [
+        [
+          250,
+          500
+        ],
+        [
+          300,
+          500
+        ],
+        [
+          300,
+          550
+        ],
+        [
+          250,
+          550
+        ]
+      ],
+      "center": [
+        275,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sumatra_s",
+      "name": "Southern Sumatra",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "java",
+        "sumatra_n"
+      ],
+      "polygon": [
+        [
+          250,
+          550
+        ],
+        [
+          300,
+          550
+        ],
+        [
+          300,
+          600
+        ],
+        [
+          250,
+          600
+        ]
+      ],
+      "center": [
+        275,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "java_sea",
+      "name": "Java Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "sumatra_n",
+        "borneo_n",
+        "celebes_sea",
+        "java",
+        "s_china_sea",
+        "banda_sea",
+        "timor_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          500
+        ],
+        [
+          350,
+          500
+        ],
+        [
+          350,
+          550
+        ],
+        [
+          300,
+          550
+        ]
+      ],
+      "center": [
+        325,
+        525
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "java",
+      "name": "Java",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "sumatra_s",
+        "borneo_s",
+        "java_sea"
+      ],
+      "polygon": [
+        [
+          300,
+          550
+        ],
+        [
+          350,
+          550
+        ],
+        [
+          350,
+          600
+        ],
+        [
+          300,
+          600
+        ]
+      ],
+      "center": [
+        325,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": true,
+      "isCapital": false
+    },
+    {
+      "id": "borneo_n",
+      "name": "Northern Borneo",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "java_sea",
+        "celebes",
+        "borneo_s"
+      ],
+      "polygon": [
+        [
+          350,
+          500
+        ],
+        [
+          400,
+          500
+        ],
+        [
+          400,
+          550
+        ],
+        [
+          350,
+          550
+        ]
+      ],
+      "center": [
+        375,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "borneo_s",
+      "name": "Southern Borneo",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "java",
+        "moluccas",
+        "borneo_n",
+        "coral_sea"
+      ],
+      "polygon": [
+        [
+          350,
+          550
+        ],
+        [
+          400,
+          550
+        ],
+        [
+          400,
+          600
+        ],
+        [
+          350,
+          600
+        ]
+      ],
+      "center": [
+        375,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "banda_sea",
+      "name": "Banda Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "celebes",
+        "celebes_sea",
+        "timor_sea",
+        "java_sea",
+        "coral_sea"
+      ],
+      "polygon": [
+        [
+          400,
+          450
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          450,
+          500
+        ],
+        [
+          400,
+          500
+        ]
+      ],
+      "center": [
+        425,
+        475
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "celebes",
+      "name": "Celebes",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "borneo_n",
+        "timor_sea",
+        "banda_sea",
+        "moluccas"
+      ],
+      "polygon": [
+        [
+          400,
+          500
+        ],
+        [
+          450,
+          500
+        ],
+        [
+          450,
+          550
+        ],
+        [
+          400,
+          550
+        ]
+      ],
+      "center": [
+        425,
+        525
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "moluccas",
+      "name": "Moluccas",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "borneo_s",
+        "timor",
+        "celebes",
+        "aust_n"
+      ],
+      "polygon": [
+        [
+          400,
+          550
+        ],
+        [
+          450,
+          550
+        ],
+        [
+          450,
+          600
+        ],
+        [
+          400,
+          600
+        ]
+      ],
+      "center": [
+        425,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "timor_sea",
+      "name": "Timor Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "celebes",
+        "timor",
+        "banda_sea",
+        "aust_n",
+        "java_sea",
+        "tasman_sea"
+      ],
+      "polygon": [
+        [
+          450,
+          500
+        ],
+        [
+          500,
+          500
+        ],
+        [
+          500,
+          550
+        ],
+        [
+          450,
+          550
+        ]
+      ],
+      "center": [
+        475,
+        525
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "timor",
+      "name": "Timor",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "moluccas",
+        "tasman_sea",
+        "timor_sea",
+        "aust_w"
+      ],
+      "polygon": [
+        [
+          450,
+          550
+        ],
+        [
+          500,
+          550
+        ],
+        [
+          500,
+          600
+        ],
+        [
+          450,
+          600
+        ]
+      ],
+      "center": [
+        475,
+        575
+      ],
+      "owner": "southern_federation",
+      "originalOwner": "southern_federation",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "coral_sea",
+      "name": "Coral Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "aust_n",
+        "borneo_s",
+        "pac_sw2",
+        "tasman_sea",
+        "banda_sea"
+      ],
+      "polygon": [
+        [
+          350,
+          600
+        ],
+        [
+          400,
+          600
+        ],
+        [
+          400,
+          650
+        ],
+        [
+          350,
+          650
+        ]
+      ],
+      "center": [
+        375,
+        625
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "aust_n",
+      "name": "Northern Australia",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "coral_sea",
+        "aust_w",
+        "moluccas",
+        "timor_sea"
+      ],
+      "polygon": [
+        [
+          400,
+          600
+        ],
+        [
+          450,
+          600
+        ],
+        [
+          450,
+          650
+        ],
+        [
+          400,
+          650
+        ]
+      ],
+      "center": [
+        425,
+        625
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "aust_w",
+      "name": "Western Australia",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "aust_n",
+        "aust_e",
+        "timor",
+        "aust_s"
+      ],
+      "polygon": [
+        [
+          450,
+          600
+        ],
+        [
+          500,
+          600
+        ],
+        [
+          500,
+          650
+        ],
+        [
+          450,
+          650
+        ]
+      ],
+      "center": [
+        475,
+        625
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "aust_e",
+      "name": "Eastern Australia",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": [
+        "aust_w",
+        "pac_sw2",
+        "tasman_sea",
+        "new_zealand"
+      ],
+      "polygon": [
+        [
+          500,
+          600
+        ],
+        [
+          550,
+          600
+        ],
+        [
+          550,
+          650
+        ],
+        [
+          500,
+          650
+        ]
+      ],
+      "center": [
+        525,
+        625
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "aust_s",
+      "name": "Southern Australia",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "new_zealand",
+        "aust_w"
+      ],
+      "polygon": [
+        [
+          450,
+          650
+        ],
+        [
+          500,
+          650
+        ],
+        [
+          500,
+          700
+        ],
+        [
+          450,
+          700
+        ]
+      ],
+      "center": [
+        475,
+        675
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "new_zealand",
+      "name": "New Zealand",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": [
+        "aust_s",
+        "pac_s2",
+        "aust_e"
+      ],
+      "polygon": [
+        [
+          500,
+          650
+        ],
+        [
+          550,
+          650
+        ],
+        [
+          550,
+          700
+        ],
+        [
+          500,
+          700
+        ]
+      ],
+      "center": [
+        525,
+        675
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "tasman_sea",
+      "name": "Tasman Sea",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "timor",
+        "aust_e",
+        "pac_s2",
+        "timor_sea",
+        "coral_sea"
+      ],
+      "polygon": [
+        [
+          500,
+          550
+        ],
+        [
+          550,
+          550
+        ],
+        [
+          550,
+          600
+        ],
+        [
+          500,
+          600
+        ]
+      ],
+      "center": [
+        525,
+        575
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_sw2",
+      "name": "S Pacific (SW)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "aust_e",
+        "pac_s2",
+        "coral_sea"
+      ],
+      "polygon": [
+        [
+          550,
+          600
+        ],
+        [
+          600,
+          600
+        ],
+        [
+          600,
+          650
+        ],
+        [
+          550,
+          650
+        ]
+      ],
+      "center": [
+        575,
+        625
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s2",
+      "name": "South Pacific",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "new_zealand",
+        "pac_sw2",
+        "pac_far_s",
+        "pac_s6",
+        "tasman_sea"
+      ],
+      "polygon": [
+        [
+          550,
+          650
+        ],
+        [
+          600,
+          650
+        ],
+        [
+          600,
+          700
+        ],
+        [
+          550,
+          700
+        ]
+      ],
+      "center": [
+        575,
+        675
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "wake_island",
+      "name": "Wake Island",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "marianas",
+        "pac_mid_e"
+      ],
+      "polygon": [
+        [
+          450,
+          250
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          450,
+          300
+        ]
+      ],
+      "center": [
+        475,
+        275
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "marianas",
+      "name": "Marianas",
+      "type": "coastal",
+      "production": 2,
+      "adjacentTo": [
+        "mindanao",
+        "wake_island",
+        "pac_trust"
+      ],
+      "polygon": [
+        [
+          450,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          450,
+          350
+        ]
+      ],
+      "center": [
+        475,
+        325
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "marshall_is",
+      "name": "Marshall Islands",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "gilbert_is",
+        "pac_mid_s"
+      ],
+      "polygon": [
+        [
+          500,
+          350
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          500,
+          400
+        ]
+      ],
+      "center": [
+        525,
+        375
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gilbert_is",
+      "name": "Gilbert Islands",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "marshall_is",
+        "solomon_is",
+        "pac_sw3"
+      ],
+      "polygon": [
+        [
+          550,
+          350
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          550,
+          400
+        ]
+      ],
+      "center": [
+        575,
+        375
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "solomon_is",
+      "name": "Solomon Islands",
+      "type": "coastal",
+      "production": 1,
+      "adjacentTo": [
+        "gilbert_is",
+        "pac_s3"
+      ],
+      "polygon": [
+        [
+          600,
+          350
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          600,
+          400
+        ]
+      ],
+      "center": [
+        625,
+        375
+      ],
+      "owner": "atlantic_alliance",
+      "originalOwner": "atlantic_alliance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_trust",
+      "name": "Pacific Trust",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_mid_s",
+        "marianas"
+      ],
+      "polygon": [
+        [
+          450,
+          400
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          450,
+          450
+        ]
+      ],
+      "center": [
+        475,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_mid_s",
+      "name": "Pacific (Mid-S)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_trust",
+        "pac_sw3",
+        "marshall_is"
+      ],
+      "polygon": [
+        [
+          500,
+          400
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          550,
+          450
+        ],
+        [
+          500,
+          450
+        ]
+      ],
+      "center": [
+        525,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_sw3",
+      "name": "Pacific (SW)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_mid_s",
+        "pac_s3",
+        "gilbert_is"
+      ],
+      "polygon": [
+        [
+          550,
+          400
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          550,
+          450
+        ]
+      ],
+      "center": [
+        575,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s3",
+      "name": "Pacific (S)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_sw3",
+        "solomon_is",
+        "pac_s4"
+      ],
+      "polygon": [
+        [
+          600,
+          400
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          600,
+          450
+        ]
+      ],
+      "center": [
+        625,
+        425
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s4",
+      "name": "Pacific (S)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_s3",
+        "pac_s5"
+      ],
+      "polygon": [
+        [
+          600,
+          450
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          650,
+          500
+        ],
+        [
+          600,
+          500
+        ]
+      ],
+      "center": [
+        625,
+        475
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s5",
+      "name": "Pacific (S)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_s4",
+        "pac_s6"
+      ],
+      "polygon": [
+        [
+          600,
+          500
+        ],
+        [
+          650,
+          500
+        ],
+        [
+          650,
+          550
+        ],
+        [
+          600,
+          550
+        ]
+      ],
+      "center": [
+        625,
+        525
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "pac_s6",
+      "name": "Pacific (S)",
+      "type": "sea",
+      "production": 0,
+      "adjacentTo": [
+        "pac_s5",
+        "pac_s2"
+      ],
+      "polygon": [
+        [
+          600,
+          550
+        ],
+        [
+          650,
+          550
+        ],
+        [
+          650,
+          600
+        ],
+        [
+          600,
+          600
+        ]
+      ],
+      "center": [
+        625,
+        575
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": [
+    {
+      "territoryId": "kamchatka",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sakhalin",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "yakutia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "siberia_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "vladivostok",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "mongolia",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "hokkaido",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "honshu_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "honshu_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "kyushu",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "okinawa",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "manchuria_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "korea_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "korea_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "manchuria_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "china_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "china_c",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "china_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "china_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "yunnan",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "china_w",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "tibet",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "burma_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "india_ne",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "india_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "india_nw",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "taiwan",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "luzon",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "visayas",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "mindanao",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "burma_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "indochina_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "thailand",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "vietnam",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "malaya",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "singapore",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "sumatra_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "sumatra_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "java",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "borneo_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "borneo_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "celebes",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "moluccas",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "timor",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "aust_n",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "aust_w",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "aust_e",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 3
+        },
+        {
+          "unitTypeId": "tank",
+          "count": 1
+        },
+        {
+          "unitTypeId": "fighter",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "territoryId": "aust_s",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "new_zealand",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "wake_island",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "marianas",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "marshall_is",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "gilbert_is",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "territoryId": "solomon_is",
+      "units": [
+        {
+          "unitTypeId": "infantry",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

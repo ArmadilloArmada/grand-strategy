@@ -1,0 +1,74 @@
+{
+  "name": "African Theater",
+  "version": "1.0.0",
+  "width": 900,
+  "height": 800,
+  "territories": [
+    {
+      "id": "north_africa",
+      "name": "North Africa",
+      "type": "coastal",
+      "production": 4,
+      "adjacentTo": ["west_africa", "east_africa", "sahara"],
+      "polygon": [[100, 50], [500, 50], [500, 200], [100, 200]],
+      "center": [300, 125],
+      "owner": "european_powers",
+      "originalOwner": "european_powers",
+      "hasFactory": true,
+      "isCapital": true
+    },
+    {
+      "id": "west_africa",
+      "name": "West Africa",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": ["north_africa", "central_africa"],
+      "polygon": [[50, 200], [300, 200], [300, 500], [50, 500]],
+      "center": [175, 350],
+      "owner": "european_powers",
+      "originalOwner": "european_powers",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "east_africa",
+      "name": "East Africa",
+      "type": "coastal",
+      "production": 3,
+      "adjacentTo": ["north_africa", "central_africa", "south_africa"],
+      "polygon": [[500, 200], [800, 200], [800, 500], [500, 500]],
+      "center": [650, 350],
+      "owner": "african_resistance",
+      "originalOwner": "african_resistance",
+      "hasFactory": false,
+      "isCapital": true
+    },
+    {
+      "id": "central_africa",
+      "name": "Central Africa",
+      "type": "land",
+      "production": 2,
+      "adjacentTo": ["west_africa", "east_africa", "south_africa"],
+      "polygon": [[250, 400], [650, 400], [650, 620], [250, 620]],
+      "center": [450, 510],
+      "owner": "african_resistance",
+      "originalOwner": "african_resistance",
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "south_africa",
+      "name": "South Africa",
+      "type": "coastal",
+      "production": 5,
+      "adjacentTo": ["central_africa", "east_africa"],
+      "polygon": [[250, 620], [700, 620], [700, 780], [250, 780]],
+      "center": [475, 700],
+      "owner": "european_powers",
+      "originalOwner": "european_powers",
+      "hasFactory": true,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": {}
+}
