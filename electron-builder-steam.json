@@ -15,21 +15,28 @@
   ],
   "win": {
     "target": [
-      { "target": "dir", "arch": ["x64"] }
+      { "target": "nsis", "arch": ["x64"] }
     ],
     "icon": "assets/icon.ico",
     "signAndEditExecutable": false
   },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  },
   "mac": {
     "target": [
-      { "target": "dir", "arch": ["x64", "arm64"] }
+      { "target": "dmg", "arch": ["x64", "arm64"] }
     ],
     "icon": "assets/icon.icns",
     "category": "public.app-category.strategy-games"
   },
   "linux": {
     "target": [
-      { "target": "dir", "arch": ["x64"] }
+      { "target": "AppImage", "arch": ["x64"] }
     ],
     "icon": "assets/icon.png",
     "category": "Game"

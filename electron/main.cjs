@@ -140,11 +140,23 @@ function createMenu() {
         {
           label: 'About Grand Strategy',
           click: () => {
+            const pkg = require('../package.json');
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About Grand Strategy',
-              message: 'Grand Strategy v0.1.0',
-              detail: 'A modern turn-based strategy wargame.\n\nInspired by classic grand strategy games like TripleA and Axis & Allies.',
+              message: `Grand Strategy v${pkg.version}`,
+              detail: [
+                'A modern turn-based strategy wargame.',
+                '',
+                'Developed by ArmadilloArmada',
+                '',
+                'Built with Electron, Vite, and TypeScript.',
+                'Inspired by TripleA and Axis & Allies.',
+                '',
+                'Third-party libraries:',
+                '  Electron · Vite · TypeScript',
+                '  steamworks.js · Vitest',
+              ].join('\n'),
             });
           },
         },
