@@ -365,6 +365,13 @@ export class HUD {
     };
     document.getElementById('victory-type')?.addEventListener('change', updateVictoryRows);
 
+    const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
+    if (factionSelect) {
+      const updateFactionCard = () => this.updateFactionInfoCard(factionSelect.value);
+      factionSelect.addEventListener('change', updateFactionCard);
+      updateFactionCard();
+    }
+
     document.getElementById('btn-start-game')?.addEventListener('click', () => this.onStartNewGame());
     document.getElementById('btn-cancel-new-game')?.addEventListener('click', () => this.hideNewGameModal());
 
@@ -2533,6 +2540,49 @@ export class HUD {
 
     this.showToast('Game started!', 'success');
     this.maybeOfferTutorial();
+  }
+
+  private updateFactionInfoCard(factionId: string): void {
+    const card = document.getElementById('faction-info-card');
+    if (!card) return;
+
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction || factionId === 'random') {
+      card.style.display = 'none';
+      return;
+    }
+
+    const uniqueUnit = this.state.unitRegistry.getAll().find(u => u.factionId === factionId);
+
+    const bonusList: string[] = [];
+    const b = faction.bonuses;
+    if (b.ipcPerFactory)           bonusList.push(`+${b.ipcPerFactory} IPC per factory`);
+    if (b.incomeMultiplierBonus)   bonusList.push(`+${Math.round(b.incomeMultiplierBonus * 100)}% income`);
+    if (b.infantryDefenseBonus)    bonusList.push(`Infantry defend at +${b.infantryDefenseBonus}`);
+    if (b.navalAttackBonus)        bonusList.push(`Naval attack +${b.navalAttackBonus}`);
+    if (b.movementBonus)           bonusList.push(`+${b.movementBonus} movement (land)`);
+    if (b.unitCostDiscount)        bonusList.push(`Mobilization costs ${b.unitCostDiscount} IPC less per unit`);
+    if (b.counterIntelBonus)       bonusList.push(`Enemy spy success –${Math.round(b.counterIntelBonus * 100)}%`);
+    if (b.researchSpeedBonus)      bonusList.push(`Research speed +${Math.round(b.researchSpeedBonus * 100)}%`);
+
+    card.style.display = 'block';
+    card.style.borderLeftColor = faction.color;
+    card.style.background = `${faction.color}14`;
+    card.innerHTML = `
+      <div style="font-weight:bold;color:${faction.color};margin-bottom:0.3rem;">
+        ${faction.name} — <span style="font-weight:normal;color:#94a3b8;">${faction.playstyle ?? ''}</span>
+      </div>
+      <div style="color:#cbd5e1;margin-bottom:0.4rem;">${faction.description ?? ''}</div>
+      ${bonusList.length ? `<div style="color:#94a3b8;font-size:0.8rem;">
+        ${bonusList.map(b => `▸ ${b}`).join(' &nbsp;·&nbsp; ')}
+      </div>` : ''}
+      ${uniqueUnit ? `<div style="margin-top:0.4rem;color:${faction.color};font-size:0.8rem;">
+        ★ Unique unit: <strong>${uniqueUnit.name}</strong>
+        (A${uniqueUnit.attack} D${uniqueUnit.defense} M${uniqueUnit.movement}, ${uniqueUnit.cost} IPC)
+        ${uniqueUnit.canBlitz ? ' · can blitz' : ''}
+        ${!uniqueUnit.requiredTransport && uniqueUnit.domain === 'land' ? ' · no transport needed' : ''}
+      </div>` : ''}
+    `;
   }
 
   private maybeOfferTutorial(): void {

@@ -125,6 +125,20 @@ export class MobilizationSystem {
       cost = Math.ceil(cost * (1 + (productionMultiplier - 1) * 0.5));
     }
 
+    // Swap in faction-specific unique unit (replace one infantry per package)
+    if (faction) {
+      const uniqueUnit = this.state.unitRegistry.getAll()
+        .find(u => u.factionId === faction.id);
+      if (uniqueUnit) {
+        const infantry = units.find(u => u.unitTypeId === 'infantry');
+        if (infantry && infantry.count > 0) {
+          infantry.count -= 1;
+          if (infantry.count === 0) units = units.filter(u => u.unitTypeId !== 'infantry');
+          units.push({ unitTypeId: uniqueUnit.id, count: 1 });
+        }
+      }
+    }
+
     // Apply faction unit cost discount (e.g., Southern Federation "People's Army": -1 IPC per unit)
     const unitCostDiscount = faction?.bonuses?.unitCostDiscount ?? 0;
     if (unitCostDiscount > 0) {

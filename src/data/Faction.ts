@@ -25,6 +25,8 @@ export interface FactionData {
   isPlayable: boolean;  // Can be controlled by human
   allies: string[];     // Faction IDs of allied nations
   bonuses?: FactionBonus; // Optional asymmetry bonuses
+  playstyle?: string;   // Short label e.g. "Industrial Powerhouse"
+  description?: string; // One-sentence flavor description
 }
 
 export class Faction {
@@ -38,6 +40,8 @@ export class Faction {
   public readonly isPlayable: boolean;
   public readonly allies: string[];
   public readonly bonuses: FactionBonus;
+  public readonly playstyle: string;
+  public readonly description: string;
 
   public ipcs: number;
   public isDefeated: boolean = false;
@@ -61,6 +65,8 @@ export class Faction {
     this.isPlayable = data.isPlayable;
     this.allies = data.allies || [];
     this.bonuses = data.bonuses || {};
+    this.playstyle = data.playstyle ?? '';
+    this.description = data.description ?? '';
   }
 
   /**

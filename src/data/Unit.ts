@@ -18,6 +18,8 @@ export interface UnitTypeData {
   canStrategicBomb: boolean; // Can bomb factories
   transportCapacity: number; // How many land units it can carry (0 = can't transport)
   requiredTransport: boolean; // Needs transport to move over sea
+  factionId?: string;  // If set, only spawned by this faction's mobilization
+  notes?: string;
 }
 
 export class UnitType {
@@ -34,6 +36,7 @@ export class UnitType {
   public readonly canStrategicBomb: boolean;
   public readonly transportCapacity: number;
   public readonly requiredTransport: boolean;
+  public readonly factionId: string | null;
 
   constructor(data: UnitTypeData) {
     this.id = data.id;
@@ -49,6 +52,7 @@ export class UnitType {
     this.canStrategicBomb = data.canStrategicBomb;
     this.transportCapacity = data.transportCapacity;
     this.requiredTransport = data.requiredTransport;
+    this.factionId = data.factionId ?? null;
   }
 
   /**

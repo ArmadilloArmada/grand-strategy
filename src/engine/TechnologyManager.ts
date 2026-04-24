@@ -251,7 +251,7 @@ export const TECHNOLOGIES: Technology[] = [
 export class TechnologyManager {
   private factionTech: Map<string, FactionTech> = new Map();
 
-  constructor(_state: GameState) {}
+  constructor(private state: GameState) {}
 
   initFaction(factionId: string): void {
     this.getFactionTech(factionId);
@@ -314,7 +314,10 @@ export class TechnologyManager {
     const tech = TECHNOLOGIES.find(t => t.id === ft.currentResearch);
     if (!tech) return null;
 
-    ft.researchProgress += points;
+    // Apply faction research speed bonus (Atlantic Alliance gets +25% research points)
+    const faction = this.state?.factionRegistry?.get(factionId);
+    const speedBonus = faction?.bonuses?.researchSpeedBonus ?? 0;
+    ft.researchProgress += Math.round(points * (1 + speedBonus));
     if (ft.researchProgress >= tech.cost) {
       ft.researched.add(ft.currentResearch);
       const completed = ft.currentResearch;
