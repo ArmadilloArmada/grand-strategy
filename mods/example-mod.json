@@ -1,0 +1,55 @@
+{
+  "manifest": {
+    "id": "example_mod",
+    "name": "Example Mod",
+    "version": "1.0.0",
+    "author": "Your Name",
+    "description": "A sample mod demonstrating how to add custom units and factions",
+    "gameVersion": "0.1.0",
+    "contents": {
+      "units": ["units"],
+      "factions": ["factions"]
+    }
+  },
+  "data": {
+    "units": [
+      {
+        "id": "special_forces",
+        "name": "Special Forces",
+        "type": "land",
+        "attack": 4,
+        "defense": 4,
+        "movement": 2,
+        "cost": 6,
+        "icon": "🪖",
+        "description": "Elite infantry with improved combat ability",
+        "abilities": ["blitz"]
+      },
+      {
+        "id": "gunship",
+        "name": "Gunship",
+        "type": "air",
+        "attack": 4,
+        "defense": 2,
+        "movement": 4,
+        "cost": 8,
+        "icon": "🚁",
+        "description": "Attack helicopter effective against land units",
+        "abilities": []
+      }
+    ],
+    "factions": [
+      {
+        "id": "resistance",
+        "name": "The Resistance",
+        "color": "#8B0000",
+        "bonus": "guerrilla",
+        "bonusDescription": "Infantry cost 1 less IPC",
+        "startingIPCs": 30,
+        "icon": "⚔️"
+      }
+    ],
+    "maps": [],
+    "rules": null
+  }
+}

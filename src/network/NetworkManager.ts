@@ -47,10 +47,13 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export interface GameAction {
-  type: string;
-  data: any;
-}
+export type GameAction =
+  | { type: 'advance_phase' }
+  | { type: 'move_units'; unitTypeId: string; count: number; fromId: string; toId: string; viaTransport?: string }
+  | { type: 'purchase_units'; territoryId: string; unitTypeId: string; count: number }
+  | { type: 'research_tech'; factionId: string; techId: string }
+  | { type: 'combat_result'; fromId: string; toId: string; attackerLosses: Record<string, number>; defenderLosses: Record<string, number>; captured: boolean; newOwner: string | null }
+  | { type: 'state_verify'; checksum: number; turnNumber: number; phase: string };
 
 type EventCallback = (data: any) => void;
 
@@ -67,7 +70,7 @@ export class NetworkManager {
   
   private eventListeners: Map<string, Set<EventCallback>> = new Map();
   
-  constructor(serverUrl: string = 'ws://localhost:8080') {
+  constructor(serverUrl: string = (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string> }).env?.['VITE_SERVER_URL'] : undefined) ?? 'ws://localhost:8080') {
     this.serverUrl = serverUrl;
   }
 
@@ -139,7 +142,12 @@ export class NetworkManager {
   private handleDisconnect(): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      setTimeout(() => this.connect().catch(() => {}), this.reconnectDelay);
+      // Exponential back-off: 2s, 4s, 8s, 16s, 32s
+      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+      this.emit('connection_lost', { attempt: this.reconnectAttempts, maxAttempts: this.maxReconnectAttempts, delayMs: delay });
+      setTimeout(() => this.connect().catch(() => {}), delay);
+    } else {
+      this.emit('connection_failed', { maxAttempts: this.maxReconnectAttempts });
     }
   }
 
@@ -168,7 +176,12 @@ export class NetworkManager {
         this.emit('game_started', message);
         break;
       case 'game_action':
-        this.emit('game_action', message);
+        // state_verify actions are handled locally; other actions are forwarded
+        if (message.action?.type === 'state_verify') {
+          this.emit('state_verify', message.action);
+        } else {
+          this.emit('game_action', message.action ?? message);
+        }
         break;
       case 'chat':
         this.emit('chat', message);
@@ -224,6 +237,14 @@ export class NetworkManager {
 
   sendChat(message: string): void {
     this.send({ type: 'chat', message });
+  }
+
+  /**
+   * Broadcast a state checksum after applying a game action.
+   * Other clients compare this against their own checksum to detect desyncs.
+   */
+  sendStateChecksum(checksum: number, turnNumber: number, phase: string): void {
+    this.sendGameAction({ type: 'state_verify', checksum, turnNumber, phase });
   }
 
   setPlayerName(name: string): void {

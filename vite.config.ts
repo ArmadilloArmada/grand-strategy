@@ -20,10 +20,27 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
         editor: resolve(__dirname, 'map-editor.html'),
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('/src/engine/AIController') || id.includes('/src/engine/AIPersonalities')) {
+            return 'ai';
+          }
+          if (id.includes('/src/engine/')) {
+            return 'engine';
+          }
+          if (id.includes('/src/ui/')) {
+            return 'ui';
+          }
+          if (id.includes('/src/renderer/')) {
+            return 'renderer';
+          }
+        },
       },
     },
   },

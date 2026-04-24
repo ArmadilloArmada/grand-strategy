@@ -353,13 +353,10 @@ export class AchievementManager {
     
     // Play sound and notify
     soundManager.play('achievement');
-    
-    // Notify listeners
+
     for (const listener of this.listeners) {
       listener(achievement);
     }
-    
-    console.log(`🏆 Achievement Unlocked: ${achievement.name}`);
   }
   
   /**

@@ -431,6 +431,24 @@ body {
   transform: translateX(4px);
 }
 
+#territory-details .commander-card {
+  background: rgba(255, 215, 0, 0.12);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#territory-details .commander-stats {
+  color: #999;
+  margin-left: auto;
+  font-size: 0.78rem;
+}
+
 #territory-details .unit-count {
   background: linear-gradient(135deg, var(--gold-dark), var(--gold-bright));
   color: var(--bg-primary);

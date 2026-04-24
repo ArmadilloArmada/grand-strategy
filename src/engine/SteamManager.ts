@@ -180,22 +180,18 @@ export class SteamManager {
   async initialize(): Promise<boolean> {
     try {
       // Check if running in Electron with Steam
-      if (!(window as any).electronAPI) {
-        console.log('Not running in Electron');
+      if (!window.electronAPI) {
         return false;
       }
-      
-      const isSteamRunning = await (window as any).electronAPI.isSteamRunning();
+
+      const isSteamRunning = await window.electronAPI.isSteamRunning();
       if (!isSteamRunning) {
-        console.log('Steam is not running');
         return false;
       }
-      
+
       // Get Steam user info
-      this.steamUsername = await (window as any).electronAPI.getSteamUsername() || 'Player';
+      this.steamUsername = await window.electronAPI.getSteamUsername() || 'Player';
       this.isInitialized = true;
-      
-      console.log(`Steam initialized for user: ${this.steamUsername}`);
       return true;
     } catch (e) {
       console.error('Failed to initialize Steam:', e);
@@ -230,8 +226,7 @@ export class SteamManager {
     }
     
     try {
-      await (window as any).electronAPI.unlockAchievement(steamAch.apiName);
-      console.log(`Steam achievement unlocked: ${steamAch.name}`);
+      await window.electronAPI?.unlockAchievement(steamAch.apiName);
       return true;
     } catch (e) {
       console.error(`Failed to unlock Steam achievement: ${steamAch.apiName}`, e);
@@ -250,8 +245,7 @@ export class SteamManager {
    * Open Steam overlay to achievement page
    */
   openAchievementsOverlay(): void {
-    // Would call Steam API to open overlay
-    console.log('Opening Steam achievements overlay...');
+    window.electronAPI?.openSteamOverlay?.('Achievements');
   }
   
   // ==================== WORKSHOP INTEGRATION ====================
@@ -259,10 +253,9 @@ export class SteamManager {
   /**
    * Get Workshop items (mods) from Steam
    */
-  async getWorkshopItems(query?: string, tags?: string[]): Promise<WorkshopItem[]> {
+  async getWorkshopItems(_query?: string, _tags?: string[]): Promise<WorkshopItem[]> {
     // In a real implementation, this would call the Steam Workshop API
     // For now, return mock data
-    console.log(`Searching Workshop: query="${query}", tags=${tags}`);
     
     return [
       {
@@ -310,17 +303,15 @@ export class SteamManager {
   /**
    * Subscribe to a Workshop item
    */
-  async subscribeToItem(itemId: string): Promise<boolean> {
-    console.log(`Subscribing to Workshop item: ${itemId}`);
+  async subscribeToItem(_itemId: string): Promise<boolean> {
     // Would call Steam Workshop API
     return true;
   }
-  
+
   /**
    * Unsubscribe from a Workshop item
    */
-  async unsubscribeFromItem(itemId: string): Promise<boolean> {
-    console.log(`Unsubscribing from Workshop item: ${itemId}`);
+  async unsubscribeFromItem(_itemId: string): Promise<boolean> {
     // Would call Steam Workshop API
     return true;
   }
@@ -337,13 +328,12 @@ export class SteamManager {
    * Publish a mod to Workshop
    */
   async publishToWorkshop(
-    title: string,
+    _title: string,
     _description: string,
     _tags: string[],
     _modData: string,
     _previewImage?: string
   ): Promise<string | null> {
-    console.log(`Publishing to Workshop: ${title}`);
     // Would call Steam Workshop API
     // Returns workshop item ID on success
     return `workshop_${Date.now()}`;
@@ -353,10 +343,9 @@ export class SteamManager {
    * Update a published Workshop item
    */
   async updateWorkshopItem(
-    itemId: string,
+    _itemId: string,
     _updates: Partial<{ title: string; description: string; tags: string[]; modData: string }>
   ): Promise<boolean> {
-    console.log(`Updating Workshop item: ${itemId}`);
     // Would call Steam Workshop API
     return true;
   }
@@ -365,16 +354,14 @@ export class SteamManager {
    * Open Workshop in Steam overlay
    */
   openWorkshopOverlay(): void {
-    console.log('Opening Steam Workshop overlay...');
-    // Would call Steam API to open overlay
+    window.electronAPI?.openSteamOverlay?.('Workshop');
   }
-  
+
   /**
    * Open Workshop item page
    */
-  openWorkshopItemPage(itemId: string): void {
-    console.log(`Opening Workshop item page: ${itemId}`);
-    // Would call Steam API to open overlay to specific item
+  openWorkshopItemPage(_itemId: string): void {
+    window.electronAPI?.openSteamOverlay?.('Workshop');
   }
   
   // ==================== RICH PRESENCE ====================
@@ -383,16 +370,14 @@ export class SteamManager {
    * Set Steam Rich Presence status
    */
   setRichPresence(status: string, details?: Record<string, string>): void {
-    console.log(`Setting Rich Presence: ${status}`, details);
-    // Would call Steam API to set rich presence
+    window.electronAPI?.setRichPresence?.(status, details);
   }
-  
+
   /**
    * Clear Rich Presence
    */
   clearRichPresence(): void {
-    console.log('Clearing Rich Presence');
-    // Would call Steam API
+    window.electronAPI?.setRichPresence?.('');
   }
 }
 

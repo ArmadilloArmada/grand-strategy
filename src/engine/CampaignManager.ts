@@ -68,7 +68,7 @@ export const CAMPAIGNS: Campaign[] = [
         faction: 'atlantic_alliance',
         difficulty: 'easy',
         objectives: [
-          { id: 'obj1', description: 'Move a unit to the marked territory', type: 'capture', target: 'tutorial_target' },
+          { id: 'obj1', description: 'Capture the Contested Territory', type: 'capture', target: 'contested_territory' },
           { id: 'obj2', description: 'Win a battle', type: 'destroy', target: 1 },
         ],
         rewards: [
@@ -113,12 +113,12 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'europe_1',
         name: 'D-Day',
         description: 'Establish a beachhead on the coast of France',
-        mapId: 'europe',
+        mapId: 'grid-europe',
         faction: 'atlantic_alliance',
         difficulty: 'normal',
         objectives: [
-          { id: 'obj1', description: 'Capture Normandy', type: 'capture', target: 'normandy' },
-          { id: 'obj2', description: 'Hold the beachhead for 3 turns', type: 'defend', target: 'normandy' },
+          { id: 'obj1', description: 'Capture Northern France (Normandy)', type: 'capture', target: 'france_n' },
+          { id: 'obj2', description: 'Hold Northern France for 3 turns', type: 'defend', target: 'france_n' },
         ],
         bonusObjectives: [
           { id: 'bonus1', description: 'Capture with minimal losses (under 5 units)', type: 'destroy', target: 5 },
@@ -135,11 +135,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'europe_2',
         name: 'March to Paris',
         description: 'Push inland and liberate Paris',
-        mapId: 'europe',
+        mapId: 'grid-europe',
         faction: 'atlantic_alliance',
         difficulty: 'normal',
         objectives: [
-          { id: 'obj1', description: 'Capture Paris', type: 'capture', target: 'paris' },
+          { id: 'obj1', description: 'Capture Central France (Paris)', type: 'capture', target: 'france_c' },
           { id: 'obj2', description: 'Destroy 10 enemy units', type: 'destroy', target: 10 },
         ],
         rewards: [
@@ -155,12 +155,12 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'europe_3',
         name: 'Battle of the Bulge',
         description: 'Survive the German counteroffensive',
-        mapId: 'europe',
+        mapId: 'grid-europe',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
           { id: 'obj1', description: 'Defend all key positions for 5 turns', type: 'survive', target: 5 },
-          { id: 'obj2', description: 'Do not lose Paris', type: 'defend', target: 'paris' },
+          { id: 'obj2', description: 'Do not lose Central France (Paris)', type: 'defend', target: 'france_c' },
         ],
         bonusObjectives: [
           { id: 'bonus1', description: 'Counterattack and capture 2 enemy territories', type: 'capture', target: 2 },
@@ -178,11 +178,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'europe_4',
         name: 'Crossing the Rhine',
         description: 'Cross into Germany and push towards Berlin',
-        mapId: 'europe',
+        mapId: 'grid-europe',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
-          { id: 'obj1', description: 'Cross the Rhine river', type: 'capture', target: 'rhineland' },
+          { id: 'obj1', description: 'Cross the Rhine into Northern Germany', type: 'capture', target: 'germany_n' },
           { id: 'obj2', description: 'Establish 3 territories in Germany', type: 'capture', target: 3 },
         ],
         rewards: [
@@ -198,11 +198,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'europe_5',
         name: 'Fall of Berlin',
         description: 'Capture Berlin and end the war in Europe',
-        mapId: 'europe',
+        mapId: 'grid-europe',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
-          { id: 'obj1', description: 'Capture Berlin', type: 'capture', target: 'berlin' },
+          { id: 'obj1', description: 'Capture Northern Germany (Berlin)', type: 'capture', target: 'germany_n' },
           { id: 'obj2', description: 'Eliminate all enemy forces', type: 'destroy', target: 'all' },
         ],
         bonusObjectives: [
@@ -228,12 +228,12 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'pacific_1',
         name: 'Midway',
         description: 'Defend Midway Island from the enemy fleet',
-        mapId: 'pacific',
+        mapId: 'grid-pacific',
         faction: 'atlantic_alliance',
         difficulty: 'normal',
         objectives: [
           { id: 'obj1', description: 'Sink 3 enemy carriers', type: 'destroy', target: 3 },
-          { id: 'obj2', description: 'Defend Midway for 4 turns', type: 'defend', target: 'midway' },
+          { id: 'obj2', description: 'Defend Midway Islands for 4 turns', type: 'defend', target: 'pac_mid' },
         ],
         rewards: [
           { type: 'units', value: 'carrier:1,fighter:2', description: 'Naval reinforcements' },
@@ -246,11 +246,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'pacific_2',
         name: 'Guadalcanal',
         description: 'Secure the island of Guadalcanal',
-        mapId: 'pacific',
+        mapId: 'grid-pacific',
         faction: 'atlantic_alliance',
         difficulty: 'normal',
         objectives: [
-          { id: 'obj1', description: 'Capture Guadalcanal', type: 'capture', target: 'guadalcanal' },
+          { id: 'obj1', description: 'Capture Solomon Islands (Guadalcanal)', type: 'capture', target: 'solomon_is' },
           { id: 'obj2', description: 'Build an airfield', type: 'produce', target: 1 },
         ],
         rewards: [
@@ -266,11 +266,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'pacific_3',
         name: 'Iwo Jima',
         description: 'Storm the beaches of Iwo Jima',
-        mapId: 'pacific',
+        mapId: 'grid-pacific',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
-          { id: 'obj1', description: 'Capture Mount Suribachi', type: 'capture', target: 'iwo_jima' },
+          { id: 'obj1', description: 'Capture Okinawa', type: 'capture', target: 'okinawa' },
           { id: 'obj2', description: 'Eliminate all defenders', type: 'destroy', target: 'all' },
         ],
         rewards: [
@@ -285,11 +285,11 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'pacific_4',
         name: 'Operation Downfall',
         description: 'Launch the final assault on the Japanese homeland',
-        mapId: 'pacific',
+        mapId: 'grid-pacific',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
-          { id: 'obj1', description: 'Capture Tokyo', type: 'capture', target: 'tokyo' },
+          { id: 'obj1', description: 'Capture Southern Honshu (Tokyo)', type: 'capture', target: 'honshu_s' },
           { id: 'obj2', description: 'Force unconditional surrender', type: 'destroy', target: 'all' },
         ],
         bonusObjectives: [
@@ -316,7 +316,7 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'world_1',
         name: 'Global Mobilization',
         description: 'Prepare your forces for world war',
-        mapId: 'world',
+        mapId: 'grid',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
@@ -334,7 +334,7 @@ export const CAMPAIGNS: Campaign[] = [
         id: 'world_2',
         name: 'Total Victory',
         description: 'Achieve complete world domination',
-        mapId: 'world',
+        mapId: 'grid',
         faction: 'atlantic_alliance',
         difficulty: 'hard',
         objectives: [
@@ -353,14 +353,143 @@ export const CAMPAIGNS: Campaign[] = [
   },
 ];
 
+/** Minimal game state interface for objective checking */
+export interface CampaignGameState {
+  turnNumber: number;
+  territoriesOwnedBy(factionId: string): { id: string; name: string }[];
+  totalUnitsKilled: number;
+  totalUnitsProduced: number;
+}
+
 export class CampaignManager {
   private progress: Map<string, CampaignProgress> = new Map();
   private storageKey = 'grand_strategy_campaigns';
+  /** Track the currently active campaign/mission for in-game display */
+  activeCampaignId: string | null = null;
+  activeMissionId: string | null = null;
+  /** Runtime objective progress counters (reset per mission) */
+  private runtimeCounters: Map<string, number> = new Map();
   
   constructor() {
     this.load();
   }
   
+  /** Call when a territory is captured during a campaign mission */
+  trackCapture(_territoryId: string): void {
+    const count = this.runtimeCounters.get('captures') ?? 0;
+    this.runtimeCounters.set('captures', count + 1);
+  }
+
+  /** Call when units are destroyed during a campaign mission */
+  trackUnitsDestroyed(count: number): void {
+    const cur = this.runtimeCounters.get('destroyed') ?? 0;
+    this.runtimeCounters.set('destroyed', cur + count);
+  }
+
+  /** Call when units are produced during a campaign mission */
+  trackUnitsProduced(count: number): void {
+    const cur = this.runtimeCounters.get('produced') ?? 0;
+    this.runtimeCounters.set('produced', cur + count);
+  }
+
+  /** Reset runtime counters at mission start */
+  resetCounters(): void {
+    this.runtimeCounters.clear();
+  }
+
+  /** Check which objectives are currently met */
+  checkObjectives(
+    mission: CampaignMission,
+    state: CampaignGameState,
+    humanFactionId: string
+  ): { objective: MissionObjective; met: boolean; progress: string }[] {
+    return mission.objectives.map(obj => {
+      let met = false;
+      let progress = '';
+
+      if (obj.type === 'capture') {
+        const owned = state.territoriesOwnedBy(humanFactionId);
+        if (typeof obj.target === 'number') {
+          const count = owned.length;
+          met = count >= obj.target;
+          progress = `${Math.min(count, obj.target)}/${obj.target}`;
+        } else {
+          met = owned.some(t => t.id === obj.target);
+          progress = met ? 'Done' : 'Pending';
+        }
+      } else if (obj.type === 'destroy') {
+        if (typeof obj.target === 'number') {
+          const cur = this.runtimeCounters.get('destroyed') ?? 0;
+          met = cur >= obj.target;
+          progress = `${Math.min(cur, obj.target)}/${obj.target}`;
+        } else {
+          met = false;
+          progress = 'Pending';
+        }
+      } else if (obj.type === 'produce') {
+        const cur = this.runtimeCounters.get('produced') ?? 0;
+        const target = typeof obj.target === 'number' ? obj.target : 1;
+        met = cur >= target;
+        progress = `${Math.min(cur, target)}/${target}`;
+      } else if (obj.type === 'survive') {
+        const target = typeof obj.target === 'number' ? obj.target : 0;
+        met = state.turnNumber >= target;
+        progress = `Turn ${state.turnNumber}/${target}`;
+      } else if (obj.type === 'defend') {
+        const owned = state.territoriesOwnedBy(humanFactionId);
+        if (typeof obj.target === 'string') {
+          met = owned.some(t => t.id === obj.target);
+          progress = met ? '✓ Held' : '✗ Lost';
+        } else {
+          met = false;
+          progress = 'Pending';
+        }
+      } else if (obj.type === 'earn') {
+        met = false;
+        progress = 'Pending';
+      }
+
+      return { objective: obj, met, progress };
+    });
+  }
+
+  /** Check bonus objectives completion.
+   * Bonus "survive" objectives mean "complete within X turns", so the check
+   * is turnNumber <= target (the opposite of a main survive objective).
+   */
+  checkBonusObjectives(
+    mission: CampaignMission,
+    state: CampaignGameState,
+    humanFactionId: string
+  ): string[] {
+    if (!mission.bonusObjectives) return [];
+    return mission.bonusObjectives.map(obj => {
+      // For bonus survive: "win in under X turns" → check turnNumber <= target
+      if (obj.type === 'survive') {
+        const target = typeof obj.target === 'number' ? obj.target : 0;
+        const met = state.turnNumber <= target;
+        return { objective: obj, met };
+      }
+      // All other types use the standard check logic
+      const results = this.checkObjectives({ ...mission, objectives: [obj] }, state, humanFactionId);
+      return results[0] ?? { objective: obj, met: false };
+    })
+      .filter(r => r.met)
+      .map(r => r.objective.id);
+  }
+
+  /** Apply rewards from a mission to a faction (returns description of what was applied) */
+  applyRewards(rewards: MissionReward[], applyIpcs: (amount: number) => void, applyTech: (techId: string) => void): string[] {
+    return rewards.map(reward => {
+      if (reward.type === 'ipcs' && typeof reward.value === 'number') {
+        applyIpcs(reward.value);
+      } else if (reward.type === 'tech' && typeof reward.value === 'string') {
+        applyTech(reward.value);
+      }
+      return reward.description;
+    });
+  }
+
   private load(): void {
     try {
       const saved = localStorage.getItem(this.storageKey);

@@ -137,9 +137,11 @@ export class MovementValidator {
         }
       }
 
-      // Faction movement bonus applies to land/air units
+      // Faction + tech movement bonus applies to land/air units
+      const techManager = this.state.systems.technologyManager;
+      const techMoveBonus = techManager?.getTechEffect(currentFaction.id)?.movementBonus ?? 0;
       const factionMoveBonus = unitType.domain !== 'sea'
-        ? (currentFaction.bonuses?.movementBonus ?? 0)
+        ? (currentFaction.bonuses?.movementBonus ?? 0) + techMoveBonus
         : 0;
       if (current.cost >= unitType.movement + factionMoveBonus) continue;
 

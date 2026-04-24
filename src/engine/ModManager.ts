@@ -34,26 +34,62 @@ export interface LoadedMod {
   };
 }
 
+/** True when running inside Electron with the mod filesystem API available */
+function isElectronWithMods(): boolean {
+  return typeof window !== 'undefined' &&
+    !!window.electronAPI?.scanModsFolder;
+}
+
 export class ModManager {
   private mods: Map<string, LoadedMod> = new Map();
   private storageKey = 'grand_strategy_mods_config';
-  // @ts-ignore Reserved for future file system access
-  private modsFolder = 'mods';
-  
+
   constructor() {
     this.loadConfig();
   }
   
   /**
-   * Load mod configuration (enabled/disabled, load order)
+   * Load mod configuration and restore all installed mods from localStorage
    */
   private loadConfig(): void {
     try {
-      const saved = localStorage.getItem(this.storageKey);
-      if (saved) {
-        // @ts-ignore Config will be applied when mods are loaded
-        const config = JSON.parse(saved) as { id: string; enabled: boolean; loadOrder: number }[];
-        void config; // Config applied during mod loading
+      // Load saved enabled/loadOrder config
+      const configRaw = localStorage.getItem(this.storageKey);
+      const config: { id: string; enabled: boolean; loadOrder: number }[] = configRaw
+        ? JSON.parse(configRaw)
+        : [];
+      const configMap = new Map(config.map(c => [c.id, c]));
+
+      // Load all installed mod manifests
+      const manifestsRaw = localStorage.getItem('grand_strategy_installed_mods');
+      const manifests: ModManifest[] = manifestsRaw ? JSON.parse(manifestsRaw) : [];
+
+      for (const manifest of manifests) {
+        const cfg = configMap.get(manifest.id);
+
+        // Retrieve stored mod content data
+        let data: LoadedMod['data'] = { units: [], factions: [], maps: [], rules: null };
+        const storedData = localStorage.getItem(`mod_data_${manifest.id}`);
+        if (storedData) {
+          try {
+            const parsed = JSON.parse(storedData);
+            data = {
+              units: Array.isArray(parsed.units) ? parsed.units : [],
+              factions: Array.isArray(parsed.factions) ? parsed.factions : [],
+              maps: Array.isArray(parsed.maps) ? parsed.maps : [],
+              rules: parsed.rules ?? null,
+            };
+          } catch (e) {
+            console.warn(`Failed to parse data for mod "${manifest.id}":`, e);
+          }
+        }
+
+        this.mods.set(manifest.id, {
+          manifest,
+          enabled: cfg ? cfg.enabled : true,
+          loadOrder: cfg ? cfg.loadOrder : this.mods.size,
+          data,
+        });
       }
     } catch (e) {
       console.error('Failed to load mod config:', e);
@@ -73,25 +109,53 @@ export class ModManager {
   }
   
   /**
-   * Scan for available mods
+   * Scan for available mods.
+   * In Electron: reads from the userData/mods/ folder on disk.
+   * In browser: reads from localStorage.
    */
   async scanForMods(): Promise<ModManifest[]> {
-    // In browser, mods would be loaded from localStorage or uploaded files
-    // In Electron, we'd scan the file system
-    const manifests: ModManifest[] = [];
-    
-    // Check for stored mod manifests
-    const storedMods = localStorage.getItem('grand_strategy_installed_mods');
-    if (storedMods) {
-      try {
-        const parsed = JSON.parse(storedMods) as ModManifest[];
-        manifests.push(...parsed);
-      } catch (e) {
-        console.error('Failed to parse stored mods:', e);
-      }
+    if (isElectronWithMods()) {
+      return this.scanModsFromFilesystem();
     }
-    
-    return manifests;
+    return this.scanModsFromLocalStorage();
+  }
+
+  private async scanModsFromFilesystem(): Promise<ModManifest[]> {
+    try {
+      const electronAPI = window.electronAPI;
+      if (!electronAPI) return [];
+      const results = await electronAPI.scanModsFolder() as unknown as { filename: string; mod: { manifest: ModManifest; data: LoadedMod['data'] } }[];
+
+      const manifests: ModManifest[] = [];
+      for (const { mod } of results) {
+        if (mod.manifest && mod.manifest.id) {
+          // Load each found mod into the registry
+          await this.loadMod(mod.manifest);
+          // Store full data so getMerged* methods can use it
+          const loaded = this.mods.get(mod.manifest.id);
+          if (loaded) {
+            loaded.data = mod.data ?? loaded.data;
+          }
+          manifests.push(mod.manifest);
+        }
+      }
+
+      return manifests;
+    } catch (e) {
+      console.error('[ModManager] Filesystem scan failed:', e);
+      return [];
+    }
+  }
+
+  private scanModsFromLocalStorage(): ModManifest[] {
+    const storedMods = localStorage.getItem('grand_strategy_installed_mods');
+    if (!storedMods) return [];
+    try {
+      return JSON.parse(storedMods) as ModManifest[];
+    } catch (e) {
+      console.error('[ModManager] Failed to parse localStorage mods:', e);
+      return [];
+    }
   }
   
   /**
@@ -99,25 +163,34 @@ export class ModManager {
    */
   async loadMod(manifest: ModManifest): Promise<boolean> {
     try {
+      // Retrieve any previously stored content data for this mod
+      let data: LoadedMod['data'] = { units: [], factions: [], maps: [], rules: null };
+      const storedData = localStorage.getItem(`mod_data_${manifest.id}`);
+      if (storedData) {
+        try {
+          const parsed = JSON.parse(storedData);
+          data = {
+            units: Array.isArray(parsed.units) ? parsed.units : [],
+            factions: Array.isArray(parsed.factions) ? parsed.factions : [],
+            maps: Array.isArray(parsed.maps) ? parsed.maps : [],
+            rules: parsed.rules ?? null,
+          };
+        } catch (e) {
+          console.warn(`Failed to parse data for mod "${manifest.id}":`, e);
+        }
+      }
+
+      const existing = this.mods.get(manifest.id);
       const loadedMod: LoadedMod = {
         manifest,
-        enabled: true,
-        loadOrder: this.mods.size,
-        data: {
-          units: [],
-          factions: [],
-          maps: [],
-          rules: null,
-        },
+        enabled: existing ? existing.enabled : true,
+        loadOrder: existing ? existing.loadOrder : this.mods.size,
+        data,
       };
-      
-      // Load mod contents (would load from files in Electron)
-      // For now, use placeholder data structure
-      
+
       this.mods.set(manifest.id, loadedMod);
       this.saveConfig();
-      
-      console.log(`Mod loaded: ${manifest.name} v${manifest.version}`);
+
       return true;
     } catch (e) {
       console.error(`Failed to load mod ${manifest.id}:`, e);
@@ -275,36 +348,87 @@ export class ModManager {
   }
   
   /**
-   * Install a mod from JSON string (mod archive)
+   * Install a mod from JSON string (mod archive).
+   * In Electron this also writes the mod to the userData/mods/ folder so it
+   * persists across sessions and shows up in scanForMods().
    */
-  installModFromJSON(jsonString: string): boolean {
+  async installModFromJSON(jsonString: string): Promise<boolean> {
     try {
       const modData = JSON.parse(jsonString);
-      
+
       if (!modData.manifest || !modData.manifest.id) {
-        console.error('Invalid mod format: missing manifest');
+        console.error('[ModManager] Invalid mod format: missing manifest');
         return false;
       }
-      
-      // Store mod in localStorage
-      const installedMods = JSON.parse(localStorage.getItem('grand_strategy_installed_mods') || '[]');
-      const existingIndex = installedMods.findIndex((m: ModManifest) => m.id === modData.manifest.id);
-      
-      if (existingIndex >= 0) {
-        installedMods[existingIndex] = modData.manifest;
+
+      if (isElectronWithMods()) {
+        // Write the mod file to disk
+        const electronAPI = window.electronAPI;
+        if (!electronAPI) return false;
+        const filename: string | null = await electronAPI.exportModFile(jsonString);
+        if (!filename) {
+          return false;
+        }
       } else {
-        installedMods.push(modData.manifest);
+        // Browser fallback: store in localStorage
+        const installedMods = JSON.parse(localStorage.getItem('grand_strategy_installed_mods') || '[]');
+        const existingIndex = installedMods.findIndex((m: ModManifest) => m.id === modData.manifest.id);
+        if (existingIndex >= 0) {
+          installedMods[existingIndex] = modData.manifest;
+        } else {
+          installedMods.push(modData.manifest);
+        }
+        localStorage.setItem('grand_strategy_installed_mods', JSON.stringify(installedMods));
+        localStorage.setItem(`mod_data_${modData.manifest.id}`, JSON.stringify(modData.data));
       }
-      
-      localStorage.setItem('grand_strategy_installed_mods', JSON.stringify(installedMods));
-      localStorage.setItem(`mod_data_${modData.manifest.id}`, JSON.stringify(modData.data));
-      
-      // Load the mod
-      return this.loadMod(modData.manifest).then(() => true).catch(() => false) as unknown as boolean;
+
+      return this.loadMod(modData.manifest);
     } catch (e) {
-      console.error('Failed to install mod:', e);
+      console.error('[ModManager] Failed to install mod:', e);
       return false;
     }
+  }
+
+  /**
+   * Open the OS file picker, let the user choose a mod .json, and install it.
+   * Only available in Electron.
+   */
+  async importModFromFilePicker(): Promise<boolean> {
+    if (!isElectronWithMods()) {
+      console.warn('[ModManager] importModFromFilePicker is only available in Electron');
+      return false;
+    }
+    try {
+      const electronAPI = window.electronAPI;
+      if (!electronAPI) return false;
+      const modData = await electronAPI.importModFile();
+      if (!modData) return false; // user cancelled
+      return this.installModFromJSON(JSON.stringify(modData));
+    } catch (e) {
+      console.error('[ModManager] File picker import failed:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Delete a mod and, in Electron, remove its file from disk.
+   */
+  async removeMod(modId: string): Promise<boolean> {
+    if (isElectronWithMods()) {
+      try {
+        const electronAPI = window.electronAPI;
+        await electronAPI?.deleteModFile(`${modId}.json`);
+      } catch (e) {
+        console.warn('[ModManager] Could not delete mod file from disk:', e);
+      }
+    } else {
+      // Browser: remove from localStorage
+      const installedMods = JSON.parse(localStorage.getItem('grand_strategy_installed_mods') || '[]');
+      const filtered = installedMods.filter((m: ModManifest) => m.id !== modId);
+      localStorage.setItem('grand_strategy_installed_mods', JSON.stringify(filtered));
+      localStorage.removeItem(`mod_data_${modId}`);
+    }
+    return this.unloadMod(modId);
   }
   
   /**

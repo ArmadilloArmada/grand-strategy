@@ -1,5 +1,5 @@
 /**
- * TurnManager - Handles turn flow and phase transitions
+ * TurnManager - Handles turn flow, phase transitions, and seasonal weather
  */
 
 import { GameState } from "./GameState";
@@ -10,6 +10,11 @@ import {
   getPhasesForStyle,
   getPhaseDisplayName as getStylePhaseDisplayName,
 } from "./TurnStyleManager";
+
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+
+/** How many full faction-rounds make up one season */
+const TURNS_PER_SEASON = 3;
 
 export class TurnManager {
   private turnStyle: TurnStyle = "classic";
@@ -28,44 +33,25 @@ export class TurnManager {
 
   constructor(private state: GameState) {}
 
-  /**
-   * Set the turn style
-   */
   setTurnStyle(style: TurnStyle): void {
     this.turnStyle = style;
     this.customPhases = getPhasesForStyle(style);
-
-    console.log("=== TURN STYLE SET ===");
-    console.log("Style:", style);
-    console.log("Phases:", this.customPhases);
-    console.log("======================");
-
-    // Chess mode: only 1 action per turn
-    if (style === "chess") {
-      this.maxActionsPerTurn = 1;
-    }
+    if (style === "chess") this.maxActionsPerTurn = 1;
   }
 
-  /**
-   * Get current turn style
-   */
   getTurnStyle(): TurnStyle {
     return this.turnStyle;
   }
 
-  /**
-   * Initialize the game and start first turn
-   */
   startGame(): void {
     const factions = this.state.factionRegistry.getInTurnOrder();
-    if (factions.length === 0) {
-      throw new Error("No factions registered");
-    }
+    if (factions.length === 0) throw new Error("No factions registered");
 
     this.state.turnNumber = 1;
     this.state.currentFactionId = factions[0].id;
     this.state.currentPhase = this.getFirstPhase();
     this.resetActionCounters();
+    this.updateSeason();
 
     this.state.emit("turn_start", {
       turnNumber: this.state.turnNumber,
@@ -78,9 +64,6 @@ export class TurnManager {
     });
   }
 
-  /**
-   * Advance to the next phase
-   */
   advancePhase(): void {
     const currentPhase = this.state.currentPhase;
 
@@ -89,13 +72,11 @@ export class TurnManager {
       factionId: this.state.currentFactionId,
     });
 
-    // Use turn style phases if set, otherwise use rules phases
     const nextPhase = this.customPhases
       ? this.getNextPhaseForStyle(currentPhase)
       : this.state.rules.getNextPhase(currentPhase);
 
     if (nextPhase === null) {
-      // End of turn for this faction
       this.advanceFaction();
     } else {
       this.state.currentPhase = nextPhase as GamePhase;
@@ -103,59 +84,68 @@ export class TurnManager {
     }
   }
 
-  /**
-   * Advance to the next faction's turn
-   */
   private advanceFaction(): void {
     const factions = this.state.factionRegistry.getInTurnOrder();
-    const currentIndex = factions.findIndex(
-      (f) => f.id === this.state.currentFactionId
-    );
-    const currentFaction = factions[currentIndex];
-
-    console.log(
-      `>>> FACTION TURN END: ${currentFaction?.name} completed all phases`
-    );
+    const currentIndex = factions.findIndex(f => f.id === this.state.currentFactionId);
 
     this.state.emit("turn_end", {
       turnNumber: this.state.turnNumber,
       factionId: this.state.currentFactionId,
     });
 
-    // Check for victory
     const victor = this.checkVictory();
     if (victor) {
       this.state.emit("victory", { winner: victor.id });
       return;
     }
 
-    // Move to next faction or next turn
     const nextIndex = (currentIndex + 1) % factions.length;
     const nextFaction = factions[nextIndex];
 
     if (nextIndex === 0) {
-      // New round — tick diplomacy to expire lapsed pacts
+      // New full round: increment turn, update season, tick diplomacy
       this.state.turnNumber++;
+      this.updateSeason();
       this.state.diplomacyManager.tick();
+
+      // Tick morale/war weariness
+      this.state.systems.moraleSystem?.tickAll?.();
+
+      // Tick nuclear readiness
+      this.state.systems.nuclearSystem?.tickReadiness?.();
+
+      // Expire old espionage intel
+      this.state.systems.espionageSystem?.tick?.();
+
+      // Fade AI grudges each round
+      this.state.systems.aiController?.fadeGrudges?.();
+
+      // Partisan spawning: 8% chance per occupied enemy territory per round
+      for (const territory of this.state.territories.values()) {
+        if (
+          territory.owner !== null &&
+          territory.originalOwner !== null &&
+          territory.owner !== territory.originalOwner &&
+          territory.isLand() &&
+          Math.random() < 0.08
+        ) {
+          territory.addUnits('partisan', 1);
+        }
+      }
     }
 
     this.state.currentFactionId = nextFaction.id;
     this.state.currentPhase = this.getFirstPhase();
 
-    // Clear pending actions
     this.state.pendingMoves = [];
     this.state.purchaseOrders = [];
     this.state.selectedTerritoryId = null;
     this.state.selectedUnits.clear();
 
-    // Reset action counters for new turn
     this.resetActionCounters();
-    
-    // Reset all units' "acted" status for the new faction's turn
+
     for (const territory of this.state.territories.values()) {
-      if (territory.owner === nextFaction.id) {
-        territory.resetActedUnits();
-      }
+      if (territory.owner === nextFaction.id) territory.resetActedUnits();
     }
 
     this.state.emit("turn_start", {
@@ -167,85 +157,95 @@ export class TurnManager {
   }
 
   /**
-   * Handle phase start logic
+   * Update season: cycles Spring → Summer → Autumn → Winter every TURNS_PER_SEASON rounds.
+   * Winter applies -1 attack/defense to all land units (handled in CombatResolver).
    */
-  private onPhaseStart(phase: GamePhase | string): void {
-    console.log(
-      `>>> PHASE START: ${phase} (Faction: ${this.state.currentFactionId}, Style: ${this.turnStyle})`
-    );
+  private updateSeason(): void {
+    const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+    const index = Math.floor((this.state.turnNumber - 1) / TURNS_PER_SEASON) % seasons.length;
+    const newSeason = seasons[index];
+    const previousSeason = this.state.currentSeason;
+    this.state.currentSeason = newSeason;
 
+    if (newSeason !== previousSeason) {
+      this.state.emit('game_event', {
+        type: 'season_change',
+        season: newSeason,
+        description: this.getSeasonDescription(newSeason),
+      });
+    }
+  }
+
+  getSeasonDescription(season: Season): string {
+    switch (season) {
+      case 'spring': return 'Spring — Normal conditions. Melting snow opens mountain passes.';
+      case 'summer': return 'Summer — Optimal conditions. Full movement and combat effectiveness.';
+      case 'autumn': return 'Autumn — Prepare for winter. Supply lines growing harder to maintain.';
+      case 'winter': return 'Winter — Harsh conditions! Land units suffer -1 attack and defense.';
+    }
+  }
+
+  getCurrentSeason(): Season {
+    return this.state.currentSeason;
+  }
+
+  private onPhaseStart(phase: GamePhase | string): void {
     this.state.emit("phase_start", {
       phase,
       factionId: this.state.currentFactionId,
     });
 
-    // Auto-collect income at income phase (classic) or end phase (quick/civ)
     if (phase === "collect_income" || phase === "end") {
       this.collectIncome();
     }
   }
 
-  /**
-   * Collect income for current faction
-   */
   private collectIncome(): void {
     const faction = this.state.getCurrentFaction();
     if (!faction) return;
 
-    const income = this.state.calculateIncome(faction.id);
+    const baseIncome = this.state.calculateIncome(faction.id);
+    const moraleMultiplier = this.state.systems.moraleSystem?.getIncomeModifier?.(faction.id) ?? 1;
+    const income = Math.floor(baseIncome * moraleMultiplier);
     faction.addIPCs(income);
 
     this.state.emit("income_collected", {
       factionId: faction.id,
       amount: income,
       total: faction.ipcs,
+      season: this.state.currentSeason,
     });
   }
 
-  /**
-   * Check for victory condition
-   */
   checkVictory(): Faction | null {
     const rules = this.state.rules;
-    const factions = this.state.factionRegistry
-      .getAll()
-      .filter((f) => !f.isDefeated);
+    const factions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
 
     switch (rules.victoryType) {
       case "capital": {
-        // Check if any faction controls enough enemy capitals
         for (const faction of factions) {
           let capitalsControlled = 0;
           for (const other of this.state.factionRegistry.getAll()) {
             if (faction.isEnemyOf(other.id)) {
-              const capitalTerritory = this.state.territories.get(
-                other.capital
-              );
-              if (capitalTerritory?.owner === faction.id) {
-                capitalsControlled++;
-              }
+              const capitalTerritory = this.state.territories.get(other.capital);
+              if (capitalTerritory?.owner === faction.id) capitalsControlled++;
             }
           }
-          if (capitalsControlled >= rules.victoryCapitalsRequired) {
-            return faction;
-          }
+          if (capitalsControlled >= rules.victoryCapitalsRequired) return faction;
         }
         break;
       }
 
       case "economic": {
         for (const faction of factions) {
-          if (faction.ipcs >= rules.victoryIPCThreshold) {
-            return faction;
-          }
+          if (faction.ipcs >= rules.victoryIPCThreshold) return faction;
         }
         break;
       }
 
       case "territorial": {
         for (const faction of factions) {
-          const territories = this.state.getTerritoriesOwnedBy(faction.id);
-          if (territories.length >= rules.victoryTerritoryCount) {
+          if (this.state.getTerritoriesOwnedBy(faction.id).length >= rules.victoryTerritoryCount) {
             return faction;
           }
         }
@@ -253,105 +253,61 @@ export class TurnManager {
       }
     }
 
-    // Check if only one alliance remains
+    // Last alliance standing wins
     const activeAlliances = new Set<string>();
     for (const faction of factions) {
-      // Create alliance identifier (sorted list of faction + allies)
       const alliance = [faction.id, ...faction.allies].sort().join(",");
       activeAlliances.add(alliance);
     }
-
-    if (activeAlliances.size === 1) {
-      return factions[0];
-    }
+    if (activeAlliances.size === 1) return factions[0];
 
     return null;
   }
 
-  /**
-   * Check if current faction is AI-controlled
-   */
   isCurrentFactionAI(): boolean {
-    const faction = this.state.getCurrentFaction();
-    return faction?.controlledBy === "ai";
+    return this.state.getCurrentFaction()?.controlledBy === "ai";
   }
 
-  /**
-   * Get current phase display name
-   */
   getPhaseDisplayName(): string {
-    const displayName = getStylePhaseDisplayName(
-      this.state.currentPhase,
-      this.turnStyle
-    );
-    console.log(
-      `Phase Display: ${this.state.currentPhase} -> ${displayName} (style: ${this.turnStyle})`
-    );
-    return displayName;
+    return getStylePhaseDisplayName(this.state.currentPhase, this.turnStyle);
   }
 
-  /**
-   * Notify that an action was taken (for action-by-action and chess modes)
-   */
   notifyAction(): void {
     this.actionCount++;
     this.actionsThisTurn++;
 
-    // In chess mode, end turn after max actions
-    if (
-      this.turnStyle === "chess" &&
-      this.actionsThisTurn >= this.maxActionsPerTurn
-    ) {
+    if (this.turnStyle === "chess" && this.actionsThisTurn >= this.maxActionsPerTurn) {
       this.advancePhase();
     }
 
-    // In action-by-action mode, wait for continue
     if (this.turnStyle === "action") {
       this.waitingForContinue = true;
       this.onWaitForContinue?.();
     }
   }
 
-  /**
-   * Continue after waiting (for action-by-action mode)
-   */
   continue(): void {
     this.waitingForContinue = false;
   }
 
-  /**
-   * Reset action counters for new turn
-   */
   private resetActionCounters(): void {
     this.actionsThisTurn = 0;
     this.actionCount = 0;
     this.waitingForContinue = false;
   }
 
-  /**
-   * Get phases for current turn style
-   */
   getPhases(): string[] {
     return this.customPhases || getPhasesForStyle(this.turnStyle);
   }
 
-  /**
-   * Get first phase for current style
-   */
   getFirstPhase(): GamePhase {
-    const phases = this.getPhases();
-    return phases[0] as GamePhase;
+    return this.getPhases()[0] as GamePhase;
   }
 
-  /**
-   * Get next phase for current style
-   */
   getNextPhaseForStyle(currentPhase: string): string | null {
     const phases = this.getPhases();
     const currentIndex = phases.indexOf(currentPhase);
-    if (currentIndex === -1 || currentIndex >= phases.length - 1) {
-      return null;
-    }
+    if (currentIndex === -1 || currentIndex >= phases.length - 1) return null;
     return phases[currentIndex + 1];
   }
 }

@@ -15,6 +15,7 @@ export interface FactionStats {
   totalIncomeEarned: number;
   totalIPCsSpent: number;
   techResearched: number;
+  nukesLaunched: number;
   veteranUnits: number;
   eliteUnits: number;
   turnCount: number;
@@ -40,6 +41,7 @@ function defaultStats(factionId: string): FactionStats {
     totalIncomeEarned: 0,
     totalIPCsSpent: 0,
     techResearched: 0,
+    nukesLaunched: 0,
     veteranUnits: 0,
     eliteUnits: 0,
     turnCount: 0,
@@ -104,6 +106,10 @@ class StatisticsManager {
 
   trackTechResearched(factionId: string): void {
     this.getFactionStats(factionId).techResearched++;
+  }
+
+  trackNukeLaunched(factionId: string): void {
+    this.getFactionStats(factionId).nukesLaunched++;
   }
 
   trackTurn(factionId: string): void {

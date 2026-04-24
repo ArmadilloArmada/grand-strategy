@@ -27,7 +27,7 @@ interface MapData {
   territories: EditorTerritory[];
 }
 
-type Tool = 'select' | 'polygon' | 'rect' | 'connect' | 'pan';
+type Tool = 'select' | 'polygon' | 'rect' | 'connect' | 'pan' | 'vertex';
 
 class MapEditor {
   private canvas: HTMLCanvasElement;
@@ -61,6 +61,15 @@ class MapEditor {
   
   // Connection state
   private connectionStart: string | null = null;
+
+  // Drag-to-move state (select tool)
+  private isDraggingTerritory: boolean = false;
+  private dragStartWorld: Point | null = null;
+  private hasDragged: boolean = false;
+
+  // Vertex editing state (vertex tool)
+  private hoveredVertexIdx: number | null = null;
+  private draggingVertexIdx: number | null = null;
   
   // Grid
   private showGrid: boolean = false;
@@ -119,11 +128,15 @@ class MapEditor {
     document.getElementById('tool-rect')?.addEventListener('click', () => this.setTool('rect'));
     document.getElementById('tool-connect')?.addEventListener('click', () => this.setTool('connect'));
     document.getElementById('tool-pan')?.addEventListener('click', () => this.setTool('pan'));
+    document.getElementById('tool-vertex')?.addEventListener('click', () => this.setTool('vertex'));
     document.getElementById('tool-zoom-in')?.addEventListener('click', () => this.zoomIn());
     document.getElementById('tool-zoom-out')?.addEventListener('click', () => this.zoomOut());
+    document.getElementById('tool-fit')?.addEventListener('click', () => this.fitToScreen());
     document.getElementById('tool-undo')?.addEventListener('click', () => this.undo());
     document.getElementById('tool-redo')?.addEventListener('click', () => this.redo());
     document.getElementById('tool-help')?.addEventListener('click', () => this.showHelp());
+    document.getElementById('btn-auto-connect')?.addEventListener('click', () => this.autoConnectAdjacent());
+    document.getElementById('btn-clear-connections')?.addEventListener('click', () => this.clearAllConnections());
     
     // Panel inputs
     document.getElementById('map-name')?.addEventListener('change', (e) => {
@@ -190,9 +203,10 @@ class MapEditor {
       rect: 'Rectangle',
       connect: 'Connect',
       pan: 'Pan',
+      vertex: 'Vertex Edit',
     };
     document.getElementById('status-tool')!.textContent = `Tool: ${toolNames[tool]}`;
-    
+
     // Update cursor
     const cursors: Record<Tool, string> = {
       select: 'default',
@@ -200,8 +214,16 @@ class MapEditor {
       rect: 'crosshair',
       connect: 'pointer',
       pan: 'grab',
+      vertex: 'crosshair',
     };
     this.canvas.style.cursor = cursors[tool];
+
+    // Reset drag/vertex state on tool switch
+    this.isDraggingTerritory = false;
+    this.dragStartWorld = null;
+    this.hasDragged = false;
+    this.draggingVertexIdx = null;
+    this.hoveredVertexIdx = null;
     
     this.connectionStart = null;
     this.render();
@@ -222,8 +244,21 @@ class MapEditor {
     
     if (e.button === 0) {
       switch (this.currentTool) {
-        case 'select':
-          this.selectTerritoryAt(worldPos);
+        case 'select': {
+          const hit = this.getTerritoryAt(worldPos);
+          if (hit && hit.id === this.selectedTerritoryId) {
+            // Start dragging the already-selected territory
+            this.isDraggingTerritory = true;
+            this.dragStartWorld = worldPos;
+            this.hasDragged = false;
+            this.canvas.style.cursor = 'move';
+          } else {
+            this.selectTerritoryAt(worldPos);
+          }
+          break;
+        }
+        case 'vertex':
+          this.startVertexDrag(worldPos);
           break;
         case 'polygon':
           this.addPolygonPoint(worldPos);
@@ -255,14 +290,65 @@ class MapEditor {
       this.render();
       return;
     }
-    
+
+    // Drag-to-move territory (select tool)
+    if (this.isDraggingTerritory && this.dragStartWorld && this.selectedTerritoryId) {
+      const territory = this.mapData.territories.find(t => t.id === this.selectedTerritoryId);
+      if (territory) {
+        const dx = worldPos.x - this.dragStartWorld.x;
+        const dy = worldPos.y - this.dragStartWorld.y;
+        territory.polygon = territory.polygon.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        if (territory.center) {
+          territory.center = { x: territory.center.x + dx, y: territory.center.y + dy };
+        }
+        this.dragStartWorld = worldPos;
+        this.hasDragged = true;
+        this.render();
+      }
+      return;
+    }
+
+    // Vertex dragging (vertex tool)
+    if (this.currentTool === 'vertex' && this.draggingVertexIdx !== null && this.selectedTerritoryId) {
+      const territory = this.mapData.territories.find(t => t.id === this.selectedTerritoryId);
+      if (territory && this.draggingVertexIdx < territory.polygon.length) {
+        const snapped = this.showGrid ? this.snapToGrid(worldPos) : worldPos;
+        territory.polygon[this.draggingVertexIdx] = snapped;
+        territory.center = this.calculateCenter(territory.polygon);
+        this.render();
+      }
+      return;
+    }
+
+    // Hover vertex detection (vertex tool)
+    if (this.currentTool === 'vertex' && this.selectedTerritoryId) {
+      const territory = this.mapData.territories.find(t => t.id === this.selectedTerritoryId);
+      const snapDist = 10 / this.zoom;
+      let found: number | null = null;
+      if (territory) {
+        for (let i = 0; i < territory.polygon.length; i++) {
+          const v = territory.polygon[i];
+          if (Math.hypot(worldPos.x - v.x, worldPos.y - v.y) < snapDist) {
+            found = i;
+            break;
+          }
+        }
+      }
+      if (found !== this.hoveredVertexIdx) {
+        this.hoveredVertexIdx = found;
+        this.canvas.style.cursor = found !== null ? 'grab' : 'crosshair';
+        this.render();
+      }
+      return;
+    }
+
     // Hover detection
     const territory = this.getTerritoryAt(worldPos);
     if (territory?.id !== this.hoveredTerritoryId) {
       this.hoveredTerritoryId = territory?.id || null;
       this.render();
     }
-    
+
     // Drawing preview
     if (this.isDrawing) {
       if (this.currentTool === 'polygon') {
@@ -281,7 +367,25 @@ class MapEditor {
       this.canvas.style.cursor = this.currentTool === 'pan' ? 'grab' : 'default';
       return;
     }
-    
+
+    if (this.isDraggingTerritory) {
+      this.isDraggingTerritory = false;
+      this.dragStartWorld = null;
+      this.canvas.style.cursor = 'default';
+      if (this.hasDragged) {
+        this.saveState();
+        this.hasDragged = false;
+      }
+      return;
+    }
+
+    if (this.currentTool === 'vertex' && this.draggingVertexIdx !== null) {
+      this.draggingVertexIdx = null;
+      this.canvas.style.cursor = 'crosshair';
+      this.saveState();
+      return;
+    }
+
     if (this.currentTool === 'rect' && this.rectStartPoint) {
       const worldPos = this.screenToWorld({ x: e.offsetX, y: e.offsetY });
       this.finishRect(worldPos);
@@ -359,6 +463,12 @@ class MapEditor {
         break;
       case 'c':
         this.setTool('connect');
+        break;
+      case 'e':
+        this.setTool('vertex');
+        break;
+      case 'f':
+        this.fitToScreen();
         break;
       case 'escape':
         this.cancelDrawing();
@@ -686,6 +796,23 @@ class MapEditor {
       }
       if (territory.hasFactory) {
         ctx.fillText('🏭', territory.center.x + 20 / this.zoom, territory.center.y - 16 / this.zoom);
+      }
+    }
+
+    // Draw vertex handles when vertex tool is active and territory is selected
+    if (this.currentTool === 'vertex' && territory.id === this.selectedTerritoryId) {
+      const r = 6 / this.zoom;
+      for (let i = 0; i < polygon.length; i++) {
+        const v = polygon[i];
+        const isHovered = i === this.hoveredVertexIdx;
+        const isDragging = i === this.draggingVertexIdx;
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = isDragging ? '#facc15' : isHovered ? '#fff' : '#e94560';
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1 / this.zoom;
+        ctx.stroke();
       }
     }
   }
@@ -1260,6 +1387,115 @@ class MapEditor {
 
   private showHelp(): void {
     document.getElementById('help-overlay')!.classList.add('visible');
+  }
+
+  // ==================== Vertex Editing ====================
+
+  private startVertexDrag(worldPos: Point): void {
+    if (!this.selectedTerritoryId) return;
+    const territory = this.mapData.territories.find(t => t.id === this.selectedTerritoryId);
+    if (!territory) return;
+
+    const snapDist = 10 / this.zoom;
+    for (let i = 0; i < territory.polygon.length; i++) {
+      const v = territory.polygon[i];
+      if (Math.hypot(worldPos.x - v.x, worldPos.y - v.y) < snapDist) {
+        this.draggingVertexIdx = i;
+        this.canvas.style.cursor = 'grabbing';
+        return;
+      }
+    }
+
+    // Clicking on the territory body in vertex mode selects it
+    const hit = this.getTerritoryAt(worldPos);
+    if (hit && hit.id !== this.selectedTerritoryId) {
+      this.selectedTerritoryId = hit.id;
+      this.hoveredVertexIdx = null;
+      this.updateTerritoryPanel();
+      this.render();
+    }
+  }
+
+  // ==================== Fit to Screen ====================
+
+  private fitToScreen(): void {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    if (this.mapData.territories.length > 0) {
+      for (const t of this.mapData.territories) {
+        for (const p of t.polygon) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+      }
+    } else {
+      minX = 0; minY = 0; maxX = this.mapData.width; maxY = this.mapData.height;
+    }
+
+    const padding = 40;
+    const contentW = maxX - minX + padding * 2;
+    const contentH = maxY - minY + padding * 2;
+
+    const scaleX = this.canvas.width / contentW;
+    const scaleY = this.canvas.height / contentH;
+    this.zoom = Math.min(scaleX, scaleY, 5);
+
+    this.panOffset = {
+      x: (this.canvas.width - contentW * this.zoom) / 2 - (minX - padding) * this.zoom,
+      y: (this.canvas.height - contentH * this.zoom) / 2 - (minY - padding) * this.zoom,
+    };
+
+    document.getElementById('status-zoom')!.textContent = `Zoom: ${Math.round(this.zoom * 100)}%`;
+    this.render();
+  }
+
+  // ==================== Auto-connect Adjacent ====================
+
+  /**
+   * Auto-connect territories whose polygons share an edge or are within `threshold` world units.
+   */
+  private autoConnectAdjacent(threshold: number = 15): void {
+    const territories = this.mapData.territories;
+    let added = 0;
+
+    for (let i = 0; i < territories.length; i++) {
+      for (let j = i + 1; j < territories.length; j++) {
+        const a = territories[i];
+        const b = territories[j];
+        if (a.connections.includes(b.id)) continue;
+
+        if (this.polygonsAreAdjacent(a.polygon, b.polygon, threshold)) {
+          a.connections.push(b.id);
+          b.connections.push(a.id);
+          added++;
+        }
+      }
+    }
+
+    if (added > 0) {
+      this.saveState();
+      this.updateTerritoryPanel();
+      this.render();
+    }
+  }
+
+  private polygonsAreAdjacent(polyA: Point[], polyB: Point[], threshold: number): boolean {
+    for (const va of polyA) {
+      for (const vb of polyB) {
+        if (Math.hypot(va.x - vb.x, va.y - vb.y) <= threshold) return true;
+      }
+    }
+    return false;
+  }
+
+  private clearAllConnections(): void {
+    if (!confirm('Remove ALL connections from all territories?')) return;
+    for (const t of this.mapData.territories) t.connections = [];
+    this.saveState();
+    this.updateTerritoryPanel();
+    this.render();
   }
 }
 

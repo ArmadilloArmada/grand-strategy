@@ -12,6 +12,8 @@ export interface RenderOptions {
   highlightSelected: boolean;
   highlightValidMoves: boolean;
   fogOfWarCallback?: (territoryId: string) => boolean; // Returns true if visible
+  intelRevealCallback?: (territoryId: string) => boolean; // Returns true if espionage-revealed
+  adjacentFogCallback?: (territoryId: string) => boolean; // Returns true if adjacent-but-hidden
 }
 
 export class MapRenderer {
@@ -85,6 +87,10 @@ export class MapRenderer {
 
     this.setupCanvas();
     this.setupEventListeners();
+
+    // Re-render whenever units are placed so AI mobilizations are visible immediately
+    this.state.on('territory_mobilized', () => this.render());
+    this.state.on('units_produced', () => this.render());
   }
 
   /**
@@ -123,6 +129,14 @@ export class MapRenderer {
    */
   setFogOfWarCallback(callback: (territoryId: string) => boolean): void {
     this.options.fogOfWarCallback = callback;
+  }
+
+  setIntelRevealCallback(callback: (territoryId: string) => boolean): void {
+    this.options.intelRevealCallback = callback;
+  }
+
+  setAdjacentFogCallback(callback: (territoryId: string) => boolean): void {
+    this.options.adjacentFogCallback = callback;
   }
 
   setTerritoryHoverCallback(callback: (territoryId: string | null, clientX: number, clientY: number) => void): void {
@@ -323,13 +337,39 @@ export class MapRenderer {
 
     // Fog of war: draw a dark overlay polygon on top of hidden territories
     if (!isVisible && !isSea) {
+      const isAdjacentFog = this.options.adjacentFogCallback?.(territory.id) ?? false;
       this.ctx.save();
       this.ctx.beginPath();
       this.ctx.moveTo(polygon[0][0], polygon[0][1]);
       for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
       this.ctx.closePath();
-      this.ctx.fillStyle = 'rgba(0, 0, 20, 0.72)';
+      // Adjacent-fog territories get a slightly lighter overlay to hint at their existence
+      this.ctx.fillStyle = isAdjacentFog ? 'rgba(0, 0, 20, 0.52)' : 'rgba(0, 0, 20, 0.72)';
       this.ctx.fill();
+      // Draw "?" marker for adjacent-fog territories so players know something is there
+      if (isAdjacentFog) {
+        const [cx, cy] = territory.center;
+        this.ctx.font = 'bold 14px sans-serif';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('?', cx, cy);
+      }
+      this.ctx.restore();
+    }
+
+    // Intel reveal indicator: teal dashed border for espionage-revealed territories
+    const isIntel = isVisible && !isSea && (this.options.intelRevealCallback?.(territory.id) ?? false);
+    if (isIntel) {
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+      this.ctx.closePath();
+      this.ctx.strokeStyle = 'rgba(0, 210, 180, 0.7)';
+      this.ctx.lineWidth = 2.5;
+      this.ctx.setLineDash([6, 4]);
+      this.ctx.stroke();
       this.ctx.restore();
     }
 
@@ -504,7 +544,32 @@ export class MapRenderer {
         this.drawFactorySymbol(fx, markerY, '#888888', '#2a1808');
       }
 
+      // Commander badge: gold diamond with ⚜ if a named general is present
+      const hasCommander = territory.units.some((u: any) => u.commander);
+      if (hasCommander) {
+        const bx = cx + (territory.isCapital ? 26 : 16);
+        const by = markerY - 8;
+        this.drawCommanderBadge(bx, by);
+      }
     }
+  }
+
+  /** Draw a small gold commander badge diamond. */
+  private drawCommanderBadge(cx: number, cy: number): void {
+    this.ctx.save();
+    const r = 5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy - r);
+    this.ctx.lineTo(cx + r, cy);
+    this.ctx.lineTo(cx, cy + r);
+    this.ctx.lineTo(cx - r, cy);
+    this.ctx.closePath();
+    this.ctx.fillStyle = '#f5c842';
+    this.ctx.fill();
+    this.ctx.strokeStyle = '#2a1808';
+    this.ctx.lineWidth = 0.8;
+    this.ctx.stroke();
+    this.ctx.restore();
   }
 
   /** Draw a 5-pointed star centered at (cx, cy) with given outer radius. */

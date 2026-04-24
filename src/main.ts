@@ -16,13 +16,20 @@ import { MultiplayerUI } from './network/MultiplayerUI';
 
 // New feature imports
 import { achievementManager } from './engine/AchievementManager';
-import { campaignManager } from './engine/CampaignManager';
+import { campaignManager, CampaignMission } from './engine/CampaignManager';
 import { tutorialManager } from './engine/TutorialManager';
 import { replayManager } from './engine/ReplayManager';
 import { steamManager } from './engine/SteamManager';
 import { achievementsUI } from './ui/AchievementsUI';
 import { campaignUI } from './ui/CampaignUI';
 import { EventsSystem, GameEvent as StrategicEvent } from './engine/EventsSystem';
+import { MoraleSystem } from './engine/MoraleSystem';
+import { EspionageSystem } from './engine/EspionageSystem';
+import { NuclearSystem } from './engine/NuclearSystem';
+import { getStartingCommander } from './data/commanders';
+import { networkManager, GameAction } from './network/NetworkManager';
+import { DebugPanel } from './ui/DebugPanel';
+import { ReplayUI } from './ui/ReplayUI';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -42,19 +49,24 @@ const UNIT_ERAS: Record<string, { name: string; description: string; data: any }
   'coldwar': { name: 'Cold War (1970)', description: 'Faster units. Jet age warfare.', data: coldwarUnitsData },
   'modern': { name: 'Modern (2020)', description: 'High-tech, fast, and expensive.', data: modernUnitsData },
 };
-import mapData from '../assets/maps/world-map.json';
-import gridMapData from '../assets/maps/grid-world-map.json';
-import tutorialMapData from '../assets/maps/tutorial-map.json';
-import europeMapData from '../assets/maps/europe-map.json';
-import pacificMapData from '../assets/maps/pacific-map.json';
-import duelMapData from '../assets/maps/duel-map.json';
-import africaMapData from '../assets/maps/africa-map.json';
-import asiaMapData from '../assets/maps/asia-map.json';
-import americasMapData from '../assets/maps/americas-map.json';
-import gridEuropeData from '../assets/maps/grid-europe.json';
-import gridPacificData from '../assets/maps/grid-pacific.json';
-import gridAmericasData from '../assets/maps/grid-americas.json';
+import _gridMapData from '../assets/maps/grid-world-map.json';
+import _tutorialMapData from '../assets/maps/tutorial-map.json';
+import _gridEuropeData from '../assets/maps/grid-europe.json';
+import _gridPacificData from '../assets/maps/grid-pacific.json';
+import _gridAmericasData from '../assets/maps/grid-americas.json';
+import _gridAfricaData from '../assets/maps/grid-africa.json';
+import _gridEasternFrontData from '../assets/maps/grid-eastern-front.json';
+import _gridSkirmishData from '../assets/maps/grid-skirmish.json';
 import { registerMap, getMapById } from './data/mapRegistry';
+import type { MapData } from './loaders/MapLoader';
+const gridMapData = _gridMapData as unknown as MapData;
+const tutorialMapData = _tutorialMapData as unknown as MapData;
+const gridEuropeData = _gridEuropeData as unknown as MapData;
+const gridPacificData = _gridPacificData as unknown as MapData;
+const gridAmericasData = _gridAmericasData as unknown as MapData;
+const gridAfricaData = _gridAfricaData as unknown as MapData;
+const gridEasternFrontData = _gridEasternFrontData as unknown as MapData;
+const gridSkirmishData = _gridSkirmishData as unknown as MapData;
 
 /**
  * Main Game class - orchestrates all systems
@@ -69,9 +81,19 @@ class Game {
   private saveManager: SaveManager;
   private multiplayerUI: MultiplayerUI;
   private eventsSystem: EventsSystem;
-  
+  private moraleSystem: MoraleSystem;
+  private espionageSystem: EspionageSystem;
+  private nuclearSystem: NuclearSystem;
+
   private isGameStarted: boolean = false;
   private saveLoadMode: 'save' | 'load' = 'save';
+  private replayUI: ReplayUI = new ReplayUI();
+  // Campaign state
+  private activeCampaignId: string | null = null;
+  private activeMission: CampaignMission | null = null;
+  private lastGameWinnerFaction: string | null = null;
+  // Cleanup handles for per-game event listeners (prevents leaks on New Game)
+  private unsubCampaignListeners: Array<() => void> = [];
 
   constructor() {
     // Initialize core systems
@@ -82,6 +104,14 @@ class Game {
     this.saveManager = new SaveManager(this.state);
     this.multiplayerUI = new MultiplayerUI();
     this.eventsSystem = new EventsSystem(this.state);
+    this.moraleSystem = new MoraleSystem(this.state);
+    this.espionageSystem = new EspionageSystem(this.state);
+    this.nuclearSystem = new NuclearSystem(this.state);
+
+    this.state.systems.moraleSystem = this.moraleSystem;
+    this.state.systems.espionageSystem = this.espionageSystem;
+    this.state.systems.nuclearSystem = this.nuclearSystem;
+    this.state.systems.aiController = this.aiController;
 
     // Apply AI difficulty from settings
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -91,44 +121,73 @@ class Game {
    * Initialize the game
    */
   async init(): Promise<void> {
-    console.log('🎮 Grand Strategy - Initializing...');
-
-    // Register available maps
-    registerMap('grid', 'World at War (Grid)', gridMapData as any);
-    registerMap('world', 'World at War (Classic)', mapData as any);
-    registerMap('tutorial', 'Tutorial', tutorialMapData as any);
-    registerMap('europe', 'Europe', europeMapData as any);
-    registerMap('pacific', 'Pacific Theater', pacificMapData as any);
-    registerMap('duel', 'Duel', duelMapData as any);
-    registerMap('africa', 'African Theater', africaMapData as any);
-    registerMap('asia', 'Asian Theater', asiaMapData as any);
-    registerMap('americas', 'The Americas', americasMapData as any);
-    registerMap('grid-europe', 'European Theater (Grid)', gridEuropeData as any);
-    registerMap('grid-pacific', 'Pacific Ring (Grid)', gridPacificData as any);
-    registerMap('grid-americas', 'Western Hemisphere (Grid)', gridAmericasData as any);
+    // Register available maps (grid maps only)
+    registerMap('grid', 'World at War (Grid)', gridMapData);
+    registerMap('tutorial', 'Tutorial', tutorialMapData);
+    registerMap('grid-europe', 'European Theater (Grid)', gridEuropeData);
+    registerMap('grid-pacific', 'Pacific Ring (Grid)', gridPacificData);
+    registerMap('grid-americas', 'Western Hemisphere (Grid)', gridAmericasData);
+    registerMap('grid-africa', 'African Campaign (Grid)', gridAfricaData);
+    registerMap('grid-eastern-front', 'Eastern Front (Grid)', gridEasternFrontData);
+    registerMap('grid-skirmish', 'Skirmish 2v2 (Grid)', gridSkirmishData);
 
     // Load game data (default map - grid for easier clicking)
     this.dataLoader.loadBundle({
       units: unitsData as import('./data/Unit').UnitTypeData[],
       factions: factionsData,
-      map: gridMapData as any,
+      map: gridMapData,
     });
-
-    console.log(`✓ Loaded ${this.state.territories.size} territories`);
-    console.log(`✓ Loaded ${this.state.unitRegistry.getAll().length} unit types`);
-    console.log(`✓ Loaded ${this.state.factionRegistry.getAll().length} factions`);
 
     // Initialize renderer and HUD
     this.renderer = new MapRenderer(this.state, 'game-canvas');
     this.hud = new HUD(this.state, this.turnManager, this.renderer);
+    // DebugPanel registers DOM/keyboard listeners and manages its own lifecycle
+    new DebugPanel(this.state, this.turnManager);
 
-    // Setup fog of war callback
+    this.state.systems.technologyManager = this.hud.technologyManager;
+
+    // Setup fog of war and intel reveal callbacks
     this.renderer.setFogOfWarCallback((id) => this.hud.isTerritoryVisible(id));
+    this.renderer.setIntelRevealCallback((id) => this.espionageSystem.isIntelRevealed(id));
+    this.renderer.setAdjacentFogCallback((id) => this.hud.isTerritoryAdjacentFog(id));
 
     // Setup event listeners
     this.state.on('turn_start', () => this.onTurnStart());
     this.state.on('phase_end', () => this.autoSave());
     this.state.on('turn_end', () => this.checkVictory());
+
+    // Multiplayer: apply incoming actions from other players
+    networkManager.on('game_action', (raw: any) => this.applyNetworkAction(raw as GameAction));
+
+    // Multiplayer: handle desync detection
+    networkManager.on('state_verify', (msg: { checksum: number; turnNumber: number; phase: string }) => {
+      const localChecksum = this.state.computeChecksum();
+      if (localChecksum !== msg.checksum) {
+        console.error(
+          `[Desync] Turn ${msg.turnNumber} phase "${msg.phase}": ` +
+          `remote=${msg.checksum} local=${localChecksum}`
+        );
+        this.hud.showToast(
+          `⚠️ State desync on turn ${msg.turnNumber}. Reload from host to resync.`,
+          'info'
+        );
+      }
+    });
+
+    // Multiplayer: surface connection loss to the player
+    networkManager.on('connection_lost', (data: { attempt: number; maxAttempts: number }) => {
+      if (this.isGameStarted) {
+        this.hud.showToast(
+          `🔌 Connection lost — reconnecting (${data.attempt}/${data.maxAttempts})…`,
+          'info'
+        );
+      }
+    });
+    networkManager.on('connection_failed', () => {
+      if (this.isGameStarted) {
+        this.hud.showToast('❌ Connection lost. Could not reconnect to server.', 'info');
+      }
+    });
 
     // Setup UI event listeners
     this.setupMenuListeners();
@@ -137,11 +196,46 @@ class Game {
     this.setupCrashHandler();
 
     // Initialize Steam integration (if available)
-    steamManager.initialize().then(available => {
-      if (available) {
-        console.log('✓ Steam integration active');
+    steamManager.initialize();
+
+    // Wire replay playback callbacks (apply actions to game state + restore initial snapshot)
+    this.replayUI.setCallbacks(
+      (action) => {
+        // Apply a single replay action to the live game state
+        switch (action.action.type) {
+          case 'move': {
+            const d = action.action.data as { unitTypeId: string; count: number; fromId: string; toId: string };
+            const from = this.state.territories.get(d.fromId);
+            const to   = this.state.territories.get(d.toId);
+            if (from && to) { from.removeUnits(d.unitTypeId, d.count); to.addUnits(d.unitTypeId, d.count); }
+            break;
+          }
+          case 'combat_result': {
+            const d = action.action.data as { attackerLosses: Record<string,number>; defenderLosses: Record<string,number>; captured: boolean; newOwner: string|null; fromId: string; toId: string };
+            for (const [uid, cnt] of Object.entries(d.attackerLosses ?? {})) this.state.territories.get(d.fromId)?.removeUnits(uid, cnt);
+            for (const [uid, cnt] of Object.entries(d.defenderLosses ?? {})) this.state.territories.get(d.toId)?.removeUnits(uid, cnt);
+            if (d.captured && d.newOwner) { const t = this.state.territories.get(d.toId); if (t) t.owner = d.newOwner; }
+            break;
+          }
+          case 'produce': {
+            const d = action.action.data as { unitTypeId: string; count: number; territoryId: string };
+            this.state.territories.get(d.territoryId)?.addUnits(d.unitTypeId, d.count);
+            break;
+          }
+          case 'phase_end':
+            this.turnManager.advancePhase();
+            break;
+        }
+        this.renderer.render();
+        this.hud.updateTurnInfo();
+      },
+      (json) => {
+        // Restore from initial snapshot
+        try { this.state.loadFromJSON(json); } catch { /* legacy replay snapshots may be partial */ }
+        this.renderer.render();
+        this.hud.updateTurnInfo();
       }
-    });
+    );
 
     // Start background music on menu
     soundManager.playMusic('menu');
@@ -179,7 +273,6 @@ class Game {
           humanFactions: ['atlantic_alliance'],
         };
         this.startNewGame();
-        console.log('✓ Launched editor preview map:', previewMap.name);
       } catch (e) {
         console.warn('Failed to load editor preview map:', e);
         this.showMainMenu();
@@ -204,11 +297,10 @@ class Game {
       turnStyle: turnStyle,
       victoryType: 'capitals',
       turnLimit: 50,
-      fogOfWar: false, // Disable fog for easier play
+      fogOfWar: true,
       autoSave: true,
     };
 
-    console.log(`🎮 Quick Start: ${turnStyle} mode`);
     this.startNewGame();
   }
 
@@ -217,13 +309,11 @@ class Game {
    */
   startNewGame(): void {
     const mapId = this.hud.gameConfig.mapId ?? 'grid';
-    const mapToLoad = getMapById(mapId) ?? (gridMapData as any);
+    const mapToLoad = getMapById(mapId) ?? gridMapData;
     
     // Get units for selected era
     const unitEra = this.hud.gameConfig.unitEra ?? 'wwii';
     const eraUnits = UNIT_ERAS[unitEra]?.data ?? wwiiUnitsData;
-    console.log(`🎮 Loading ${unitEra.toUpperCase()} era units`);
-    
     // Reset game state by reloading data
     this.dataLoader.loadBundle({
       units: eraUnits as import('./data/Unit').UnitTypeData[],
@@ -238,7 +328,6 @@ class Game {
     for (const faction of factions) {
       // Check if this faction should be human controlled
       faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
-      console.log(`${faction.name} controlled by: ${faction.controlledBy}`);
     }
 
     // Apply current difficulty and personality
@@ -247,7 +336,6 @@ class Game {
 
     // Set turn style from config
     this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
-    console.log(`Turn style: ${this.hud.gameConfig.turnStyle}`);
 
     // Fit map to screen
     this.renderer.fitToScreen();
@@ -267,8 +355,61 @@ class Game {
     });
 
     this.hud.updateTurnInfo();
-    
+
+    // Assign starting commanders to each faction's capital territory
+    for (const faction of this.state.factionRegistry.getAll()) {
+      const commander = getStartingCommander(faction.id);
+      if (!commander) continue;
+      // Find this faction's capital territory
+      const capital = Array.from(this.state.territories.values()).find(
+        t => t.owner === faction.id && t.isCapital
+      );
+      if (capital && capital.units.length > 0) {
+        // Attach to first land unit stack
+        const landUnit = capital.units.find(u => {
+          const unitType = this.state.unitRegistry.get(u.unitTypeId);
+          return unitType?.domain === 'land';
+        });
+        if (landUnit) {
+          (landUnit as any).commander = commander;
+        }
+      }
+    }
+
+    // Expose game state globally for modal onclick handlers
+    (window as any).__gameState = this.state;
+
     this.isGameStarted = true;
+
+    // Clean up any previous per-game listeners before adding new ones
+    for (const unsub of this.unsubCampaignListeners) unsub();
+    this.unsubCampaignListeners = [];
+
+    // Wire campaign tracking events if in campaign mode
+    if (this.activeCampaignId) {
+      this.unsubCampaignListeners.push(
+        this.state.on('combat_end', (e) => {
+          if (!this.activeCampaignId) return;
+          const combat = (e.data as any)?.combat;
+          if (!combat) return;
+          const humanFaction = this.hud.gameConfig.humanFactions?.[0];
+          if (combat.attackingFactionId === humanFaction) {
+            const defenderLosses = (combat.defenders as Array<{ casualties: number }>)
+              ?.reduce((sum: number, d: { casualties: number }) => sum + (d.casualties ?? 0), 0) ?? 0;
+            if (defenderLosses > 0) campaignManager.trackUnitsDestroyed(defenderLosses);
+            if (combat.captured) campaignManager.trackCapture(combat.territoryId);
+          }
+        }),
+        this.state.on('territory_mobilized', (e) => {
+          if (!this.activeCampaignId) return;
+          const data = e.data as any;
+          const humanFaction = this.hud.gameConfig.humanFactions?.[0];
+          if (data?.factionId === humanFaction && data?.count) {
+            campaignManager.trackUnitsProduced(data.count as number);
+          }
+        })
+      );
+    }
 
     // Hide main menu
     this.hideMainMenu();
@@ -279,7 +420,6 @@ class Game {
       this.hud.showTutorial();
     }
 
-    console.log('✓ New game started!');
   }
 
   /**
@@ -478,40 +618,50 @@ class Game {
     if (content) {
       campaignUI.show(content);
       campaignUI.onStart((mission, campaignId) => {
-        // Hide all menus
-        this.hideCampaign();
-        this.hideMainMenu();
-        
-        console.log(`Starting mission: ${mission.name} from campaign: ${campaignId}`);
-        
-        // Load the mission map and start the game
-        const missionMap = getMapById(mission.mapId);
-        if (missionMap) {
-          // Set up game config for campaign mission
-          this.hud.gameConfig = {
-            ...this.hud.gameConfig,
-            mode: 'vs-ai',
-            humanFactions: [mission.faction],
-            turnStyle: 'classic',
-            victoryType: 'capitals',
-            turnLimit: 50,
-            fogOfWar: false,
-            autoSave: true,
-          };
-          
-          // Load the map
-          this.dataLoader.loadBundle({
-            units: unitsData as import('./data/Unit').UnitTypeData[],
-            factions: factionsData,
-            map: missionMap as import('./loaders/MapLoader').MapData,
-          });
-          
-          // Show mission briefing then start
-          this.hud.showToast(`Mission: ${mission.name}`, 'info');
-          this.startNewGame();
-        } else {
-          this.hud.showToast(`Map not found: ${mission.mapId}`, 'info');
-        }
+        // Show mission briefing overlay before launching
+        campaignUI.showBriefing(
+          mission,
+          campaignId,
+          () => {
+            // Player clicked "Launch Mission"
+            this.hideCampaign();
+            this.hideMainMenu();
+
+            const missionMap = getMapById(mission.mapId);
+            if (!missionMap) {
+              this.hud.showToast(`Map not found: ${mission.mapId}`, 'info');
+              return;
+            }
+
+            // Store active campaign state
+            this.activeCampaignId = campaignId;
+            this.activeMission = mission;
+            this.lastGameWinnerFaction = null;
+            campaignManager.activeCampaignId = campaignId;
+            campaignManager.activeMissionId = mission.id;
+            campaignManager.resetCounters();
+
+            // Ensure progress entry exists
+            campaignManager.startCampaign(campaignId);
+
+            this.hud.gameConfig = {
+              ...this.hud.gameConfig,
+              mapId: mission.mapId,
+              mode: 'vs-ai',
+              humanFactions: [mission.faction],
+              turnStyle: 'classic',
+              victoryType: 'capitals',
+              turnLimit: 50,
+              fogOfWar: true,
+              autoSave: true,
+            };
+
+            this.startNewGame();
+          },
+          () => {
+            // Player clicked "Back" — briefing closes, campaign list remains visible
+          }
+        );
       });
     }
   }
@@ -523,6 +673,78 @@ class Game {
     const modal = document.getElementById('campaign-modal');
     if (modal) modal.classList.add('hidden');
     campaignUI.hide();
+  }
+
+  /**
+   * Show campaign debriefing after a mission ends (win or loss)
+   */
+  private showCampaignDebriefing(): void {
+    const campaignId = this.activeCampaignId;
+    const mission = this.activeMission;
+    if (!campaignId || !mission) {
+      this.showMainMenu();
+      return;
+    }
+
+    const humanFaction = this.hud.gameConfig.humanFactions?.[0] ?? '';
+    const won = this.lastGameWinnerFaction === humanFaction;
+
+    let appliedRewards: string[] = [];
+    let nextMission: CampaignMission | null = null;
+
+    if (won) {
+      // Collect bonus objectives completed during the mission
+      const bonusCompleted = campaignManager.checkBonusObjectives(
+        mission,
+        {
+          turnNumber: this.state.turnNumber,
+          territoriesOwnedBy: (fid) =>
+            Array.from(this.state.territories.values())
+              .filter(t => t.owner === fid)
+              .map(t => ({ id: t.id, name: t.name })),
+          totalUnitsKilled: 0,
+          totalUnitsProduced: 0,
+        },
+        humanFaction
+      );
+
+      // Apply rewards and get next mission
+      appliedRewards = campaignManager.applyRewards(
+        mission.rewards,
+        (amount) => {
+          const faction = this.state.factionRegistry.get(humanFaction);
+          if (faction) faction.ipcs += amount;
+        },
+        (_techId) => {
+          // Tech rewards are informational only — actual tech application on next mission load
+        }
+      );
+
+      nextMission = campaignManager.completeMission(campaignId, bonusCompleted);
+    }
+
+    // Clear active campaign state
+    this.activeCampaignId = null;
+    this.activeMission = null;
+    campaignManager.activeCampaignId = null;
+    campaignManager.activeMissionId = null;
+
+    campaignUI.showDebriefing(
+      mission,
+      won,
+      appliedRewards,
+      nextMission,
+      () => {
+        // "Next Mission" — show campaign screen so player can launch next
+        this.showMainMenu();
+        this.showCampaign();
+      },
+      () => {
+        // "Return to Campaign" — go back to main menu with campaign modal
+        this.showMainMenu();
+        this.showCampaign();
+      }
+    );
   }
 
   /**
@@ -646,6 +868,8 @@ class Game {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
+        const slot = this.saveManager.getSlots().find(s => s.id === slotId);
+        if (!slot?.isEmpty && !confirm('Overwrite existing save?')) return;
         this.saveManager.saveToSlot(slotId);
         this.hud.showToast('Game saved!', 'success');
         this.renderSaveSlots();
@@ -767,16 +991,38 @@ class Game {
       this.startNewGame();
     });
 
-    // Victory/defeat screen: return to main menu
+    // Track victory winner for campaign debriefing
+    this.state.on('victory', (e) => {
+      const data = e.data as { winner: string };
+      this.lastGameWinnerFaction = data.winner;
+    });
+
+    // Victory/defeat screen: return to main menu (or show campaign debriefing)
     this.hud.events.on('showMainMenu', () => {
       replayManager.stopRecording();
       this.isGameStarted = false;
-      this.showMainMenu();
+
+      if (this.activeCampaignId && this.activeMission) {
+        this.showCampaignDebriefing();
+      } else {
+        this.showMainMenu();
+      }
     });
 
     // Listen for auto-save event
     this.hud.events.on('autoSave', () => {
       this.saveManager.quickSave();
+    });
+
+    // HUD keyboard shortcut events
+    this.hud.events.on('quickSave', () => {
+      if (this.isGameStarted) this.saveManager.quickSave();
+    });
+    this.hud.events.on('quickLoad', () => {
+      if (this.saveManager.quickLoad()) {
+        this.renderer.render();
+        this.hud.updateTurnInfo();
+      }
     });
 
     document.getElementById('btn-continue-game')?.addEventListener('click', () => {
@@ -821,6 +1067,18 @@ class Game {
 
     document.getElementById('btn-close-achievements')?.addEventListener('click', () => {
       this.hideAchievements();
+    });
+
+    // Replays
+    document.getElementById('btn-replays')?.addEventListener('click', () => {
+      const modal = document.getElementById('replays-modal');
+      const content = document.getElementById('replays-content');
+      if (modal) modal.classList.remove('hidden');
+      if (content) this.replayUI.showBrowser(content);
+    });
+    document.getElementById('btn-close-replays')?.addEventListener('click', () => {
+      document.getElementById('replays-modal')?.classList.add('hidden');
+      this.replayUI.hideBrowser();
     });
 
     // Interactive tutorial
@@ -1027,7 +1285,6 @@ class Game {
     
     // Human player's turn - just update UI and wait for input
     if (faction.controlledBy === 'human') {
-      console.log(`👤 HUMAN TURN: ${faction.name}`);
       soundManager.play('your_turn');
       steamManager.setRichPresence('Playing', {
         turn: this.state.turnNumber.toString(),
@@ -1058,8 +1315,6 @@ class Game {
     }
     
     // AI turn - execute automatically
-    console.log(`🤖 AI TURN: ${faction.name}`);
-    
     // Roll for AI strategic event (apply automatically)
     const aiEvent = this.eventsSystem.rollForEvent(faction.id);
     if (aiEvent && aiEvent.type !== 'choice') {
@@ -1207,6 +1462,61 @@ class Game {
   /**
    * Auto save at end of each phase
    */
+  /**
+   * Apply a game action received from another player via multiplayer
+   */
+  private applyNetworkAction(action: GameAction): void {
+    if (!this.isGameStarted) return;
+    switch (action.type) {
+      case 'advance_phase':
+        this.turnManager.advancePhase();
+        break;
+      case 'move_units': {
+        const from = this.state.territories.get(action.fromId);
+        const to   = this.state.territories.get(action.toId);
+        if (from && to) {
+          from.removeUnits(action.unitTypeId, action.count);
+          if (!to.owner && from.owner) to.owner = from.owner;
+          to.addUnits(action.unitTypeId, action.count);
+        }
+        break;
+      }
+      case 'purchase_units': {
+        const t = this.state.territories.get(action.territoryId);
+        if (t) t.addUnits(action.unitTypeId, action.count);
+        break;
+      }
+      case 'research_tech': {
+        const tm = this.state.systems.technologyManager;
+        if (tm?.startResearch) tm.startResearch(action.factionId, action.techId);
+        break;
+      }
+      case 'combat_result': {
+        for (const [uid, count] of Object.entries(action.attackerLosses)) {
+          this.state.territories.get(action.fromId)?.removeUnits(uid, count);
+        }
+        for (const [uid, count] of Object.entries(action.defenderLosses)) {
+          this.state.territories.get(action.toId)?.removeUnits(uid, count);
+        }
+        if (action.captured && action.newOwner) {
+          const to = this.state.territories.get(action.toId);
+          if (to) to.owner = action.newOwner;
+        }
+        break;
+      }
+    }
+    this.renderer.render();
+
+    // Broadcast checksum so peers can verify state consistency
+    if (networkManager.isConnected()) {
+      networkManager.sendStateChecksum(
+        this.state.computeChecksum(),
+        this.state.turnNumber,
+        this.state.currentPhase
+      );
+    }
+  }
+
   private autoSave(): void {
     if (this.isGameStarted && this.hud.gameConfig.autoSave) {
       this.saveManager.autoSave();
@@ -1240,7 +1550,6 @@ class Game {
       // Try to auto-save before showing the dialog
       try {
         this.saveManager.autoSave();
-        console.log('💾 Emergency auto-save completed');
       } catch (e) {
         console.error('Emergency save failed:', e);
       }
@@ -1325,19 +1634,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Expose game instance for debugging
   (window as any).game = game;
-
-  console.log('');
-  console.log('🎮 Grand Strategy loaded!');
-  console.log('');
-  console.log('⌨️ Keyboard shortcuts:');
-  console.log('  Ctrl+S  - Quick save');
-  console.log('  Ctrl+L  - Quick load');
-  console.log('  Escape  - Open/close menu');
-  console.log('  Enter   - End phase');
-  console.log('  Space   - End phase');
-  console.log('  B       - Build units (purchase phase)');
-  console.log('  A       - Attack (combat phase)');
-  console.log('  H       - Help/tutorial');
-  console.log('  F       - Fit map to screen');
-  console.log('  C       - Center on capital');
 });

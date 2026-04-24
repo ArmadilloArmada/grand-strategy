@@ -58,7 +58,6 @@ export class SoundManager {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.initialized = true;
-      console.log('🔊 Audio initialized');
     } catch (e) {
       console.warn('Audio not available:', e);
     }

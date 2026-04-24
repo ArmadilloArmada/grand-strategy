@@ -84,7 +84,7 @@ export class ReserveSystem {
       pool.push({ unitTypeId, count });
     }
 
-    this.state.emit('reserve_updated' as any, { factionId, reserves: pool });
+    this.state.emit('reserve_updated', { factionId, reserves: pool });
   }
 
   /**
@@ -285,7 +285,7 @@ export class ReserveSystem {
     // Clear pending deployments
     this.pendingDeployments = [];
 
-    this.state.emit('units_deployed' as any, { 
+    this.state.emit('units_deployed', {
       factionId: faction.id, 
       count: deployed,
       territories: Array.from(territories)

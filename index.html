@@ -120,12 +120,16 @@
       
       <div id="action-buttons" role="toolbar" aria-label="Game actions">
         <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️ Undo</button>
+        <button id="btn-redo" disabled title="Redo" aria-label="Redo last undone phase">↪️ Redo</button>
         <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
         <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
+        <button id="btn-strategic-bomb" disabled class="hidden" title="Strategic bombing mission" aria-label="Strategic bombing">💣 Bomb Factory</button>
         <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
         <div class="btn-separator"></div>
         <button id="btn-research" class="utility-btn" title="Research technologies" aria-label="Research technologies">🔬</button>
         <button id="btn-diplomacy" class="utility-btn" title="Diplomatic relations" aria-label="Diplomatic relations">🤝</button>
+        <button id="btn-espionage" class="utility-btn" title="Espionage operations" aria-label="Espionage operations">🕵️</button>
+        <button id="btn-nuclear" class="utility-btn hidden" title="Launch nuclear strike (readiness must be 100%)" aria-label="Launch nuclear strike">☢️</button>
         <button id="btn-stats" class="utility-btn" title="View game statistics" aria-label="View game statistics">📊</button>
         <button id="btn-fog-toggle" class="utility-btn" title="Toggle fog of war" aria-label="Toggle fog of war">🌫️</button>
         <div class="btn-separator"></div>
@@ -204,11 +208,11 @@
               <span class="menu-btn-icon">📂</span>
               <div class="menu-btn-label">Load Saved Game</div>
             </button>
-            <button id="btn-multiplayer" class="menu-btn" disabled title="Online multiplayer coming soon!">
+            <button id="btn-multiplayer" class="menu-btn">
               <span class="menu-btn-icon">🌐</span>
               <div>
                 <div class="menu-btn-label">Multiplayer</div>
-                <div class="menu-btn-sub">Coming Soon</div>
+                <div class="menu-btn-sub">Online Play</div>
               </div>
             </button>
           </div>
@@ -218,6 +222,7 @@
           <!-- Utility Footer -->
           <div class="main-menu-footer">
             <button id="btn-achievements" class="menu-btn-icon-only" title="Achievements">🏆</button>
+            <button id="btn-replays"      class="menu-btn-icon-only" title="Watch Replays">📽️</button>
             <button id="btn-tutorial"     class="menu-btn-icon-only" title="Tutorial">📚</button>
             <button id="btn-open-settings" class="menu-btn-icon-only" title="Settings">⚙️</button>
             <a href="/map-editor.html" target="_blank" style="display:contents;">
@@ -239,15 +244,11 @@
           <div class="setting-row">
             <label for="map-select">Map</label>
             <select id="map-select">
-              <!-- Options filled by JS from map registry -->
               <option value="grid" selected>World at War (Grid) - Recommended</option>
-              <option value="world">World at War (Classic)</option>
+              <option value="grid-europe">European Theater (Grid)</option>
+              <option value="grid-pacific">Pacific Ring (Grid)</option>
+              <option value="grid-americas">Western Hemisphere (Grid)</option>
               <option value="tutorial">Tutorial</option>
-              <optgroup label="── Grid Theater Maps ──">
-                <option value="grid-europe">European Theater (Grid)</option>
-                <option value="grid-pacific">Pacific Ring (Grid)</option>
-                <option value="grid-americas">Western Hemisphere (Grid)</option>
-              </optgroup>
             </select>
           </div>
           <div class="setting-row">
@@ -643,8 +644,42 @@
           </div>
         </div>
 
-        <!-- Step 10: Tips -->
+        <!-- Step 10: Espionage & Intelligence -->
         <div class="tutorial-step" data-step="9">
+          <div class="tutorial-image">🕵️</div>
+          <div class="tutorial-text">
+            <strong>Espionage &amp; Covert Operations</strong><br><br>
+            Open the <strong>🕵️ Espionage</strong> panel to run secret operations against enemies:<br>
+            &nbsp;• <em>Gather Intel</em> (5 IPCs) — reveal enemy units in all their territories<br>
+            &nbsp;• <em>Sabotage Factory</em> (10 IPCs) — shut down a factory for 1 turn<br>
+            &nbsp;• <em>Steal Technology</em> (15 IPCs) — copy research progress from enemies<br>
+            &nbsp;• <em>Economic Disruption</em> (15 IPCs) — steal 15% of their treasury<br>
+            &nbsp;• <em>Propaganda</em> (10 IPCs) — boost enemy war weariness<br>
+            &nbsp;• <em>Nuclear Secrets</em> (25 IPCs) — gain 30% nuclear readiness instantly<br><br>
+            Operations can <strong>fail</strong> (enemy discovers your spy) and even trigger war!
+            The <strong>Eastern Coalition</strong> has built-in counter-intelligence.
+          </div>
+        </div>
+
+        <!-- Step 11: Research & Nuclear -->
+        <div class="tutorial-step" data-step="10">
+          <div class="tutorial-image">☢️</div>
+          <div class="tutorial-text">
+            <strong>Technology &amp; Nuclear Weapons</strong><br><br>
+            Open <strong>🔬 Research</strong> to invest IPCs into technologies each turn:<br>
+            &nbsp;• <em>Advanced Industry</em> — cheaper units<br>
+            &nbsp;• <em>Radar</em> — stronger air defense<br>
+            &nbsp;• <em>Nuclear Program</em> — unlocks nuclear strikes<br><br>
+            Once you research <strong>Nuclear Program</strong>, your readiness charges 20%/turn
+            (uranium territories speed this up). At 100%, launch a devastating strike:<br>
+            &nbsp;• Destroys ~80% of units in the target territory<br>
+            &nbsp;• Bombs any factory there for 5 turns<br>
+            &nbsp;• All factions gain +40 war weariness against you — use wisely!
+          </div>
+        </div>
+
+        <!-- Step 12: Tips -->
+        <div class="tutorial-step" data-step="11">
           <div class="tutorial-image">⌨️</div>
           <div class="tutorial-text">
             <strong>Keyboard Shortcuts &amp; Tips</strong><br><br>
@@ -665,6 +700,8 @@
           <button id="btn-tutorial-prev" disabled>← Back</button>
           <div class="tutorial-dots">
             <div class="tutorial-dot active"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
             <div class="tutorial-dot"></div>
             <div class="tutorial-dot"></div>
             <div class="tutorial-dot"></div>
@@ -726,6 +763,24 @@
       <div id="territory-tooltip-content"></div>
     </div>
 
+    <!-- Strategic Bombing Modal -->
+    <div id="strategic-bombing-modal" class="modal hidden">
+      <div class="modal-content" style="max-width:480px;">
+        <h2>💣 Strategic Bombing Mission</h2>
+        <p style="color:#aaa;margin:0.5rem 0 1rem;">Send bombers to destroy an enemy factory, disabling it for several turns.</p>
+        <div class="setting-row" style="margin-bottom:0.75rem;">
+          <label for="sb-target-select">Target factory territory</label>
+          <select id="sb-target-select" style="background:#1a2a3a;color:#ccc;border:1px solid #444;padding:0.35rem;border-radius:4px;flex:1;"></select>
+        </div>
+        <div id="sb-bomber-info" style="color:#888;font-size:0.85rem;margin-bottom:1rem;"></div>
+        <div id="sb-result" style="display:none;padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:6px;margin-bottom:1rem;"></div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button id="btn-sb-launch" class="primary">🚀 Launch Mission</button>
+          <button id="btn-sb-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Combat Modal -->
     <div id="combat-modal" class="modal hidden">
       <div class="modal-content">
@@ -767,17 +822,23 @@
           Spend IPCs to unlock permanent upgrades for your faction
         </p>
         
-        <div id="tech-categories" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-          <button class="tech-cat-btn active" data-cat="all">All</button>
-          <button class="tech-cat-btn" data-cat="infantry">🎖️ Infantry</button>
-          <button class="tech-cat-btn" data-cat="armor">🛡️ Armor</button>
-          <button class="tech-cat-btn" data-cat="air">✈️ Air</button>
-          <button class="tech-cat-btn" data-cat="naval">🚢 Naval</button>
-          <button class="tech-cat-btn" data-cat="economy">💰 Economy</button>
-          <button class="tech-cat-btn" data-cat="special">⭐ Special</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+          <div id="tech-categories" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="tech-cat-btn active" data-cat="all">All</button>
+            <button class="tech-cat-btn" data-cat="infantry">🎖️ Infantry</button>
+            <button class="tech-cat-btn" data-cat="armor">🛡️ Armor</button>
+            <button class="tech-cat-btn" data-cat="air">✈️ Air</button>
+            <button class="tech-cat-btn" data-cat="naval">🚢 Naval</button>
+            <button class="tech-cat-btn" data-cat="economy">💰 Economy</button>
+            <button class="tech-cat-btn" data-cat="special">⭐ Special</button>
+          </div>
+          <button id="btn-tech-tree-toggle" style="font-size:0.8rem;padding:0.3rem 0.7rem;">🌳 Tree View</button>
         </div>
-        
+
         <div id="tech-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; max-height: 400px; overflow-y: auto;"></div>
+        <div id="tech-tree-container" class="hidden" style="overflow-x:auto;overflow-y:auto;max-height:440px;background:rgba(0,0,0,0.04);border-radius:8px;padding:0.5rem;">
+          <svg id="tech-tree-svg" style="display:block;"></svg>
+        </div>
         
         <div id="researched-tech" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
           <h3>✓ Researched Technologies</h3>
@@ -958,6 +1019,19 @@
         </div>
         <div id="achievements-content">
           <!-- Populated by AchievementsUI -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Replay Browser Modal -->
+    <div id="replays-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2>📽️ Replays</h2>
+          <button id="btn-close-replays" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
+        </div>
+        <div id="replays-content">
+          <!-- Populated by ReplayUI -->
         </div>
       </div>
     </div>

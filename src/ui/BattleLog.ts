@@ -29,6 +29,7 @@ export class BattleLog {
    * Setup event listeners
    */
   private setupEventListeners(): void {
+    if (typeof document === 'undefined') return;
     document.getElementById('battle-log-header')?.addEventListener('click', () => this.toggle());
     document.getElementById('btn-toggle-log')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -139,6 +140,7 @@ export class BattleLog {
    * Render the log entries to the DOM
    */
   private render(): void {
+    if (typeof document === 'undefined') return;
     const container = document.getElementById('battle-log-entries');
     if (!container) return;
 

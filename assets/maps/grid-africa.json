@@ -1,0 +1,5211 @@
+{
+  "id": "grid-africa",
+  "name": "African Campaign (Grid)",
+  "version": "1.0",
+  "width": 700,
+  "height": 500,
+  "backgroundColor": "#c8a96e",
+  "territories": [
+    {
+      "id": "med_w",
+      "name": "Med West",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "adjacentTo": [
+        "med_cw",
+        "atl_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_cw",
+      "name": "Med CW",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "adjacentTo": [
+        "med_w",
+        "med_c",
+        "atl_n2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_c",
+      "name": "Med C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "adjacentTo": [
+        "med_cw",
+        "med_ce",
+        "morocco"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_ce",
+      "name": "Med CE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "adjacentTo": [
+        "med_c",
+        "med_e",
+        "algeria"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e",
+      "name": "Med E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "adjacentTo": [
+        "med_ce",
+        "med_ee",
+        "tunisia"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_ee",
+      "name": "Med EE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "adjacentTo": [
+        "med_e",
+        "med_red",
+        "libya"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_red",
+      "name": "Med/Red",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          0
+        ],
+        [
+          350,
+          0
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          300,
+          50
+        ]
+      ],
+      "center": [
+        325,
+        25
+      ],
+      "adjacentTo": [
+        "med_ee",
+        "red_n",
+        "egypt"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "red_n",
+      "name": "Red Sea N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          0
+        ],
+        [
+          400,
+          0
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          350,
+          50
+        ]
+      ],
+      "center": [
+        375,
+        25
+      ],
+      "adjacentTo": [
+        "med_red",
+        "red_c",
+        "suez"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "red_c",
+      "name": "Red Sea C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          0
+        ],
+        [
+          450,
+          0
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          400,
+          50
+        ]
+      ],
+      "center": [
+        425,
+        25
+      ],
+      "adjacentTo": [
+        "red_n",
+        "red_s",
+        "sinai"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "red_s",
+      "name": "Red Sea S",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          0
+        ],
+        [
+          500,
+          0
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          450,
+          50
+        ]
+      ],
+      "center": [
+        475,
+        25
+      ],
+      "adjacentTo": [
+        "red_c",
+        "gulf_aden",
+        "palestine"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_aden",
+      "name": "Gulf of Aden",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          0
+        ],
+        [
+          550,
+          0
+        ],
+        [
+          550,
+          50
+        ],
+        [
+          500,
+          50
+        ]
+      ],
+      "center": [
+        525,
+        25
+      ],
+      "adjacentTo": [
+        "red_s",
+        "indian_ne",
+        "arabia_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ne",
+      "name": "Indian NE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          0
+        ],
+        [
+          600,
+          0
+        ],
+        [
+          600,
+          50
+        ],
+        [
+          550,
+          50
+        ]
+      ],
+      "center": [
+        575,
+        25
+      ],
+      "adjacentTo": [
+        "gulf_aden",
+        "indian_ne2",
+        "persian_gf"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ne2",
+      "name": "Indian NE2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          0
+        ],
+        [
+          650,
+          0
+        ],
+        [
+          650,
+          50
+        ],
+        [
+          600,
+          50
+        ]
+      ],
+      "center": [
+        625,
+        25
+      ],
+      "adjacentTo": [
+        "indian_ne",
+        "indian_ne3",
+        "indian_en"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ne3",
+      "name": "Indian NE3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          0
+        ],
+        [
+          700,
+          0
+        ],
+        [
+          700,
+          50
+        ],
+        [
+          650,
+          50
+        ]
+      ],
+      "center": [
+        675,
+        25
+      ],
+      "adjacentTo": [
+        "indian_ne2",
+        "indian_en2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_n",
+      "name": "N Atlantic",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "adjacentTo": [
+        "med_w",
+        "atl_n2",
+        "atl_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_n2",
+      "name": "N Atlantic 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "adjacentTo": [
+        "med_cw",
+        "atl_n",
+        "morocco",
+        "mauritania"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "morocco",
+      "name": "Morocco",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "adjacentTo": [
+        "med_c",
+        "atl_n2",
+        "algeria",
+        "mali_n"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "algeria",
+      "name": "Algeria",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "adjacentTo": [
+        "med_ce",
+        "morocco",
+        "tunisia",
+        "algeria_s"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "tunisia",
+      "name": "Tunisia",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "adjacentTo": [
+        "med_e",
+        "algeria",
+        "libya",
+        "sahara"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "libya",
+      "name": "Libya",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          50
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          250,
+          100
+        ]
+      ],
+      "center": [
+        275,
+        75
+      ],
+      "adjacentTo": [
+        "med_ee",
+        "tunisia",
+        "egypt",
+        "libya_s"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "egypt",
+      "name": "Egypt",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          50
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          300,
+          100
+        ]
+      ],
+      "center": [
+        325,
+        75
+      ],
+      "adjacentTo": [
+        "med_red",
+        "libya",
+        "suez",
+        "egypt_s"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "suez",
+      "name": "Suez Canal",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          50
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          350,
+          100
+        ]
+      ],
+      "center": [
+        375,
+        75
+      ],
+      "adjacentTo": [
+        "red_n",
+        "egypt",
+        "sinai",
+        "sudan_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sinai",
+      "name": "Sinai",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          400,
+          50
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          400,
+          100
+        ]
+      ],
+      "center": [
+        425,
+        75
+      ],
+      "adjacentTo": [
+        "red_c",
+        "suez",
+        "palestine",
+        "eritrea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "palestine",
+      "name": "Palestine",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          50
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          450,
+          100
+        ]
+      ],
+      "center": [
+        475,
+        75
+      ],
+      "adjacentTo": [
+        "red_s",
+        "sinai",
+        "arabia_n",
+        "ethiopia_n"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "arabia_n",
+      "name": "N Arabia",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          500,
+          50
+        ],
+        [
+          550,
+          50
+        ],
+        [
+          550,
+          100
+        ],
+        [
+          500,
+          100
+        ]
+      ],
+      "center": [
+        525,
+        75
+      ],
+      "adjacentTo": [
+        "gulf_aden",
+        "palestine",
+        "persian_gf",
+        "somalia_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#e8d5a3"
+    },
+    {
+      "id": "persian_gf",
+      "name": "Persian Gulf",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          50
+        ],
+        [
+          600,
+          50
+        ],
+        [
+          600,
+          100
+        ],
+        [
+          550,
+          100
+        ]
+      ],
+      "center": [
+        575,
+        75
+      ],
+      "adjacentTo": [
+        "indian_ne",
+        "arabia_n",
+        "indian_en",
+        "somalia"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_en",
+      "name": "Indian EN",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          50
+        ],
+        [
+          650,
+          50
+        ],
+        [
+          650,
+          100
+        ],
+        [
+          600,
+          100
+        ]
+      ],
+      "center": [
+        625,
+        75
+      ],
+      "adjacentTo": [
+        "indian_ne2",
+        "persian_gf",
+        "indian_en2",
+        "indian_ec"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_en2",
+      "name": "Indian EN2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          50
+        ],
+        [
+          700,
+          50
+        ],
+        [
+          700,
+          100
+        ],
+        [
+          650,
+          100
+        ]
+      ],
+      "center": [
+        675,
+        75
+      ],
+      "adjacentTo": [
+        "indian_ne3",
+        "indian_en",
+        "indian_ec2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_c",
+      "name": "C Atlantic",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "adjacentTo": [
+        "atl_n",
+        "mauritania",
+        "atl_c2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "mauritania",
+      "name": "Mauritania",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "adjacentTo": [
+        "atl_n2",
+        "atl_c",
+        "mali_n",
+        "senegal"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "mali_n",
+      "name": "N Mali",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "adjacentTo": [
+        "morocco",
+        "mauritania",
+        "algeria_s",
+        "guinea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "algeria_s",
+      "name": "S Algeria",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "adjacentTo": [
+        "algeria",
+        "mali_n",
+        "sahara",
+        "burkina"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "sahara",
+      "name": "Sahara",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "adjacentTo": [
+        "tunisia",
+        "algeria_s",
+        "libya_s",
+        "niger"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "libya_s",
+      "name": "S Libya",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "adjacentTo": [
+        "libya",
+        "sahara",
+        "egypt_s",
+        "chad"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "axis_africa",
+      "originalOwner": "axis_africa"
+    },
+    {
+      "id": "egypt_s",
+      "name": "S Egypt",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          100
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          300,
+          150
+        ]
+      ],
+      "center": [
+        325,
+        125
+      ],
+      "adjacentTo": [
+        "egypt",
+        "libya_s",
+        "sudan_n",
+        "sudan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sudan_n",
+      "name": "N Sudan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          100
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          350,
+          150
+        ]
+      ],
+      "center": [
+        375,
+        125
+      ],
+      "adjacentTo": [
+        "suez",
+        "egypt_s",
+        "eritrea",
+        "ethiopia"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "eritrea",
+      "name": "Eritrea",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          100
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          400,
+          150
+        ]
+      ],
+      "center": [
+        425,
+        125
+      ],
+      "adjacentTo": [
+        "sinai",
+        "sudan_n",
+        "ethiopia_n",
+        "djibouti"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "ethiopia_n",
+      "name": "N Ethiopia",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          100
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          450,
+          150
+        ]
+      ],
+      "center": [
+        475,
+        125
+      ],
+      "adjacentTo": [
+        "palestine",
+        "eritrea",
+        "somalia_n",
+        "kenya_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "somalia_n",
+      "name": "N Somalia",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          500,
+          100
+        ],
+        [
+          550,
+          100
+        ],
+        [
+          550,
+          150
+        ],
+        [
+          500,
+          150
+        ]
+      ],
+      "center": [
+        525,
+        125
+      ],
+      "adjacentTo": [
+        "arabia_n",
+        "ethiopia_n",
+        "somalia",
+        "somalia_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "somalia",
+      "name": "Somalia",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          100
+        ],
+        [
+          600,
+          100
+        ],
+        [
+          600,
+          150
+        ],
+        [
+          550,
+          150
+        ]
+      ],
+      "center": [
+        575,
+        125
+      ],
+      "adjacentTo": [
+        "persian_gf",
+        "somalia_n",
+        "indian_ec",
+        "indian_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_ec",
+      "name": "Indian EC",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          100
+        ],
+        [
+          650,
+          100
+        ],
+        [
+          650,
+          150
+        ],
+        [
+          600,
+          150
+        ]
+      ],
+      "center": [
+        625,
+        125
+      ],
+      "adjacentTo": [
+        "indian_en",
+        "somalia",
+        "indian_ec2",
+        "indian_w2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ec2",
+      "name": "Indian EC2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          100
+        ],
+        [
+          700,
+          100
+        ],
+        [
+          700,
+          150
+        ],
+        [
+          650,
+          150
+        ]
+      ],
+      "center": [
+        675,
+        125
+      ],
+      "adjacentTo": [
+        "indian_en2",
+        "indian_ec",
+        "indian_w3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_c2",
+      "name": "C Atlantic 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "adjacentTo": [
+        "atl_c",
+        "senegal",
+        "atl_waf"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "senegal",
+      "name": "Senegal",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "adjacentTo": [
+        "mauritania",
+        "atl_c2",
+        "guinea",
+        "ivory"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "guinea",
+      "name": "Guinea",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "adjacentTo": [
+        "mali_n",
+        "senegal",
+        "burkina",
+        "ghana"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "burkina",
+      "name": "Burkina Faso",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "adjacentTo": [
+        "algeria_s",
+        "guinea",
+        "niger",
+        "nigeria_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "niger",
+      "name": "Niger",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "adjacentTo": [
+        "sahara",
+        "burkina",
+        "chad",
+        "nigeria"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "chad",
+      "name": "Chad",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "adjacentTo": [
+        "libya_s",
+        "niger",
+        "sudan",
+        "cameroon"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "sudan",
+      "name": "Sudan",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          300,
+          200
+        ]
+      ],
+      "center": [
+        325,
+        175
+      ],
+      "adjacentTo": [
+        "egypt_s",
+        "chad",
+        "ethiopia",
+        "car"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "ethiopia",
+      "name": "Ethiopia",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          350,
+          150
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          350,
+          200
+        ]
+      ],
+      "center": [
+        375,
+        175
+      ],
+      "adjacentTo": [
+        "sudan_n",
+        "sudan",
+        "djibouti",
+        "uganda"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "djibouti",
+      "name": "Djibouti",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          400,
+          150
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          400,
+          200
+        ]
+      ],
+      "center": [
+        425,
+        175
+      ],
+      "adjacentTo": [
+        "eritrea",
+        "ethiopia",
+        "kenya_n",
+        "kenya"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "kenya_n",
+      "name": "N Kenya",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          150
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          450,
+          200
+        ]
+      ],
+      "center": [
+        475,
+        175
+      ],
+      "adjacentTo": [
+        "ethiopia_n",
+        "djibouti",
+        "somalia_s",
+        "tanzania_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "somalia_s",
+      "name": "S Somalia",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          500,
+          150
+        ],
+        [
+          550,
+          150
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          500,
+          200
+        ]
+      ],
+      "center": [
+        525,
+        175
+      ],
+      "adjacentTo": [
+        "somalia_n",
+        "kenya_n",
+        "indian_w",
+        "indian_sw"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_w",
+      "name": "Indian W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          150
+        ],
+        [
+          600,
+          150
+        ],
+        [
+          600,
+          200
+        ],
+        [
+          550,
+          200
+        ]
+      ],
+      "center": [
+        575,
+        175
+      ],
+      "adjacentTo": [
+        "somalia",
+        "somalia_s",
+        "indian_w2",
+        "madagascar_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_w2",
+      "name": "Indian W2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          150
+        ],
+        [
+          650,
+          150
+        ],
+        [
+          650,
+          200
+        ],
+        [
+          600,
+          200
+        ]
+      ],
+      "center": [
+        625,
+        175
+      ],
+      "adjacentTo": [
+        "indian_ec",
+        "indian_w",
+        "indian_w3",
+        "indian_sw2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_w3",
+      "name": "Indian W3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          150
+        ],
+        [
+          700,
+          150
+        ],
+        [
+          700,
+          200
+        ],
+        [
+          650,
+          200
+        ]
+      ],
+      "center": [
+        675,
+        175
+      ],
+      "adjacentTo": [
+        "indian_ec2",
+        "indian_w2",
+        "indian_sw3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_waf",
+      "name": "W Atlantic",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "adjacentTo": [
+        "atl_c2",
+        "ivory",
+        "atl_caf"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ivory",
+      "name": "Ivory Coast",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "adjacentTo": [
+        "senegal",
+        "atl_waf",
+        "ghana",
+        "gulf_guinea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "ghana",
+      "name": "Ghana",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          200
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          100,
+          250
+        ]
+      ],
+      "center": [
+        125,
+        225
+      ],
+      "adjacentTo": [
+        "guinea",
+        "ivory",
+        "nigeria_n",
+        "gabon"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "nigeria_n",
+      "name": "N Nigeria",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "adjacentTo": [
+        "burkina",
+        "ghana",
+        "nigeria",
+        "congo_b"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "nigeria",
+      "name": "Nigeria",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "adjacentTo": [
+        "niger",
+        "nigeria_n",
+        "cameroon",
+        "drc_n"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "cameroon",
+      "name": "Cameroon",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "adjacentTo": [
+        "chad",
+        "nigeria",
+        "car",
+        "drc"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "car",
+      "name": "C.A. Republic",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "adjacentTo": [
+        "sudan",
+        "cameroon",
+        "uganda",
+        "drc_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "uganda",
+      "name": "Uganda",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          200
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          350,
+          250
+        ]
+      ],
+      "center": [
+        375,
+        225
+      ],
+      "adjacentTo": [
+        "ethiopia",
+        "car",
+        "kenya",
+        "rwanda"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "kenya",
+      "name": "Kenya",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          400,
+          200
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          400,
+          250
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "adjacentTo": [
+        "djibouti",
+        "uganda",
+        "tanzania_n",
+        "tanzania"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "tanzania_n",
+      "name": "N Tanzania",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          200
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          450,
+          250
+        ]
+      ],
+      "center": [
+        475,
+        225
+      ],
+      "adjacentTo": [
+        "kenya_n",
+        "kenya",
+        "indian_sw",
+        "tanzania_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sw",
+      "name": "Indian SW",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          200
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          500,
+          250
+        ]
+      ],
+      "center": [
+        525,
+        225
+      ],
+      "adjacentTo": [
+        "somalia_s",
+        "tanzania_n",
+        "madagascar_n",
+        "indian_sc"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "madagascar_n",
+      "name": "N Madagascar",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          200
+        ],
+        [
+          600,
+          200
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          550,
+          250
+        ]
+      ],
+      "center": [
+        575,
+        225
+      ],
+      "adjacentTo": [
+        "indian_w",
+        "indian_sw",
+        "indian_sw2",
+        "madagascar"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sw2",
+      "name": "Indian SW2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          200
+        ],
+        [
+          650,
+          200
+        ],
+        [
+          650,
+          250
+        ],
+        [
+          600,
+          250
+        ]
+      ],
+      "center": [
+        625,
+        225
+      ],
+      "adjacentTo": [
+        "indian_w2",
+        "madagascar_n",
+        "indian_sw3",
+        "indian_sc2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sw3",
+      "name": "Indian SW3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          200
+        ],
+        [
+          700,
+          200
+        ],
+        [
+          700,
+          250
+        ],
+        [
+          650,
+          250
+        ]
+      ],
+      "center": [
+        675,
+        225
+      ],
+      "adjacentTo": [
+        "indian_w3",
+        "indian_sw2",
+        "indian_sc3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_caf",
+      "name": "C Atlantic 3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "adjacentTo": [
+        "atl_waf",
+        "gulf_guinea",
+        "atl_sn"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_guinea",
+      "name": "Gulf of Guinea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "adjacentTo": [
+        "ivory",
+        "atl_caf",
+        "gabon",
+        "atl_sn2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gabon",
+      "name": "Gabon",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          100,
+          250
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          100,
+          300
+        ]
+      ],
+      "center": [
+        125,
+        275
+      ],
+      "adjacentTo": [
+        "ghana",
+        "gulf_guinea",
+        "congo_b",
+        "angola"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "congo_b",
+      "name": "Congo Brazzaville",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "adjacentTo": [
+        "nigeria_n",
+        "gabon",
+        "drc_n",
+        "zambia_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d",
+      "owner": "vichy_africa",
+      "originalOwner": "vichy_africa"
+    },
+    {
+      "id": "drc_n",
+      "name": "N Congo",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "adjacentTo": [
+        "nigeria",
+        "congo_b",
+        "drc",
+        "zambia"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "drc",
+      "name": "Congo (Zaire)",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "adjacentTo": [
+        "cameroon",
+        "drc_n",
+        "drc_e",
+        "malawi"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "drc_e",
+      "name": "E Congo",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "adjacentTo": [
+        "car",
+        "drc",
+        "rwanda",
+        "mozambique_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "rwanda",
+      "name": "Rwanda/Burundi",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          350,
+          250
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          350,
+          300
+        ]
+      ],
+      "center": [
+        375,
+        275
+      ],
+      "adjacentTo": [
+        "uganda",
+        "drc_e",
+        "tanzania",
+        "mozambique"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "tanzania",
+      "name": "Tanzania",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          250
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          400,
+          300
+        ]
+      ],
+      "center": [
+        425,
+        275
+      ],
+      "adjacentTo": [
+        "kenya",
+        "rwanda",
+        "tanzania_e",
+        "indian_ss"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "tanzania_e",
+      "name": "E Tanzania",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          450,
+          250
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          450,
+          300
+        ]
+      ],
+      "center": [
+        475,
+        275
+      ],
+      "adjacentTo": [
+        "tanzania_n",
+        "tanzania",
+        "indian_sc",
+        "indian_ss2"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sc",
+      "name": "Indian SC",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          250
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          500,
+          300
+        ]
+      ],
+      "center": [
+        525,
+        275
+      ],
+      "adjacentTo": [
+        "indian_sw",
+        "tanzania_e",
+        "madagascar",
+        "indian_ss3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "madagascar",
+      "name": "Madagascar",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          550,
+          250
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          550,
+          300
+        ]
+      ],
+      "center": [
+        575,
+        275
+      ],
+      "adjacentTo": [
+        "madagascar_n",
+        "indian_sc",
+        "indian_sc2",
+        "madagascar_s"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sc2",
+      "name": "Indian SC2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          250
+        ],
+        [
+          650,
+          250
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          600,
+          300
+        ]
+      ],
+      "center": [
+        625,
+        275
+      ],
+      "adjacentTo": [
+        "indian_sw2",
+        "madagascar",
+        "indian_sc3",
+        "indian_ss4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sc3",
+      "name": "Indian SC3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          250
+        ],
+        [
+          700,
+          250
+        ],
+        [
+          700,
+          300
+        ],
+        [
+          650,
+          300
+        ]
+      ],
+      "center": [
+        675,
+        275
+      ],
+      "adjacentTo": [
+        "indian_sw3",
+        "indian_sc2",
+        "indian_ss5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_sn",
+      "name": "S Atlantic N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "adjacentTo": [
+        "atl_caf",
+        "atl_sn2",
+        "atl_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_sn2",
+      "name": "S Atlantic N2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          300
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          50,
+          350
+        ]
+      ],
+      "center": [
+        75,
+        325
+      ],
+      "adjacentTo": [
+        "gulf_guinea",
+        "atl_sn",
+        "angola",
+        "atl_s2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "angola",
+      "name": "Angola",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "adjacentTo": [
+        "gabon",
+        "atl_sn2",
+        "zambia_n",
+        "namibia"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "zambia_n",
+      "name": "N Zambia",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "adjacentTo": [
+        "congo_b",
+        "angola",
+        "zambia",
+        "botswana"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "zambia",
+      "name": "Zambia",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "adjacentTo": [
+        "drc_n",
+        "zambia_n",
+        "malawi",
+        "zimbabwe"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#27ae60",
+      "owner": "free_africa",
+      "originalOwner": "free_africa"
+    },
+    {
+      "id": "malawi",
+      "name": "Malawi",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "adjacentTo": [
+        "drc",
+        "zambia",
+        "mozambique_n",
+        "sa_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "mozambique_n",
+      "name": "N Mozambique",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "adjacentTo": [
+        "drc_e",
+        "malawi",
+        "mozambique",
+        "sa_ne"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "mozambique",
+      "name": "Mozambique",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "adjacentTo": [
+        "rwanda",
+        "mozambique_n",
+        "indian_ss",
+        "mozambique_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_ss",
+      "name": "Indian SS",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          300
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          400,
+          350
+        ]
+      ],
+      "center": [
+        425,
+        325
+      ],
+      "adjacentTo": [
+        "tanzania",
+        "mozambique",
+        "indian_ss2",
+        "indian_sss"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ss2",
+      "name": "Indian SS2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          450,
+          350
+        ]
+      ],
+      "center": [
+        475,
+        325
+      ],
+      "adjacentTo": [
+        "tanzania_e",
+        "indian_ss",
+        "indian_ss3",
+        "indian_sss2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ss3",
+      "name": "Indian SS3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          300
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          500,
+          350
+        ]
+      ],
+      "center": [
+        525,
+        325
+      ],
+      "adjacentTo": [
+        "indian_sc",
+        "indian_ss2",
+        "madagascar_s",
+        "indian_sss3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "madagascar_s",
+      "name": "S Madagascar",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          300
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          550,
+          350
+        ]
+      ],
+      "center": [
+        575,
+        325
+      ],
+      "adjacentTo": [
+        "madagascar",
+        "indian_ss3",
+        "indian_ss4",
+        "indian_sss4"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_ss4",
+      "name": "Indian SS4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          300
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          600,
+          350
+        ]
+      ],
+      "center": [
+        625,
+        325
+      ],
+      "adjacentTo": [
+        "indian_sc2",
+        "madagascar_s",
+        "indian_ss5",
+        "indian_sss5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_ss5",
+      "name": "Indian SS5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          300
+        ],
+        [
+          700,
+          300
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          650,
+          350
+        ]
+      ],
+      "center": [
+        675,
+        325
+      ],
+      "adjacentTo": [
+        "indian_sc3",
+        "indian_ss4",
+        "indian_sss6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_s",
+      "name": "S Atlantic",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          0,
+          400
+        ]
+      ],
+      "center": [
+        25,
+        375
+      ],
+      "adjacentTo": [
+        "atl_sn",
+        "atl_s2",
+        "atl_ss"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_s2",
+      "name": "S Atlantic 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          350
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        75,
+        375
+      ],
+      "adjacentTo": [
+        "atl_sn2",
+        "atl_s",
+        "namibia",
+        "atl_ss2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "namibia",
+      "name": "Namibia",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          350
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          100,
+          400
+        ]
+      ],
+      "center": [
+        125,
+        375
+      ],
+      "adjacentTo": [
+        "angola",
+        "atl_s2",
+        "botswana",
+        "sa_w"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "botswana",
+      "name": "Botswana",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "adjacentTo": [
+        "zambia_n",
+        "namibia",
+        "zimbabwe",
+        "sa_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "zimbabwe",
+      "name": "Zimbabwe",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "adjacentTo": [
+        "zambia",
+        "botswana",
+        "sa_n",
+        "sa_e"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_n",
+      "name": "N South Africa",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "adjacentTo": [
+        "malawi",
+        "zimbabwe",
+        "sa_ne",
+        "sa_coast"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_ne",
+      "name": "NE South Africa",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "adjacentTo": [
+        "mozambique_n",
+        "sa_n",
+        "mozambique_s",
+        "sa_east"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "mozambique_s",
+      "name": "S Mozambique",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          350,
+          350
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          350,
+          400
+        ]
+      ],
+      "center": [
+        375,
+        375
+      ],
+      "adjacentTo": [
+        "mozambique",
+        "sa_ne",
+        "indian_sss",
+        "indian_sa"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sss",
+      "name": "Indian SSS",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          350
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          400,
+          400
+        ]
+      ],
+      "center": [
+        425,
+        375
+      ],
+      "adjacentTo": [
+        "indian_ss",
+        "mozambique_s",
+        "indian_sss2",
+        "indian_sa2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sss2",
+      "name": "Indian SSS2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          350
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          450,
+          400
+        ]
+      ],
+      "center": [
+        475,
+        375
+      ],
+      "adjacentTo": [
+        "indian_ss2",
+        "indian_sss",
+        "indian_sss3",
+        "indian_sa3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sss3",
+      "name": "Indian SSS3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          350
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          500,
+          400
+        ]
+      ],
+      "center": [
+        525,
+        375
+      ],
+      "adjacentTo": [
+        "indian_ss3",
+        "indian_sss2",
+        "indian_sss4",
+        "indian_sa4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sss4",
+      "name": "Indian SSS4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          350
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          550,
+          400
+        ]
+      ],
+      "center": [
+        575,
+        375
+      ],
+      "adjacentTo": [
+        "madagascar_s",
+        "indian_sss3",
+        "indian_sss5",
+        "indian_sa5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sss5",
+      "name": "Indian SSS5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          350
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          600,
+          400
+        ]
+      ],
+      "center": [
+        625,
+        375
+      ],
+      "adjacentTo": [
+        "indian_ss4",
+        "indian_sss4",
+        "indian_sss6",
+        "indian_sa6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sss6",
+      "name": "Indian SSS6",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          350
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          650,
+          400
+        ]
+      ],
+      "center": [
+        675,
+        375
+      ],
+      "adjacentTo": [
+        "indian_ss5",
+        "indian_sss5",
+        "indian_sa7"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_ss",
+      "name": "SS Atlantic",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          400
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          50,
+          450
+        ],
+        [
+          0,
+          450
+        ]
+      ],
+      "center": [
+        25,
+        425
+      ],
+      "adjacentTo": [
+        "atl_s",
+        "atl_ss2",
+        "cape_atl"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "atl_ss2",
+      "name": "SS Atlantic 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          400
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          100,
+          450
+        ],
+        [
+          50,
+          450
+        ]
+      ],
+      "center": [
+        75,
+        425
+      ],
+      "adjacentTo": [
+        "atl_s2",
+        "atl_ss",
+        "sa_w",
+        "cape_atl2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sa_w",
+      "name": "W South Africa",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          400
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          150,
+          450
+        ],
+        [
+          100,
+          450
+        ]
+      ],
+      "center": [
+        125,
+        425
+      ],
+      "adjacentTo": [
+        "namibia",
+        "atl_ss2",
+        "sa_c",
+        "cape_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_c",
+      "name": "C South Africa",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          150,
+          400
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          150,
+          450
+        ]
+      ],
+      "center": [
+        175,
+        425
+      ],
+      "adjacentTo": [
+        "botswana",
+        "sa_w",
+        "sa_e",
+        "cape"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_e",
+      "name": "E South Africa",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          200,
+          450
+        ]
+      ],
+      "center": [
+        225,
+        425
+      ],
+      "adjacentTo": [
+        "zimbabwe",
+        "sa_c",
+        "sa_coast",
+        "cape_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_coast",
+      "name": "SA Coast",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          400
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          250,
+          450
+        ]
+      ],
+      "center": [
+        275,
+        425
+      ],
+      "adjacentTo": [
+        "sa_n",
+        "sa_e",
+        "sa_east",
+        "cape_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "sa_east",
+      "name": "SA East",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          300,
+          400
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        325,
+        425
+      ],
+      "adjacentTo": [
+        "sa_ne",
+        "sa_coast",
+        "indian_sa",
+        "cape_sea2"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_sa",
+      "name": "Indian SA",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          400
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          350,
+          450
+        ]
+      ],
+      "center": [
+        375,
+        425
+      ],
+      "adjacentTo": [
+        "mozambique_s",
+        "sa_east",
+        "indian_sa2",
+        "cape_sea3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa2",
+      "name": "Indian SA2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          400
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          400,
+          450
+        ]
+      ],
+      "center": [
+        425,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss",
+        "indian_sa",
+        "indian_sa3",
+        "cape_sea4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa3",
+      "name": "Indian SA3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          400
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          450,
+          450
+        ]
+      ],
+      "center": [
+        475,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss2",
+        "indian_sa2",
+        "indian_sa4",
+        "cape_sea5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa4",
+      "name": "Indian SA4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          400
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          550,
+          450
+        ],
+        [
+          500,
+          450
+        ]
+      ],
+      "center": [
+        525,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss3",
+        "indian_sa3",
+        "indian_sa5",
+        "cape_sea6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa5",
+      "name": "Indian SA5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          400
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          550,
+          450
+        ]
+      ],
+      "center": [
+        575,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss4",
+        "indian_sa4",
+        "indian_sa6",
+        "cape_sea7"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa6",
+      "name": "Indian SA6",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          400
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          600,
+          450
+        ]
+      ],
+      "center": [
+        625,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss5",
+        "indian_sa5",
+        "indian_sa7",
+        "cape_sea8"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "indian_sa7",
+      "name": "Indian SA7",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          400
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          700,
+          450
+        ],
+        [
+          650,
+          450
+        ]
+      ],
+      "center": [
+        675,
+        425
+      ],
+      "adjacentTo": [
+        "indian_sss6",
+        "indian_sa6",
+        "cape_sea9"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_atl",
+      "name": "Cape Atl",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          450
+        ],
+        [
+          50,
+          450
+        ],
+        [
+          50,
+          500
+        ],
+        [
+          0,
+          500
+        ]
+      ],
+      "center": [
+        25,
+        475
+      ],
+      "adjacentTo": [
+        "atl_ss",
+        "cape_atl2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_atl2",
+      "name": "Cape Atl 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          450
+        ],
+        [
+          100,
+          450
+        ],
+        [
+          100,
+          500
+        ],
+        [
+          50,
+          500
+        ]
+      ],
+      "center": [
+        75,
+        475
+      ],
+      "adjacentTo": [
+        "atl_ss2",
+        "cape_atl",
+        "cape_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_w",
+      "name": "Cape West",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          100,
+          450
+        ],
+        [
+          150,
+          450
+        ],
+        [
+          150,
+          500
+        ],
+        [
+          100,
+          500
+        ]
+      ],
+      "center": [
+        125,
+        475
+      ],
+      "adjacentTo": [
+        "sa_w",
+        "cape_atl2",
+        "cape"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "cape",
+      "name": "Cape of Good Hope",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          450
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          200,
+          500
+        ],
+        [
+          150,
+          500
+        ]
+      ],
+      "center": [
+        175,
+        475
+      ],
+      "adjacentTo": [
+        "sa_c",
+        "cape_w",
+        "cape_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "cape_e",
+      "name": "Cape East",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          200,
+          450
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          250,
+          500
+        ],
+        [
+          200,
+          500
+        ]
+      ],
+      "center": [
+        225,
+        475
+      ],
+      "adjacentTo": [
+        "sa_e",
+        "cape",
+        "cape_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2980b9",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "cape_sea",
+      "name": "Cape Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          450
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          300,
+          500
+        ],
+        [
+          250,
+          500
+        ]
+      ],
+      "center": [
+        275,
+        475
+      ],
+      "adjacentTo": [
+        "sa_coast",
+        "cape_e",
+        "cape_sea2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea2",
+      "name": "Cape Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          450
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          350,
+          500
+        ],
+        [
+          300,
+          500
+        ]
+      ],
+      "center": [
+        325,
+        475
+      ],
+      "adjacentTo": [
+        "sa_east",
+        "cape_sea",
+        "cape_sea3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea3",
+      "name": "Cape Sea 3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          450
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          400,
+          500
+        ],
+        [
+          350,
+          500
+        ]
+      ],
+      "center": [
+        375,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa",
+        "cape_sea2",
+        "cape_sea4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea4",
+      "name": "Cape Sea 4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          450
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          450,
+          500
+        ],
+        [
+          400,
+          500
+        ]
+      ],
+      "center": [
+        425,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa2",
+        "cape_sea3",
+        "cape_sea5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea5",
+      "name": "Cape Sea 5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          450
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          500,
+          500
+        ],
+        [
+          450,
+          500
+        ]
+      ],
+      "center": [
+        475,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa3",
+        "cape_sea4",
+        "cape_sea6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea6",
+      "name": "Cape Sea 6",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          450
+        ],
+        [
+          550,
+          450
+        ],
+        [
+          550,
+          500
+        ],
+        [
+          500,
+          500
+        ]
+      ],
+      "center": [
+        525,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa4",
+        "cape_sea5",
+        "cape_sea7"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea7",
+      "name": "Cape Sea 7",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          450
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          600,
+          500
+        ],
+        [
+          550,
+          500
+        ]
+      ],
+      "center": [
+        575,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa5",
+        "cape_sea6",
+        "cape_sea8"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea8",
+      "name": "Cape Sea 8",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          450
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          650,
+          500
+        ],
+        [
+          600,
+          500
+        ]
+      ],
+      "center": [
+        625,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa6",
+        "cape_sea7",
+        "cape_sea9"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "cape_sea9",
+      "name": "Cape Sea 9",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          450
+        ],
+        [
+          700,
+          450
+        ],
+        [
+          700,
+          500
+        ],
+        [
+          650,
+          500
+        ]
+      ],
+      "center": [
+        675,
+        475
+      ],
+      "adjacentTo": [
+        "indian_sa7",
+        "cape_sea8"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": []
+}

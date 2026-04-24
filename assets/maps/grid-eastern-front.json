@@ -1,0 +1,5448 @@
+{
+  "id": "grid-eastern-front",
+  "name": "Eastern Front (Grid)",
+  "version": "1.0",
+  "width": 800,
+  "height": 450,
+  "backgroundColor": "#4a5a3a",
+  "territories": [
+    {
+      "id": "arc_w",
+      "name": "Arctic W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "adjacentTo": [
+        "arc_cw",
+        "n_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arc_cw",
+      "name": "Arctic CW",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "adjacentTo": [
+        "arc_w",
+        "arc_c",
+        "n_sea2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arc_c",
+      "name": "Arctic C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "adjacentTo": [
+        "arc_cw",
+        "arc_ce",
+        "norway"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arc_ce",
+      "name": "Arctic CE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "adjacentTo": [
+        "arc_c",
+        "arc_e",
+        "sweden"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arc_e",
+      "name": "Arctic E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "adjacentTo": [
+        "arc_ce",
+        "barents_w",
+        "finland"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_w",
+      "name": "Barents W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "adjacentTo": [
+        "arc_e",
+        "barents_c",
+        "karelia"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_c",
+      "name": "Barents C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          0
+        ],
+        [
+          350,
+          0
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          300,
+          50
+        ]
+      ],
+      "center": [
+        325,
+        25
+      ],
+      "adjacentTo": [
+        "barents_w",
+        "barents_e",
+        "kola"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "barents_e",
+      "name": "Barents E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          0
+        ],
+        [
+          400,
+          0
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          350,
+          50
+        ]
+      ],
+      "center": [
+        375,
+        25
+      ],
+      "adjacentTo": [
+        "barents_c",
+        "kara_w",
+        "archangel"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "kara_w",
+      "name": "Kara W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          0
+        ],
+        [
+          450,
+          0
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          400,
+          50
+        ]
+      ],
+      "center": [
+        425,
+        25
+      ],
+      "adjacentTo": [
+        "barents_e",
+        "kara_c",
+        "dvina"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "kara_c",
+      "name": "Kara C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          0
+        ],
+        [
+          500,
+          0
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          450,
+          50
+        ]
+      ],
+      "center": [
+        475,
+        25
+      ],
+      "adjacentTo": [
+        "kara_w",
+        "kara_e",
+        "perm"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "kara_e",
+      "name": "Kara E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          0
+        ],
+        [
+          550,
+          0
+        ],
+        [
+          550,
+          50
+        ],
+        [
+          500,
+          50
+        ]
+      ],
+      "center": [
+        525,
+        25
+      ],
+      "adjacentTo": [
+        "kara_c",
+        "kara_ee",
+        "ural_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "kara_ee",
+      "name": "Kara EE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          0
+        ],
+        [
+          600,
+          0
+        ],
+        [
+          600,
+          50
+        ],
+        [
+          550,
+          50
+        ]
+      ],
+      "center": [
+        575,
+        25
+      ],
+      "adjacentTo": [
+        "kara_e",
+        "sib_sea_w",
+        "tyumen"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sib_sea_w",
+      "name": "Siberian Sea W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          600,
+          0
+        ],
+        [
+          650,
+          0
+        ],
+        [
+          650,
+          50
+        ],
+        [
+          600,
+          50
+        ]
+      ],
+      "center": [
+        625,
+        25
+      ],
+      "adjacentTo": [
+        "kara_ee",
+        "sib_sea_e",
+        "omsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sib_sea_e",
+      "name": "Siberian Sea E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          650,
+          0
+        ],
+        [
+          700,
+          0
+        ],
+        [
+          700,
+          50
+        ],
+        [
+          650,
+          50
+        ]
+      ],
+      "center": [
+        675,
+        25
+      ],
+      "adjacentTo": [
+        "sib_sea_w",
+        "sib_sea_ee",
+        "tomsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sib_sea_ee",
+      "name": "Siberian Sea EE",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          700,
+          0
+        ],
+        [
+          750,
+          0
+        ],
+        [
+          750,
+          50
+        ],
+        [
+          700,
+          50
+        ]
+      ],
+      "center": [
+        725,
+        25
+      ],
+      "adjacentTo": [
+        "sib_sea_e",
+        "sib_sea_far",
+        "krasnoyarsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sib_sea_far",
+      "name": "Siberian Far",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          750,
+          0
+        ],
+        [
+          800,
+          0
+        ],
+        [
+          800,
+          50
+        ],
+        [
+          750,
+          50
+        ]
+      ],
+      "center": [
+        775,
+        25
+      ],
+      "adjacentTo": [
+        "sib_sea_ee",
+        "irkutsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "n_sea",
+      "name": "North Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "adjacentTo": [
+        "arc_w",
+        "n_sea2",
+        "n_sea_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "n_sea2",
+      "name": "North Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "adjacentTo": [
+        "arc_cw",
+        "n_sea",
+        "norway",
+        "denmark"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "norway",
+      "name": "Norway",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "adjacentTo": [
+        "arc_c",
+        "n_sea2",
+        "sweden",
+        "baltic"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "sweden",
+      "name": "Sweden",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "adjacentTo": [
+        "arc_ce",
+        "norway",
+        "finland",
+        "estonia"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#aaaaaa"
+    },
+    {
+      "id": "finland",
+      "name": "Finland",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "adjacentTo": [
+        "arc_e",
+        "sweden",
+        "karelia",
+        "leningrad"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "karelia",
+      "name": "Karelia",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          50
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          250,
+          100
+        ]
+      ],
+      "center": [
+        275,
+        75
+      ],
+      "adjacentTo": [
+        "barents_w",
+        "finland",
+        "kola",
+        "novgorod"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kola",
+      "name": "Kola",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          50
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          300,
+          100
+        ]
+      ],
+      "center": [
+        325,
+        75
+      ],
+      "adjacentTo": [
+        "barents_c",
+        "karelia",
+        "archangel",
+        "vologda"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "archangel",
+      "name": "Archangel",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          350,
+          50
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          350,
+          100
+        ]
+      ],
+      "center": [
+        375,
+        75
+      ],
+      "adjacentTo": [
+        "barents_e",
+        "kola",
+        "dvina",
+        "yaroslavl"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "dvina",
+      "name": "Dvina",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          400,
+          50
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          400,
+          100
+        ]
+      ],
+      "center": [
+        425,
+        75
+      ],
+      "adjacentTo": [
+        "kara_w",
+        "archangel",
+        "perm",
+        "moscow_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "perm",
+      "name": "Perm",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          50
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          450,
+          100
+        ]
+      ],
+      "center": [
+        475,
+        75
+      ],
+      "adjacentTo": [
+        "kara_c",
+        "dvina",
+        "ural_n",
+        "kazan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "ural_n",
+      "name": "N Urals",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          500,
+          50
+        ],
+        [
+          550,
+          50
+        ],
+        [
+          550,
+          100
+        ],
+        [
+          500,
+          100
+        ]
+      ],
+      "center": [
+        525,
+        75
+      ],
+      "adjacentTo": [
+        "kara_e",
+        "perm",
+        "tyumen",
+        "ural_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "tyumen",
+      "name": "Tyumen",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          550,
+          50
+        ],
+        [
+          600,
+          50
+        ],
+        [
+          600,
+          100
+        ],
+        [
+          550,
+          100
+        ]
+      ],
+      "center": [
+        575,
+        75
+      ],
+      "adjacentTo": [
+        "kara_ee",
+        "ural_n",
+        "omsk",
+        "chelyabinsk"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "omsk",
+      "name": "Omsk",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          600,
+          50
+        ],
+        [
+          650,
+          50
+        ],
+        [
+          650,
+          100
+        ],
+        [
+          600,
+          100
+        ]
+      ],
+      "center": [
+        625,
+        75
+      ],
+      "adjacentTo": [
+        "sib_sea_w",
+        "tyumen",
+        "tomsk",
+        "novosibirsk"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "tomsk",
+      "name": "Tomsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          650,
+          50
+        ],
+        [
+          700,
+          50
+        ],
+        [
+          700,
+          100
+        ],
+        [
+          650,
+          100
+        ]
+      ],
+      "center": [
+        675,
+        75
+      ],
+      "adjacentTo": [
+        "sib_sea_e",
+        "omsk",
+        "krasnoyarsk",
+        "barnaul"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "krasnoyarsk",
+      "name": "Krasnoyarsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          700,
+          50
+        ],
+        [
+          750,
+          50
+        ],
+        [
+          750,
+          100
+        ],
+        [
+          700,
+          100
+        ]
+      ],
+      "center": [
+        725,
+        75
+      ],
+      "adjacentTo": [
+        "sib_sea_ee",
+        "tomsk",
+        "irkutsk",
+        "kemerovo"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "irkutsk",
+      "name": "Irkutsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          750,
+          50
+        ],
+        [
+          800,
+          50
+        ],
+        [
+          800,
+          100
+        ],
+        [
+          750,
+          100
+        ]
+      ],
+      "center": [
+        775,
+        75
+      ],
+      "adjacentTo": [
+        "sib_sea_far",
+        "krasnoyarsk",
+        "irkutsk_s"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "n_sea_s",
+      "name": "N Sea S",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "adjacentTo": [
+        "n_sea",
+        "denmark",
+        "n_sea_ss"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "denmark",
+      "name": "Denmark",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "adjacentTo": [
+        "n_sea2",
+        "n_sea_s",
+        "baltic",
+        "netherlands"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "baltic",
+      "name": "Baltic Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "adjacentTo": [
+        "norway",
+        "denmark",
+        "estonia",
+        "germany_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "estonia",
+      "name": "Estonia",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "adjacentTo": [
+        "sweden",
+        "baltic",
+        "leningrad",
+        "poland_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "leningrad",
+      "name": "Leningrad",
+      "type": "coastal",
+      "production": 5,
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "adjacentTo": [
+        "finland",
+        "estonia",
+        "novgorod",
+        "lithuania"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "novgorod",
+      "name": "Novgorod",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "adjacentTo": [
+        "karelia",
+        "leningrad",
+        "vologda",
+        "minsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "vologda",
+      "name": "Vologda",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          100
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          300,
+          150
+        ]
+      ],
+      "center": [
+        325,
+        125
+      ],
+      "adjacentTo": [
+        "kola",
+        "novgorod",
+        "yaroslavl",
+        "smolensk"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "yaroslavl",
+      "name": "Yaroslavl",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          100
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          350,
+          150
+        ]
+      ],
+      "center": [
+        375,
+        125
+      ],
+      "adjacentTo": [
+        "archangel",
+        "vologda",
+        "moscow_n",
+        "moscow"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "moscow_n",
+      "name": "N Moscow",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          400,
+          100
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          400,
+          150
+        ]
+      ],
+      "center": [
+        425,
+        125
+      ],
+      "adjacentTo": [
+        "dvina",
+        "yaroslavl",
+        "kazan",
+        "gorky"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kazan",
+      "name": "Kazan",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          450,
+          100
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          450,
+          150
+        ]
+      ],
+      "center": [
+        475,
+        125
+      ],
+      "adjacentTo": [
+        "perm",
+        "moscow_n",
+        "ural_c",
+        "samara"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "ural_c",
+      "name": "C Urals",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          500,
+          100
+        ],
+        [
+          550,
+          100
+        ],
+        [
+          550,
+          150
+        ],
+        [
+          500,
+          150
+        ]
+      ],
+      "center": [
+        525,
+        125
+      ],
+      "adjacentTo": [
+        "ural_n",
+        "kazan",
+        "chelyabinsk",
+        "ufa"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "chelyabinsk",
+      "name": "Chelyabinsk",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          550,
+          100
+        ],
+        [
+          600,
+          100
+        ],
+        [
+          600,
+          150
+        ],
+        [
+          550,
+          150
+        ]
+      ],
+      "center": [
+        575,
+        125
+      ],
+      "adjacentTo": [
+        "tyumen",
+        "ural_c",
+        "novosibirsk",
+        "magnitogorsk"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "novosibirsk",
+      "name": "Novosibirsk",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          600,
+          100
+        ],
+        [
+          650,
+          100
+        ],
+        [
+          650,
+          150
+        ],
+        [
+          600,
+          150
+        ]
+      ],
+      "center": [
+        625,
+        125
+      ],
+      "adjacentTo": [
+        "omsk",
+        "chelyabinsk",
+        "barnaul",
+        "kurgan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "barnaul",
+      "name": "Barnaul",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          650,
+          100
+        ],
+        [
+          700,
+          100
+        ],
+        [
+          700,
+          150
+        ],
+        [
+          650,
+          150
+        ]
+      ],
+      "center": [
+        675,
+        125
+      ],
+      "adjacentTo": [
+        "tomsk",
+        "novosibirsk",
+        "kemerovo",
+        "novosibirsk_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kemerovo",
+      "name": "Kemerovo",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          700,
+          100
+        ],
+        [
+          750,
+          100
+        ],
+        [
+          750,
+          150
+        ],
+        [
+          700,
+          150
+        ]
+      ],
+      "center": [
+        725,
+        125
+      ],
+      "adjacentTo": [
+        "krasnoyarsk",
+        "barnaul",
+        "irkutsk_s",
+        "altai"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "irkutsk_s",
+      "name": "S Irkutsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          750,
+          100
+        ],
+        [
+          800,
+          100
+        ],
+        [
+          800,
+          150
+        ],
+        [
+          750,
+          150
+        ]
+      ],
+      "center": [
+        775,
+        125
+      ],
+      "adjacentTo": [
+        "irkutsk",
+        "kemerovo",
+        "kuznetsk"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "n_sea_ss",
+      "name": "N Sea SS",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "adjacentTo": [
+        "n_sea_s",
+        "netherlands",
+        "n_sea_sss"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "netherlands",
+      "name": "Netherlands",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "adjacentTo": [
+        "denmark",
+        "n_sea_ss",
+        "germany_n",
+        "germany_c"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "germany_n",
+      "name": "N Germany",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "adjacentTo": [
+        "baltic",
+        "netherlands",
+        "poland_n",
+        "silesia"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "poland_n",
+      "name": "N Poland",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "adjacentTo": [
+        "estonia",
+        "germany_n",
+        "lithuania",
+        "poland"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "lithuania",
+      "name": "Lithuania",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "adjacentTo": [
+        "leningrad",
+        "poland_n",
+        "minsk",
+        "brest"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "minsk",
+      "name": "Minsk",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "adjacentTo": [
+        "novgorod",
+        "lithuania",
+        "smolensk",
+        "kiev_n"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "smolensk",
+      "name": "Smolensk",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          300,
+          200
+        ]
+      ],
+      "center": [
+        325,
+        175
+      ],
+      "adjacentTo": [
+        "vologda",
+        "minsk",
+        "moscow",
+        "kursk"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "moscow",
+      "name": "Moscow",
+      "type": "land",
+      "production": 5,
+      "polygon": [
+        [
+          350,
+          150
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          350,
+          200
+        ]
+      ],
+      "center": [
+        375,
+        175
+      ],
+      "adjacentTo": [
+        "yaroslavl",
+        "smolensk",
+        "gorky",
+        "voronezh"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "gorky",
+      "name": "Gorky",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          400,
+          150
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          400,
+          200
+        ]
+      ],
+      "center": [
+        425,
+        175
+      ],
+      "adjacentTo": [
+        "moscow_n",
+        "moscow",
+        "samara",
+        "penza"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "samara",
+      "name": "Samara",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          450,
+          150
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          450,
+          200
+        ]
+      ],
+      "center": [
+        475,
+        175
+      ],
+      "adjacentTo": [
+        "kazan",
+        "gorky",
+        "ufa",
+        "saratov"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "ufa",
+      "name": "Ufa",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          500,
+          150
+        ],
+        [
+          550,
+          150
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          500,
+          200
+        ]
+      ],
+      "center": [
+        525,
+        175
+      ],
+      "adjacentTo": [
+        "ural_c",
+        "samara",
+        "magnitogorsk",
+        "orenburg"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "magnitogorsk",
+      "name": "Magnitogorsk",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          550,
+          150
+        ],
+        [
+          600,
+          150
+        ],
+        [
+          600,
+          200
+        ],
+        [
+          550,
+          200
+        ]
+      ],
+      "center": [
+        575,
+        175
+      ],
+      "adjacentTo": [
+        "chelyabinsk",
+        "ufa",
+        "kurgan",
+        "aktobe"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kurgan",
+      "name": "Kurgan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          600,
+          150
+        ],
+        [
+          650,
+          150
+        ],
+        [
+          650,
+          200
+        ],
+        [
+          600,
+          200
+        ]
+      ],
+      "center": [
+        625,
+        175
+      ],
+      "adjacentTo": [
+        "novosibirsk",
+        "magnitogorsk",
+        "novosibirsk_s",
+        "kustanay"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "novosibirsk_s",
+      "name": "S Novosibirsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          650,
+          150
+        ],
+        [
+          700,
+          150
+        ],
+        [
+          700,
+          200
+        ],
+        [
+          650,
+          200
+        ]
+      ],
+      "center": [
+        675,
+        175
+      ],
+      "adjacentTo": [
+        "barnaul",
+        "kurgan",
+        "altai",
+        "petropavl"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "altai",
+      "name": "Altai",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          700,
+          150
+        ],
+        [
+          750,
+          150
+        ],
+        [
+          750,
+          200
+        ],
+        [
+          700,
+          200
+        ]
+      ],
+      "center": [
+        725,
+        175
+      ],
+      "adjacentTo": [
+        "kemerovo",
+        "novosibirsk_s",
+        "kuznetsk",
+        "semipal"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kuznetsk",
+      "name": "Kuznetsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          750,
+          150
+        ],
+        [
+          800,
+          150
+        ],
+        [
+          800,
+          200
+        ],
+        [
+          750,
+          200
+        ]
+      ],
+      "center": [
+        775,
+        175
+      ],
+      "adjacentTo": [
+        "irkutsk_s",
+        "altai",
+        "omsk_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "n_sea_sss",
+      "name": "N Sea SSS",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "adjacentTo": [
+        "n_sea_ss",
+        "germany_c",
+        "n_sea_bot"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "germany_c",
+      "name": "C Germany",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "adjacentTo": [
+        "netherlands",
+        "n_sea_sss",
+        "silesia",
+        "germany_s"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "silesia",
+      "name": "Silesia",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          100,
+          200
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          100,
+          250
+        ]
+      ],
+      "center": [
+        125,
+        225
+      ],
+      "adjacentTo": [
+        "germany_n",
+        "germany_c",
+        "poland",
+        "austria"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "poland",
+      "name": "Poland",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "adjacentTo": [
+        "poland_n",
+        "silesia",
+        "brest",
+        "hungary"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "brest",
+      "name": "Brest-Litovsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "adjacentTo": [
+        "lithuania",
+        "poland",
+        "kiev_n",
+        "lviv"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "kiev_n",
+      "name": "N Kiev",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "adjacentTo": [
+        "minsk",
+        "brest",
+        "kursk",
+        "kiev"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "kursk",
+      "name": "Kursk",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "adjacentTo": [
+        "smolensk",
+        "kiev_n",
+        "voronezh",
+        "kharkov"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "voronezh",
+      "name": "Voronezh",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          350,
+          200
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          350,
+          250
+        ]
+      ],
+      "center": [
+        375,
+        225
+      ],
+      "adjacentTo": [
+        "moscow",
+        "kursk",
+        "penza",
+        "stalino"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "penza",
+      "name": "Penza",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          200
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          400,
+          250
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "adjacentTo": [
+        "gorky",
+        "voronezh",
+        "saratov",
+        "volgograd"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "saratov",
+      "name": "Saratov",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          450,
+          200
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          450,
+          250
+        ]
+      ],
+      "center": [
+        475,
+        225
+      ],
+      "adjacentTo": [
+        "samara",
+        "penza",
+        "orenburg",
+        "astrakhan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "orenburg",
+      "name": "Orenburg",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          500,
+          200
+        ],
+        [
+          550,
+          200
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          500,
+          250
+        ]
+      ],
+      "center": [
+        525,
+        225
+      ],
+      "adjacentTo": [
+        "ufa",
+        "saratov",
+        "aktobe",
+        "kzakh_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "aktobe",
+      "name": "Aktobe",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          200
+        ],
+        [
+          600,
+          200
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          550,
+          250
+        ]
+      ],
+      "center": [
+        575,
+        225
+      ],
+      "adjacentTo": [
+        "magnitogorsk",
+        "orenburg",
+        "kustanay",
+        "kzakh_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kustanay",
+      "name": "Kustanay",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          600,
+          200
+        ],
+        [
+          650,
+          200
+        ],
+        [
+          650,
+          250
+        ],
+        [
+          600,
+          250
+        ]
+      ],
+      "center": [
+        625,
+        225
+      ],
+      "adjacentTo": [
+        "kurgan",
+        "aktobe",
+        "petropavl",
+        "kzakh_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "petropavl",
+      "name": "Petropavlovsk",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          650,
+          200
+        ],
+        [
+          700,
+          200
+        ],
+        [
+          700,
+          250
+        ],
+        [
+          650,
+          250
+        ]
+      ],
+      "center": [
+        675,
+        225
+      ],
+      "adjacentTo": [
+        "novosibirsk_s",
+        "kustanay",
+        "semipal",
+        "almaty"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "semipal",
+      "name": "Semipalatinsk",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          700,
+          200
+        ],
+        [
+          750,
+          200
+        ],
+        [
+          750,
+          250
+        ],
+        [
+          700,
+          250
+        ]
+      ],
+      "center": [
+        725,
+        225
+      ],
+      "adjacentTo": [
+        "altai",
+        "petropavl",
+        "omsk_e",
+        "kzakh_far"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "omsk_e",
+      "name": "E Omsk",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          750,
+          200
+        ],
+        [
+          800,
+          200
+        ],
+        [
+          800,
+          250
+        ],
+        [
+          750,
+          250
+        ]
+      ],
+      "center": [
+        775,
+        225
+      ],
+      "adjacentTo": [
+        "kuznetsk",
+        "semipal",
+        "kzakh_far2"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "n_sea_bot",
+      "name": "N Sea Bot",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "adjacentTo": [
+        "n_sea_sss",
+        "germany_s",
+        "med_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "germany_s",
+      "name": "S Germany",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "adjacentTo": [
+        "germany_c",
+        "n_sea_bot",
+        "austria",
+        "italy"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "austria",
+      "name": "Austria",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          100,
+          250
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          100,
+          300
+        ]
+      ],
+      "center": [
+        125,
+        275
+      ],
+      "adjacentTo": [
+        "silesia",
+        "germany_s",
+        "hungary",
+        "croatia"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "hungary",
+      "name": "Hungary",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "adjacentTo": [
+        "poland",
+        "austria",
+        "lviv",
+        "romania"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "lviv",
+      "name": "Lviv",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "adjacentTo": [
+        "brest",
+        "hungary",
+        "kiev",
+        "moldova"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "kiev",
+      "name": "Kiev",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "adjacentTo": [
+        "kiev_n",
+        "lviv",
+        "kharkov",
+        "crimea"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "kharkov",
+      "name": "Kharkov",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "adjacentTo": [
+        "kursk",
+        "kiev",
+        "stalino",
+        "rostov"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "stalino",
+      "name": "Stalino",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          350,
+          250
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          350,
+          300
+        ]
+      ],
+      "center": [
+        375,
+        275
+      ],
+      "adjacentTo": [
+        "voronezh",
+        "kharkov",
+        "volgograd",
+        "krasnodar"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "volgograd",
+      "name": "Volgograd",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          400,
+          250
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          400,
+          300
+        ]
+      ],
+      "center": [
+        425,
+        275
+      ],
+      "adjacentTo": [
+        "penza",
+        "stalino",
+        "astrakhan",
+        "grozny"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "astrakhan",
+      "name": "Astrakhan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          250
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          450,
+          300
+        ]
+      ],
+      "center": [
+        475,
+        275
+      ],
+      "adjacentTo": [
+        "saratov",
+        "volgograd",
+        "kzakh_n",
+        "baku"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kzakh_n",
+      "name": "N Kazakhstan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          500,
+          250
+        ],
+        [
+          550,
+          250
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          500,
+          300
+        ]
+      ],
+      "center": [
+        525,
+        275
+      ],
+      "adjacentTo": [
+        "orenburg",
+        "astrakhan",
+        "kzakh_c",
+        "caspian"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kzakh_c",
+      "name": "C Kazakhstan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          250
+        ],
+        [
+          600,
+          250
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          550,
+          300
+        ]
+      ],
+      "center": [
+        575,
+        275
+      ],
+      "adjacentTo": [
+        "aktobe",
+        "kzakh_n",
+        "kzakh_e",
+        "turkmenistan"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kzakh_e",
+      "name": "E Kazakhstan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          600,
+          250
+        ],
+        [
+          650,
+          250
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          600,
+          300
+        ]
+      ],
+      "center": [
+        625,
+        275
+      ],
+      "adjacentTo": [
+        "kustanay",
+        "kzakh_c",
+        "almaty",
+        "uzbekistan"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "almaty",
+      "name": "Almaty",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          650,
+          250
+        ],
+        [
+          700,
+          250
+        ],
+        [
+          700,
+          300
+        ],
+        [
+          650,
+          300
+        ]
+      ],
+      "center": [
+        675,
+        275
+      ],
+      "adjacentTo": [
+        "petropavl",
+        "kzakh_e",
+        "kzakh_far",
+        "tajikistan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kzakh_far",
+      "name": "Far Kzakh",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          700,
+          250
+        ],
+        [
+          750,
+          250
+        ],
+        [
+          750,
+          300
+        ],
+        [
+          700,
+          300
+        ]
+      ],
+      "center": [
+        725,
+        275
+      ],
+      "adjacentTo": [
+        "semipal",
+        "almaty",
+        "kzakh_far2",
+        "kyrgyzstan"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kzakh_far2",
+      "name": "Far E Kzakh",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          750,
+          250
+        ],
+        [
+          800,
+          250
+        ],
+        [
+          800,
+          300
+        ],
+        [
+          750,
+          300
+        ]
+      ],
+      "center": [
+        775,
+        275
+      ],
+      "adjacentTo": [
+        "omsk_e",
+        "kzakh_far",
+        "xinjiang"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "med_n",
+      "name": "Med North",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "adjacentTo": [
+        "n_sea_bot",
+        "italy",
+        "med_c_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "italy",
+      "name": "Italy",
+      "type": "coastal",
+      "production": 4,
+      "polygon": [
+        [
+          50,
+          300
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          50,
+          350
+        ]
+      ],
+      "center": [
+        75,
+        325
+      ],
+      "adjacentTo": [
+        "germany_s",
+        "med_n",
+        "croatia",
+        "med_e_s"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "croatia",
+      "name": "Croatia",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "adjacentTo": [
+        "austria",
+        "italy",
+        "romania",
+        "greece"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "romania",
+      "name": "Romania",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "adjacentTo": [
+        "hungary",
+        "croatia",
+        "moldova",
+        "bulgaria"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "moldova",
+      "name": "Moldova",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "adjacentTo": [
+        "lviv",
+        "romania",
+        "crimea",
+        "black_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "crimea",
+      "name": "Crimea",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "adjacentTo": [
+        "kiev",
+        "moldova",
+        "rostov",
+        "turkey"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "rostov",
+      "name": "Rostov",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "adjacentTo": [
+        "kharkov",
+        "crimea",
+        "krasnodar",
+        "turkey_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "krasnodar",
+      "name": "Krasnodar",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "adjacentTo": [
+        "stalino",
+        "rostov",
+        "grozny",
+        "georgia"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "grozny",
+      "name": "Grozny (Oil)",
+      "type": "land",
+      "production": 4,
+      "polygon": [
+        [
+          400,
+          300
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          400,
+          350
+        ]
+      ],
+      "center": [
+        425,
+        325
+      ],
+      "adjacentTo": [
+        "volgograd",
+        "krasnodar",
+        "baku",
+        "armenia"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "baku",
+      "name": "Baku (Oil)",
+      "type": "coastal",
+      "production": 5,
+      "polygon": [
+        [
+          450,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          450,
+          350
+        ]
+      ],
+      "center": [
+        475,
+        325
+      ],
+      "adjacentTo": [
+        "astrakhan",
+        "grozny",
+        "caspian",
+        "iran_n"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "caspian",
+      "name": "Caspian Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          300
+        ],
+        [
+          550,
+          300
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          500,
+          350
+        ]
+      ],
+      "center": [
+        525,
+        325
+      ],
+      "adjacentTo": [
+        "kzakh_n",
+        "baku",
+        "turkmenistan",
+        "iran_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "turkmenistan",
+      "name": "Turkmenistan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          550,
+          300
+        ],
+        [
+          600,
+          300
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          550,
+          350
+        ]
+      ],
+      "center": [
+        575,
+        325
+      ],
+      "adjacentTo": [
+        "kzakh_c",
+        "caspian",
+        "uzbekistan",
+        "iran_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "uzbekistan",
+      "name": "Uzbekistan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          600,
+          300
+        ],
+        [
+          650,
+          300
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          600,
+          350
+        ]
+      ],
+      "center": [
+        625,
+        325
+      ],
+      "adjacentTo": [
+        "kzakh_e",
+        "turkmenistan",
+        "tajikistan",
+        "afghanistan"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "tajikistan",
+      "name": "Tajikistan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          650,
+          300
+        ],
+        [
+          700,
+          300
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          650,
+          350
+        ]
+      ],
+      "center": [
+        675,
+        325
+      ],
+      "adjacentTo": [
+        "almaty",
+        "uzbekistan",
+        "kyrgyzstan",
+        "pakistan"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "kyrgyzstan",
+      "name": "Kyrgyzstan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          700,
+          300
+        ],
+        [
+          750,
+          300
+        ],
+        [
+          750,
+          350
+        ],
+        [
+          700,
+          350
+        ]
+      ],
+      "center": [
+        725,
+        325
+      ],
+      "adjacentTo": [
+        "kzakh_far",
+        "tajikistan",
+        "xinjiang",
+        "india_nw"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "xinjiang",
+      "name": "Xinjiang",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          750,
+          300
+        ],
+        [
+          800,
+          300
+        ],
+        [
+          800,
+          350
+        ],
+        [
+          750,
+          350
+        ]
+      ],
+      "center": [
+        775,
+        325
+      ],
+      "adjacentTo": [
+        "kzakh_far2",
+        "kyrgyzstan",
+        "india_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "med_c_s",
+      "name": "Med CS",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          0,
+          400
+        ]
+      ],
+      "center": [
+        25,
+        375
+      ],
+      "adjacentTo": [
+        "med_n",
+        "med_e_s",
+        "med_bot_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_e_s",
+      "name": "Med ES",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          350
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        75,
+        375
+      ],
+      "adjacentTo": [
+        "italy",
+        "med_c_s",
+        "greece",
+        "med_bot_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "greece",
+      "name": "Greece",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          350
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          100,
+          400
+        ]
+      ],
+      "center": [
+        125,
+        375
+      ],
+      "adjacentTo": [
+        "croatia",
+        "med_e_s",
+        "bulgaria",
+        "med_bot_e"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "bulgaria",
+      "name": "Bulgaria",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "adjacentTo": [
+        "romania",
+        "greece",
+        "black_sea",
+        "ef_egypt"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#8B0000",
+      "owner": "axis",
+      "originalOwner": "axis"
+    },
+    {
+      "id": "black_sea",
+      "name": "Black Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "adjacentTo": [
+        "moldova",
+        "bulgaria",
+        "turkey",
+        "syria"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "turkey",
+      "name": "Turkey",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "adjacentTo": [
+        "crimea",
+        "black_sea",
+        "turkey_e",
+        "iraq"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "turkey_e",
+      "name": "E Turkey",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "adjacentTo": [
+        "rostov",
+        "turkey",
+        "georgia",
+        "iraq_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "georgia",
+      "name": "Georgia",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          350
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          350,
+          400
+        ]
+      ],
+      "center": [
+        375,
+        375
+      ],
+      "adjacentTo": [
+        "krasnodar",
+        "turkey_e",
+        "armenia",
+        "gulf_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "armenia",
+      "name": "Armenia",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          350
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          400,
+          400
+        ]
+      ],
+      "center": [
+        425,
+        375
+      ],
+      "adjacentTo": [
+        "grozny",
+        "georgia",
+        "iran_n",
+        "gulf_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#1a3a5c",
+      "owner": "soviets",
+      "originalOwner": "soviets"
+    },
+    {
+      "id": "iran_n",
+      "name": "N Iran",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          350
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          450,
+          400
+        ]
+      ],
+      "center": [
+        475,
+        375
+      ],
+      "adjacentTo": [
+        "baku",
+        "armenia",
+        "iran_c",
+        "gulf_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "iran_c",
+      "name": "C Iran",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          500,
+          350
+        ],
+        [
+          550,
+          350
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          500,
+          400
+        ]
+      ],
+      "center": [
+        525,
+        375
+      ],
+      "adjacentTo": [
+        "caspian",
+        "iran_n",
+        "iran_e",
+        "arabian"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "iran_e",
+      "name": "E Iran",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          550,
+          350
+        ],
+        [
+          600,
+          350
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          550,
+          400
+        ]
+      ],
+      "center": [
+        575,
+        375
+      ],
+      "adjacentTo": [
+        "turkmenistan",
+        "iran_c",
+        "afghanistan",
+        "arabian2"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "afghanistan",
+      "name": "Afghanistan",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          600,
+          350
+        ],
+        [
+          650,
+          350
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          600,
+          400
+        ]
+      ],
+      "center": [
+        625,
+        375
+      ],
+      "adjacentTo": [
+        "uzbekistan",
+        "iran_e",
+        "pakistan",
+        "india_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "pakistan",
+      "name": "Pakistan",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          650,
+          350
+        ],
+        [
+          700,
+          350
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          650,
+          400
+        ]
+      ],
+      "center": [
+        675,
+        375
+      ],
+      "adjacentTo": [
+        "tajikistan",
+        "afghanistan",
+        "india_nw",
+        "india_c"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c8a96e"
+    },
+    {
+      "id": "india_nw",
+      "name": "NW India",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          700,
+          350
+        ],
+        [
+          750,
+          350
+        ],
+        [
+          750,
+          400
+        ],
+        [
+          700,
+          400
+        ]
+      ],
+      "center": [
+        725,
+        375
+      ],
+      "adjacentTo": [
+        "kyrgyzstan",
+        "pakistan",
+        "india_n",
+        "india_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "india_n",
+      "name": "N India",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          750,
+          350
+        ],
+        [
+          800,
+          350
+        ],
+        [
+          800,
+          400
+        ],
+        [
+          750,
+          400
+        ]
+      ],
+      "center": [
+        775,
+        375
+      ],
+      "adjacentTo": [
+        "xinjiang",
+        "india_nw",
+        "indian_e_ef"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "med_bot_w",
+      "name": "Med Bot W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          400
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          50,
+          450
+        ],
+        [
+          0,
+          450
+        ]
+      ],
+      "center": [
+        25,
+        425
+      ],
+      "adjacentTo": [
+        "med_c_s",
+        "med_bot_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_bot_c",
+      "name": "Med Bot C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          400
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          100,
+          450
+        ],
+        [
+          50,
+          450
+        ]
+      ],
+      "center": [
+        75,
+        425
+      ],
+      "adjacentTo": [
+        "med_e_s",
+        "med_bot_w",
+        "med_bot_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "med_bot_e",
+      "name": "Med Bot E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          400
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          150,
+          450
+        ],
+        [
+          100,
+          450
+        ]
+      ],
+      "center": [
+        125,
+        425
+      ],
+      "adjacentTo": [
+        "greece",
+        "med_bot_c",
+        "ef_egypt"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ef_egypt",
+      "name": "Egypt",
+      "type": "coastal",
+      "production": 3,
+      "polygon": [
+        [
+          150,
+          400
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          200,
+          450
+        ],
+        [
+          150,
+          450
+        ]
+      ],
+      "center": [
+        175,
+        425
+      ],
+      "adjacentTo": [
+        "bulgaria",
+        "med_bot_e",
+        "syria"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "syria",
+      "name": "Syria",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          400
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          250,
+          450
+        ],
+        [
+          200,
+          450
+        ]
+      ],
+      "center": [
+        225,
+        425
+      ],
+      "adjacentTo": [
+        "black_sea",
+        "ef_egypt",
+        "iraq"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "iraq",
+      "name": "Iraq",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          400
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          300,
+          450
+        ],
+        [
+          250,
+          450
+        ]
+      ],
+      "center": [
+        275,
+        425
+      ],
+      "adjacentTo": [
+        "turkey",
+        "syria",
+        "iraq_e"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "iraq_e",
+      "name": "E Iraq",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          300,
+          400
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          350,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ],
+      "center": [
+        325,
+        425
+      ],
+      "adjacentTo": [
+        "turkey_e",
+        "iraq",
+        "gulf_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "gulf_n",
+      "name": "Persian Gulf N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          400
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          400,
+          450
+        ],
+        [
+          350,
+          450
+        ]
+      ],
+      "center": [
+        375,
+        425
+      ],
+      "adjacentTo": [
+        "georgia",
+        "iraq_e",
+        "gulf_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_c",
+      "name": "Persian Gulf C",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          400
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          450,
+          450
+        ],
+        [
+          400,
+          450
+        ]
+      ],
+      "center": [
+        425,
+        425
+      ],
+      "adjacentTo": [
+        "armenia",
+        "gulf_n",
+        "gulf_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "gulf_s",
+      "name": "Persian Gulf S",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          400
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          500,
+          450
+        ],
+        [
+          450,
+          450
+        ]
+      ],
+      "center": [
+        475,
+        425
+      ],
+      "adjacentTo": [
+        "iran_n",
+        "gulf_c",
+        "arabian"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arabian",
+      "name": "Arabian Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          500,
+          400
+        ],
+        [
+          550,
+          400
+        ],
+        [
+          550,
+          450
+        ],
+        [
+          500,
+          450
+        ]
+      ],
+      "center": [
+        525,
+        425
+      ],
+      "adjacentTo": [
+        "iran_c",
+        "gulf_s",
+        "arabian2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "arabian2",
+      "name": "Arabian Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          550,
+          400
+        ],
+        [
+          600,
+          400
+        ],
+        [
+          600,
+          450
+        ],
+        [
+          550,
+          450
+        ]
+      ],
+      "center": [
+        575,
+        425
+      ],
+      "adjacentTo": [
+        "iran_e",
+        "arabian",
+        "india_w"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "india_w",
+      "name": "W India",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          600,
+          400
+        ],
+        [
+          650,
+          400
+        ],
+        [
+          650,
+          450
+        ],
+        [
+          600,
+          450
+        ]
+      ],
+      "center": [
+        625,
+        425
+      ],
+      "adjacentTo": [
+        "afghanistan",
+        "arabian2",
+        "india_c"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "india_c",
+      "name": "C India",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          650,
+          400
+        ],
+        [
+          700,
+          400
+        ],
+        [
+          700,
+          450
+        ],
+        [
+          650,
+          450
+        ]
+      ],
+      "center": [
+        675,
+        425
+      ],
+      "adjacentTo": [
+        "pakistan",
+        "india_w",
+        "india_e"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "india_e",
+      "name": "E India",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          700,
+          400
+        ],
+        [
+          750,
+          400
+        ],
+        [
+          750,
+          450
+        ],
+        [
+          700,
+          450
+        ]
+      ],
+      "center": [
+        725,
+        425
+      ],
+      "adjacentTo": [
+        "india_nw",
+        "india_c",
+        "indian_e_ef"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "allies_africa",
+      "originalOwner": "allies_africa"
+    },
+    {
+      "id": "indian_e_ef",
+      "name": "Indian E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          750,
+          400
+        ],
+        [
+          800,
+          400
+        ],
+        [
+          800,
+          450
+        ],
+        [
+          750,
+          450
+        ]
+      ],
+      "center": [
+        775,
+        425
+      ],
+      "adjacentTo": [
+        "india_n",
+        "india_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": []
+}

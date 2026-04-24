@@ -176,12 +176,12 @@ class SteamCloudProvider implements CloudProvider {
   icon = '☁️';
   
   isAvailable(): boolean {
-    return !!(window as any).electronAPI?.isSteamRunning;
+    return !!window.electronAPI?.isSteamRunning;
   }
   
   async authenticate(): Promise<boolean> {
     try {
-      return await (window as any).electronAPI?.isSteamRunning() || false;
+      return await window.electronAPI?.isSteamRunning() || false;
     } catch {
       return false;
     }
@@ -191,26 +191,53 @@ class SteamCloudProvider implements CloudProvider {
     return this.isAvailable();
   }
   
-  async upload(_key: string, _data: string): Promise<boolean> {
-    // Would integrate with Steamworks FileWrite
-    console.log('Steam Cloud upload not implemented');
-    return false;
+  async upload(key: string, data: string): Promise<boolean> {
+    try {
+      return await window.electronAPI?.steamCloudWrite(`save_${key}.json`, data) ?? false;
+    } catch (e) {
+      console.error('Steam Cloud upload failed:', e);
+      return false;
+    }
   }
-  
-  async download(_key: string): Promise<string | null> {
-    // Would integrate with Steamworks FileRead
-    console.log('Steam Cloud download not implemented');
-    return null;
+
+  async download(key: string): Promise<string | null> {
+    try {
+      return await window.electronAPI?.steamCloudRead(`save_${key}.json`) ?? null;
+    } catch (e) {
+      console.error('Steam Cloud download failed:', e);
+      return null;
+    }
   }
-  
+
   async list(): Promise<CloudSaveMetadata[]> {
-    // Would integrate with Steamworks FileList
-    return [];
+    try {
+      const files: unknown[] = await window.electronAPI?.steamCloudList() ?? [];
+      return files
+        .filter((f): f is string => typeof f === 'string' && f.startsWith('save_') && f.endsWith('.json'))
+        .map((filename) => ({
+          id: filename.replace(/^save_/, '').replace(/\.json$/, ''),
+          name: filename,
+          turnNumber: 0,
+          factionId: '',
+          mapId: '',
+          savedAt: Date.now(),
+          syncedAt: Date.now(),
+          size: 0,
+          checksum: '',
+        }));
+    } catch (e) {
+      console.error('Steam Cloud list failed:', e);
+      return [];
+    }
   }
-  
-  async delete(_key: string): Promise<boolean> {
-    // Would integrate with Steamworks FileDelete
-    return false;
+
+  async delete(key: string): Promise<boolean> {
+    try {
+      return await window.electronAPI?.steamCloudDelete(`save_${key}.json`) ?? false;
+    } catch (e) {
+      console.error('Steam Cloud delete failed:', e);
+      return false;
+    }
   }
 }
 
@@ -323,17 +350,50 @@ export class CloudSaveManager {
   }
   
   /**
-   * Start auto-sync interval
+   * Start auto-sync interval.
+   * Pass a getSaves callback so the manager can read current local saves.
    */
-  startAutoSync(intervalMs: number = 300000): void { // 5 minutes
+  startAutoSync(
+    intervalMs: number = 300000, // 5 minutes
+    getSaves?: () => { id: string; data: string; timestamp: number }[]
+  ): void {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
-    
-    this.syncInterval = window.setInterval(() => {
-      // Auto-sync logic would go here
-      console.log('Auto-sync check...');
+
+    this.syncInterval = window.setInterval(async () => {
+      if (!this.activeProvider) return;
+      const localSaves = getSaves ? getSaves() : this.readLocalSavesFromStorage();
+      if (localSaves.length === 0) return;
+
+      await this.syncWithLocal(localSaves);
     }, intervalMs);
+  }
+
+  /**
+   * Read saves stored by the game's SaveManager from localStorage.
+   * Keys follow the pattern "grand_strategy_save_<id>".
+   */
+  private readLocalSavesFromStorage(): { id: string; data: string; timestamp: number }[] {
+    const saves: { id: string; data: string; timestamp: number }[] = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith('grand_strategy_save_')) continue;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const id = key.replace('grand_strategy_save_', '');
+        let timestamp = Date.now();
+        try {
+          const parsed = JSON.parse(raw);
+          timestamp = parsed.savedAt ?? parsed.timestamp ?? Date.now();
+        } catch { /* use default */ }
+        saves.push({ id, data: raw, timestamp });
+      }
+    } catch (e) {
+      console.error('[CloudSync] Failed to read local saves:', e);
+    }
+    return saves;
   }
   
   /**

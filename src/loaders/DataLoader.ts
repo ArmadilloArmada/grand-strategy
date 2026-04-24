@@ -7,6 +7,7 @@ import { UnitTypeData } from '../data/Unit';
 import { FactionData } from '../data/Faction';
 import { GameRulesData, GameRules } from '../data/GameRules';
 import { MapLoader, MapData } from './MapLoader';
+import { rulesetLoader, RulesetData } from './RulesetLoader';
 
 export interface GameDataBundle {
   rules?: GameRulesData;
@@ -81,6 +82,34 @@ export class DataLoader {
     }
     if (mod.rules) {
       this.state.rules = new GameRules(mod.rules);
+    }
+  }
+
+  /**
+   * Load a ruleset override from a RulesetData object, merging it with current rules.
+   * Validates the ruleset before applying; logs errors and skips on failure.
+   */
+  loadRuleset(data: RulesetData): boolean {
+    try {
+      const overrides = rulesetLoader.load(data);
+      this.state.rules = rulesetLoader.mergeWithDefaults(overrides);
+      return true;
+    } catch (e) {
+      console.error('[DataLoader] Failed to apply ruleset:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Load a ruleset override from a JSON string.
+   */
+  loadRulesetFromJSON(json: string): boolean {
+    try {
+      const data: RulesetData = JSON.parse(json);
+      return this.loadRuleset(data);
+    } catch (e) {
+      console.error('[DataLoader] Failed to parse ruleset JSON:', e);
+      return false;
     }
   }
 

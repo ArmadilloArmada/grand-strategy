@@ -14,9 +14,9 @@
     "description": "Strong economy and production. Excels at building and sustaining large armies.",
     "bonuses": {
       "ipcPerFactory": 1,
-      "factoryProduction": 1,
-      "navalStrength": 1,
-      "researchBonus": 10
+      "navalAttackBonus": 1,
+      "researchSpeedBonus": 0.25,
+      "incomeMultiplierBonus": 0.1
     },
     "specialAbility": {
       "name": "Arsenal of Democracy",
@@ -39,9 +39,7 @@
     "description": "Masters of defense. Infantry hold the line while armor counterattacks.",
     "bonuses": {
       "infantryDefenseBonus": 1,
-      "winterCombatBonus": 1,
-      "conscriptionDiscount": 1,
-      "territoryDefenseBonus": 1
+      "counterIntelBonus": 0.3
     },
     "specialAbility": {
       "name": "Deep Battle Doctrine",
@@ -64,9 +62,7 @@
     "description": "Swift and mobile forces. Strike fast, capture quickly, consolidate.",
     "bonuses": {
       "movementBonus": 1,
-      "blitzBonus": 1,
-      "islandHoppingBonus": 1,
-      "airSuperiority": 1
+      "navalAttackBonus": 1
     },
     "specialAbility": {
       "name": "Lightning War",
@@ -89,9 +85,7 @@
     "description": "Resourceful and adaptable. Cheaper units and terrain advantages.",
     "bonuses": {
       "unitCostDiscount": 1,
-      "jungleBonus": 1,
-      "guerrillaDefense": 1,
-      "resourceEfficiency": 15
+      "incomeMultiplierBonus": 0.05
     },
     "specialAbility": {
       "name": "People's Army",

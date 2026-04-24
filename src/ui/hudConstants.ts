@@ -1,0 +1,15 @@
+export const UNIT_ICONS: Record<string, string> = {
+  infantry: '🚶',
+  mech_infantry: '🏃',
+  tank: '🛡️',
+  artillery: '💥',
+  anti_air: '🎯',
+  fighter: '✈️',
+  bomber: '🛩️',
+  battleship: '🚢',
+  carrier: '🛳️',
+  cruiser: '⛵',
+  destroyer: '🚤',
+  submarine: '🐋',
+  transport: '📦',
+};

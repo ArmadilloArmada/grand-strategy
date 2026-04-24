@@ -23,7 +23,7 @@ export interface GameEvent {
 export interface EventEffect {
   type: 'ipc_bonus' | 'ipc_penalty' | 'production_bonus' | 'unit_spawn' | 'unit_loss' |
         'defense_bonus' | 'attack_bonus' | 'movement_bonus' | 'factory_damage' |
-        'territory_revolt' | 'morale_boost' | 'intel_reveal';
+        'territory_revolt' | 'morale_boost' | 'intel_reveal' | 'partisan_spawn';
   value?: number;
   target?: 'random_territory' | 'capital' | 'all' | 'frontline';
   duration?: number; // Turns the effect lasts
@@ -286,6 +286,185 @@ export const STRATEGIC_EVENTS: GameEvent[] = [
     cooldownTurns: 10,
     conditions: [{ type: 'losing' }],
   },
+
+  // === NEW DRAMATIC EVENTS ===
+
+  {
+    id: 'coup_attempt',
+    name: '⚠️ Coup Attempt!',
+    description: 'Political factions within your government are plotting to seize power. How do you respond?',
+    type: 'choice',
+    icon: '🔪',
+    effects: [],
+    choices: [
+      {
+        id: 'crush_coup',
+        text: 'Crush the coup with force (-10 IPCs, army stays loyal)',
+        effects: [
+          { type: 'ipc_penalty', value: 10 },
+          { type: 'defense_bonus', value: 1, duration: 2 },
+        ],
+        cost: 10,
+      },
+      {
+        id: 'negotiate_coup',
+        text: 'Negotiate with conspirators (-5 IPCs, lose 2 infantry)',
+        effects: [
+          { type: 'ipc_penalty', value: 5 },
+          { type: 'unit_loss', unitType: 'infantry', value: 2, target: 'capital' },
+        ],
+      },
+      {
+        id: 'ignore_coup',
+        text: 'Ignore the threat (risk factory sabotage)',
+        effects: [
+          { type: 'factory_damage' },
+        ],
+      },
+    ],
+    weight: 4,
+    cooldownTurns: 15,
+    conditions: [{ type: 'losing' }],
+  },
+  {
+    id: 'naval_breakthrough',
+    name: '⚓ Naval Breakthrough!',
+    description: 'Your navy has achieved a decisive engagement, opening strategic opportunities.',
+    type: 'choice',
+    icon: '⚓',
+    effects: [],
+    choices: [
+      {
+        id: 'seize_lanes',
+        text: 'Press the advantage — spawn 2 destroyers at capital',
+        effects: [
+          { type: 'unit_spawn', unitType: 'destroyer', value: 2, target: 'capital' },
+        ],
+      },
+      {
+        id: 'consolidate_navy',
+        text: 'Consolidate control (+15 IPCs)',
+        effects: [
+          { type: 'ipc_bonus', value: 15 },
+        ],
+      },
+    ],
+    weight: 6,
+    cooldownTurns: 10,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'defecting_general',
+    name: '🎖️ General Defects to Your Side!',
+    description: 'A decorated enemy commander has offered to defect, bringing crucial intelligence.',
+    type: 'choice',
+    icon: '🎖️',
+    effects: [],
+    choices: [
+      {
+        id: 'welcome_general',
+        text: 'Accept the defector (+2 infantry, +8 IPCs)',
+        effects: [
+          { type: 'unit_spawn', unitType: 'infantry', value: 2, target: 'capital' },
+          { type: 'ipc_bonus', value: 8 },
+        ],
+      },
+      {
+        id: 'reject_general',
+        text: 'Reject — could be a spy (-5 IPCs)',
+        effects: [
+          { type: 'ipc_penalty', value: 5 },
+        ],
+      },
+    ],
+    weight: 7,
+    cooldownTurns: 8,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'plague_outbreak',
+    name: '☠️ Plague Outbreak',
+    description: 'A virulent disease sweeps through your front-line troops, weakening their fighting capacity.',
+    type: 'negative',
+    icon: '☠️',
+    effects: [
+      { type: 'unit_loss', unitType: 'infantry', value: 3, target: 'frontline' },
+      { type: 'ipc_penalty', value: 5 },
+    ],
+    weight: 5,
+    cooldownTurns: 10,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'guerrilla_uprising',
+    name: '🌿 Guerrilla Uprising',
+    description: 'Resistance fighters emerge in territories you occupy, disrupting supply lines.',
+    type: 'negative',
+    icon: '🌿',
+    effects: [
+      { type: 'partisan_spawn' },
+    ],
+    weight: 8,
+    cooldownTurns: 6,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'war_profiteers',
+    name: '💰 War Profiteers',
+    description: 'Arms dealers demand payment, threatening to sell secrets to your enemies if refused.',
+    type: 'choice',
+    icon: '💰',
+    effects: [],
+    choices: [
+      {
+        id: 'pay_profiteers',
+        text: 'Pay them off (-8 IPCs, secrets stay hidden)',
+        effects: [
+          { type: 'ipc_penalty', value: 8 },
+          { type: 'attack_bonus', value: 1, duration: 2 },
+        ],
+        cost: 8,
+      },
+      {
+        id: 'refuse_profiteers',
+        text: 'Refuse — risk intel leak (factory damage)',
+        effects: [
+          { type: 'factory_damage' },
+        ],
+      },
+    ],
+    weight: 6,
+    cooldownTurns: 12,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'heroic_last_stand',
+    name: '🦁 Heroic Last Stand',
+    description: 'Your troops are inspired by tales of heroic resistance. They will fight to the last!',
+    type: 'positive',
+    icon: '🦁',
+    effects: [
+      { type: 'defense_bonus', value: 2, duration: 1, target: 'frontline' },
+      { type: 'morale_boost', value: 1 },
+    ],
+    weight: 7,
+    cooldownTurns: 8,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'supply_lines_broken',
+    name: '📦 Supply Line Disruption',
+    description: 'Enemy saboteurs have struck your logistics network, hampering troop movements.',
+    type: 'negative',
+    icon: '📦',
+    effects: [
+      { type: 'movement_bonus', value: -1, duration: 2 },
+      { type: 'ipc_penalty', value: 5 },
+    ],
+    weight: 7,
+    cooldownTurns: 7,
+    conditions: [{ type: 'at_war' }],
+  },
 ];
 
 export class EventsSystem {
@@ -424,6 +603,49 @@ export class EventsSystem {
           });
         }
         break;
+
+      case 'partisan_spawn': {
+        // Spawn partisan units in 1-2 enemy-occupied territories whose originalOwner is factionId
+        const occupied = Array.from(this.state.territories.values()).filter(
+          t => t.owner !== null && t.owner !== factionId && t.originalOwner === factionId && t.isLand()
+        );
+        const count = Math.min(occupied.length, 1 + Math.floor(Math.random() * 2));
+        for (let i = 0; i < count; i++) {
+          const t = occupied[Math.floor(Math.random() * occupied.length)];
+          t.addUnits('partisan', 1);
+        }
+        break;
+      }
+
+      case 'territory_revolt': {
+        // A non-capital owned territory returns to its original owner
+        const revoltable = Array.from(this.state.territories.values()).filter(
+          t => t.owner === factionId && !t.isCapital && t.isLand() && t.originalOwner && t.originalOwner !== factionId
+        );
+        if (revoltable.length > 0) {
+          const revolted = revoltable[Math.floor(Math.random() * revoltable.length)];
+          revolted.owner = revolted.originalOwner;
+        }
+        break;
+      }
+
+      case 'morale_boost': {
+        if (faction) {
+          faction.morale = Math.min(100, faction.morale + (effect.value ?? 10));
+        }
+        break;
+      }
+
+      case 'intel_reveal': {
+        const enemies = this.state.factionRegistry.getAll().filter(
+          f => f.id !== factionId && !f.isDefeated
+        );
+        if (enemies.length > 0) {
+          const target = enemies[Math.floor(Math.random() * enemies.length)];
+          this.state.systems.espionageSystem?.revealFactionIntel?.(target.id, 3);
+        }
+        break;
+      }
     }
   }
 

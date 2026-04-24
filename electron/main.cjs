@@ -6,15 +6,15 @@ const fs = require('fs');
 let mainWindow = null;
 
 // Steam integration (optional - will work without Steam)
+// Replace 480 with your real Steam App ID once you have one from Steamworks
+const STEAM_APP_ID = 480;
 let steamworks = null;
 try {
-  // Try to load steamworks - will fail gracefully if not installed
-  // Install with: npm install steamworks.js
-  // steamworks = require('steamworks.js');
-  // steamworks.init(YOUR_STEAM_APP_ID);
-  console.log('Steam integration disabled (install steamworks.js for Steam features)');
+  const steamworksJs = require('steamworks.js');
+  steamworks = steamworksJs.init(STEAM_APP_ID);
+  console.log('Steam integration enabled. User:', steamworks.localplayer.getName());
 } catch (e) {
-  console.log('Running without Steam integration');
+  console.log('Running without Steam integration:', e.message);
 }
 
 // Check if running in development
@@ -190,6 +190,82 @@ ipcMain.handle('get-steam-username', () => {
   return null;
 });
 
+// Steam Cloud file operations
+ipcMain.handle('steam-cloud-write', (event, filename, data) => {
+  if (steamworks) {
+    try {
+      steamworks.cloud.writeFile(filename, data);
+      return true;
+    } catch (e) {
+      console.error('Steam cloud write failed:', e);
+    }
+  }
+  return false;
+});
+
+ipcMain.handle('steam-cloud-read', (event, filename) => {
+  if (steamworks) {
+    try {
+      const data = steamworks.cloud.readFile(filename);
+      // readFile returns a Buffer; convert to string for JSON save data
+      return Buffer.isBuffer(data) ? data.toString('utf8') : data;
+    } catch (e) {
+      console.error('Steam cloud read failed:', e);
+    }
+  }
+  return null;
+});
+
+ipcMain.handle('steam-cloud-list', () => {
+  if (steamworks) {
+    try {
+      return steamworks.cloud.listFiles();
+    } catch (e) {
+      console.error('Steam cloud list failed:', e);
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('steam-cloud-delete', (event, filename) => {
+  if (steamworks) {
+    try {
+      steamworks.cloud.deleteFile(filename);
+      return true;
+    } catch (e) {
+      console.error('Steam cloud delete failed:', e);
+    }
+  }
+  return false;
+});
+
+// Steam Rich Presence
+ipcMain.handle('set-rich-presence', (event, status, details) => {
+  if (steamworks) {
+    try {
+      steamworks.localplayer.setRichPresence('status', String(status ?? ''));
+      if (details && typeof details === 'object') {
+        for (const [key, value] of Object.entries(details)) {
+          steamworks.localplayer.setRichPresence(key, String(value));
+        }
+      }
+    } catch (e) {
+      console.error('Set rich presence failed:', e);
+    }
+  }
+});
+
+// Steam Overlay
+ipcMain.handle('open-steam-overlay', (event, dialog) => {
+  if (steamworks) {
+    try {
+      steamworks.overlay.activateOverlay(dialog ?? 'Achievements');
+    } catch (e) {
+      console.error('Open steam overlay failed:', e);
+    }
+  }
+});
+
 // Save file dialog
 ipcMain.handle('show-save-dialog', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -208,6 +284,86 @@ ipcMain.handle('show-open-dialog', async () => {
     filters: [{ name: 'Save Files', extensions: ['json'] }],
   });
   return result;
+});
+
+// ── Mod filesystem integration ─────────────────────────────────────────────
+
+/** Scan the userData/mods/ folder and return all valid mod JSON files */
+ipcMain.handle('scan-mods-folder', async () => {
+  const modsDir = path.join(app.getPath('userData'), 'mods');
+  try {
+    if (!fs.existsSync(modsDir)) {
+      fs.mkdirSync(modsDir, { recursive: true });
+    }
+    const files = fs.readdirSync(modsDir).filter(f => f.endsWith('.json'));
+    const mods = [];
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(modsDir, file), 'utf8');
+        const parsed = JSON.parse(content);
+        if (parsed.manifest && parsed.manifest.id) {
+          mods.push({ filename: file, mod: parsed });
+        }
+      } catch (e) {
+        console.warn(`Skipping invalid mod file "${file}":`, e.message);
+      }
+    }
+    return mods;
+  } catch (e) {
+    console.error('Failed to scan mods folder:', e);
+    return [];
+  }
+});
+
+/** Open a file-picker dialog restricted to .json files and return the chosen file's content */
+ipcMain.handle('import-mod-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Mod',
+    properties: ['openFile'],
+    filters: [{ name: 'Mod Files', extensions: ['json'] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  try {
+    const content = fs.readFileSync(result.filePaths[0], 'utf8');
+    const parsed = JSON.parse(content);
+    return parsed;
+  } catch (e) {
+    console.error('Failed to read mod file:', e);
+    return null;
+  }
+});
+
+/** Export a mod to the userData/mods/ folder */
+ipcMain.handle('export-mod-file', async (event, modJson) => {
+  try {
+    const parsed = JSON.parse(modJson);
+    const filename = `${parsed.manifest.id}.json`;
+    const modsDir = path.join(app.getPath('userData'), 'mods');
+    if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+    fs.writeFileSync(path.join(modsDir, filename), modJson, 'utf8');
+    return filename;
+  } catch (e) {
+    console.error('Failed to export mod:', e);
+    return null;
+  }
+});
+
+/** Delete a mod file from the userData/mods/ folder */
+ipcMain.handle('delete-mod-file', async (event, filename) => {
+  try {
+    const modsDir = path.join(app.getPath('userData'), 'mods');
+    const fullPath = path.join(modsDir, filename);
+    // Security: ensure the path is inside the mods directory
+    if (!fullPath.startsWith(modsDir)) return false;
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Failed to delete mod file:', e);
+    return false;
+  }
 });
 
 // App lifecycle

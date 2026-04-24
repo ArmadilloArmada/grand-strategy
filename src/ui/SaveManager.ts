@@ -96,7 +96,6 @@ export class SaveManager {
       const key = `grand-strategy-save-${slotId}`;
       localStorage.setItem(key, JSON.stringify(saveData));
       
-      console.log(`💾 Saved to slot ${slotId}`);
       return true;
     } catch (e) {
       console.error('Failed to save:', e);
@@ -115,7 +114,6 @@ export class SaveManager {
       const data = localStorage.getItem(key);
       
       if (!data) {
-        console.log('No save found in slot', slotId);
         return false;
       }
 
@@ -128,7 +126,6 @@ export class SaveManager {
 
       this.state.restoreFromSnapshot(saveData.snapshot);
       
-      console.log(`📂 Loaded from slot ${slotId}`);
       return true;
     } catch (e) {
       console.error('Failed to load:', e);
@@ -145,7 +142,6 @@ export class SaveManager {
     try {
       const key = `grand-strategy-save-${slotId}`;
       localStorage.removeItem(key);
-      console.log(`🗑️ Deleted slot ${slotId}`);
       return true;
     } catch (e) {
       console.error('Failed to delete:', e);

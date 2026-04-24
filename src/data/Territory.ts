@@ -25,11 +25,20 @@ export interface TerritoryData {
   defenseBonus?: number; // Natural defensive terrain bonus
 }
 
+export interface Commander {
+  id: string;
+  name: string;
+  attackBonus: number;
+  defenseBonus: number;
+  factionId: string;
+}
+
 export interface PlacedUnit {
   unitTypeId: string;
   count: number;
   veteranCount?: number; // Battles survived; adds +1 attack/defense when > 0
   movedCount?: number; // Units that have already moved/attacked this turn
+  commander?: Commander; // Named general attached to this unit stack
 }
 
 export class Territory {

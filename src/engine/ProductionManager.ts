@@ -173,7 +173,8 @@ export class ProductionManager {
   }
 
   /**
-   * Confirm purchases: deduct IPCs and move units to reserve
+   * Confirm purchases: deduct IPCs and move units to reserve.
+   * Atomic — IPCs are only deducted after all reserve insertions succeed.
    */
   confirmPurchases(): boolean {
     const faction = this.state.getCurrentFaction();
@@ -182,14 +183,22 @@ export class ProductionManager {
     const totalCost = this.getTotalPurchaseCost();
     if (totalCost > faction.ipcs) return false;
 
-    // Deduct IPCs
-    faction.ipcs -= totalCost;
-
-    // Add to reserve
-    for (const order of this.simplePurchaseQueue) {
-      this.reserveSystem.addToReserve(faction.id, order.unitTypeId, order.count);
+    // Snapshot the queue so we can roll back if something throws
+    const snapshot = [...this.simplePurchaseQueue];
+    try {
+      for (const order of snapshot) {
+        this.reserveSystem.addToReserve(faction.id, order.unitTypeId, order.count);
+      }
+    } catch (err) {
+      // Roll back any partial reserve additions
+      for (const order of snapshot) {
+        try { this.reserveSystem.removeFromReserve(faction.id, order.unitTypeId, order.count); } catch { /* best-effort */ }
+      }
+      console.error('[ProductionManager] confirmPurchases failed, rolled back:', err);
+      return false;
     }
 
+    faction.ipcs -= totalCost;
     this.simplePurchaseQueue = [];
     return true;
   }

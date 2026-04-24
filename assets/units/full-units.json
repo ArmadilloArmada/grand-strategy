@@ -200,5 +200,21 @@
     "canStrategicBomb": false,
     "transportCapacity": 2,
     "requiredTransport": false
+  },
+  {
+    "id": "partisan",
+    "name": "Partisan Force",
+    "attack": 1,
+    "defense": 2,
+    "movement": 1,
+    "cost": 0,
+    "domain": "land",
+    "hitPoints": 1,
+    "canBlitz": false,
+    "canBombard": false,
+    "canStrategicBomb": false,
+    "transportCapacity": 0,
+    "requiredTransport": false,
+    "notes": "Resistance fighters. Spawn in occupied territories to harass occupiers."
   }
 ]

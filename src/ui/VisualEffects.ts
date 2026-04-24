@@ -210,6 +210,46 @@ export class VisualEffects {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
   }
 
+  triggerNuclearFlash(): void {
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:fixed;inset:0;background:#fff;opacity:1;z-index:9999;
+      pointer-events:none;transition:opacity 1.5s ease-out;
+    `;
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => {
+      flash.style.opacity = '0';
+      setTimeout(() => flash.remove(), 1600);
+    });
+    this.triggerShake(20);
+  }
+
+  triggerShockwave(x: number, y: number): void {
+    const duration = 1200;
+    const start = Date.now();
+    const maxRadius = Math.max(window.innerWidth, window.innerHeight) * 1.2;
+
+    const draw = () => {
+      const elapsed = Date.now() - start;
+      if (elapsed >= duration) return;
+
+      const progress = elapsed / duration;
+      const radius = maxRadius * progress;
+      const alpha = (1 - progress) * 0.6;
+
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(255, 120, 0, ${alpha})`;
+      this.ctx.lineWidth = 6 * (1 - progress);
+      this.ctx.stroke();
+      this.ctx.restore();
+
+      requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+  }
+
   destroy(): void {
     if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
@@ -267,6 +307,14 @@ class VisualEffectsProxy {
 
   shake(intensity: number): void {
     this.get().triggerShake(intensity);
+  }
+
+  nuclearFlash(): void {
+    this.get().triggerNuclearFlash();
+  }
+
+  shockwave(x: number, y: number): void {
+    this.get().triggerShockwave(x, y);
   }
 }
 

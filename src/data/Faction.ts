@@ -3,11 +3,15 @@
  */
 
 export interface FactionBonus {
-  ipcPerFactory?: number;      // Extra IPCs per factory (e.g. +1)
-  infantryDefenseBonus?: number;
-  armorAttackBonus?: number;
-  unitCostDiscount?: number;   // Percent discount on unit cost
-  movementBonus?: number;      // +1 movement for land/air
+  ipcPerFactory?: number;         // Extra IPCs per factory (e.g. +1)
+  infantryDefenseBonus?: number;  // +N to infantry defense rolls
+  armorAttackBonus?: number;      // +N to armor attack rolls
+  unitCostDiscount?: number;      // Flat IPC discount on all unit costs
+  movementBonus?: number;         // +1 movement for land/air units
+  navalAttackBonus?: number;      // +N to naval unit attack rolls
+  researchSpeedBonus?: number;    // Research progress fraction bonus (e.g. 0.25 = +25% speed)
+  incomeMultiplierBonus?: number; // Income multiplier bonus (e.g. 0.1 = +10% income)
+  counterIntelBonus?: number;     // Reduces enemy espionage success (0–1 fraction)
 }
 
 export interface FactionData {
@@ -38,6 +42,12 @@ export class Faction {
   public ipcs: number;
   public isDefeated: boolean = false;
   public controlledBy: 'human' | 'ai' = 'human';
+
+  // Runtime state for new features
+  public warWeariness: number = 0;      // 0–100: increases each turn at war
+  public morale: number = 100;          // 0–100: derived from warWeariness
+  public nuclearReadiness: number = 0;  // 0–100: charges up after researching nuclear_program
+  public betrayalCooldown: number = 0;  // turns before can form new alliances after betrayal
 
   constructor(data: FactionData) {
     this.id = data.id;
@@ -102,7 +112,7 @@ export class Faction {
   /**
    * Serialize for save/load
    */
-  serialize(): FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string } {
+  serialize(): FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string; warWeariness: number; morale: number; nuclearReadiness: number; betrayalCooldown: number } {
     return {
       id: this.id,
       name: this.name,
@@ -117,6 +127,10 @@ export class Faction {
       ipcs: this.ipcs,
       isDefeated: this.isDefeated,
       controlledBy: this.controlledBy,
+      warWeariness: this.warWeariness,
+      morale: this.morale,
+      nuclearReadiness: this.nuclearReadiness,
+      betrayalCooldown: this.betrayalCooldown,
     };
   }
 }

@@ -1,0 +1,2977 @@
+{
+  "id": "grid-skirmish",
+  "name": "Skirmish (2v2 Grid)",
+  "version": "1.0",
+  "width": 500,
+  "height": 400,
+  "backgroundColor": "#2d3a22",
+  "territories": [
+    {
+      "id": "sk_s00",
+      "name": "N Sea 0",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "center": [
+        25,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s01",
+        "red_cap"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s01",
+      "name": "N Sea 1",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          0
+        ],
+        [
+          100,
+          0
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          50,
+          50
+        ]
+      ],
+      "center": [
+        75,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s00",
+        "sk_s02",
+        "red_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s02",
+      "name": "N Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          0
+        ],
+        [
+          150,
+          0
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          100,
+          50
+        ]
+      ],
+      "center": [
+        125,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s01",
+        "sk_s03",
+        "red_port_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s03",
+      "name": "N Sea 3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          150,
+          50
+        ]
+      ],
+      "center": [
+        175,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s02",
+        "sk_s04",
+        "w_sea_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s04",
+      "name": "N Sea 4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          250,
+          0
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          200,
+          50
+        ]
+      ],
+      "center": [
+        225,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s03",
+        "sk_s05",
+        "center_nw"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s05",
+      "name": "N Sea 5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          0
+        ],
+        [
+          300,
+          0
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          250,
+          50
+        ]
+      ],
+      "center": [
+        275,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s04",
+        "sk_s06",
+        "center_ne"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s06",
+      "name": "N Sea 6",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          0
+        ],
+        [
+          350,
+          0
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          300,
+          50
+        ]
+      ],
+      "center": [
+        325,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s05",
+        "sk_s07",
+        "e_sea_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s07",
+      "name": "N Sea 7",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          0
+        ],
+        [
+          400,
+          0
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          350,
+          50
+        ]
+      ],
+      "center": [
+        375,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s06",
+        "sk_s08",
+        "blue_port_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s08",
+      "name": "N Sea 8",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          0
+        ],
+        [
+          450,
+          0
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          400,
+          50
+        ]
+      ],
+      "center": [
+        425,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s07",
+        "sk_s09",
+        "blue_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sk_s09",
+      "name": "N Sea 9",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          0
+        ],
+        [
+          500,
+          0
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          450,
+          50
+        ]
+      ],
+      "center": [
+        475,
+        25
+      ],
+      "adjacentTo": [
+        "sk_s08",
+        "blue_cap"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "red_cap",
+      "name": "Red Capital",
+      "type": "land",
+      "production": 5,
+      "polygon": [
+        [
+          0,
+          50
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          0,
+          100
+        ]
+      ],
+      "center": [
+        25,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s00",
+        "red_n",
+        "red_w"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_n",
+      "name": "Red North",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          50,
+          50
+        ],
+        [
+          100,
+          50
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          50,
+          100
+        ]
+      ],
+      "center": [
+        75,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s01",
+        "red_cap",
+        "red_port_n",
+        "red_cw"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_port_n",
+      "name": "Red N Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          50
+        ],
+        [
+          150,
+          50
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "center": [
+        125,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s02",
+        "red_n",
+        "w_sea_n",
+        "red_port"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "w_sea_n",
+      "name": "W Sea N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          50
+        ],
+        [
+          200,
+          50
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          150,
+          100
+        ]
+      ],
+      "center": [
+        175,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s03",
+        "red_port_n",
+        "center_nw",
+        "w_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "center_nw",
+      "name": "Disputed NW",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          50
+        ],
+        [
+          250,
+          50
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          200,
+          100
+        ]
+      ],
+      "center": [
+        225,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s04",
+        "w_sea_n",
+        "center_ne",
+        "ford_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "center_ne",
+      "name": "Disputed NE",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          50
+        ],
+        [
+          300,
+          50
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          250,
+          100
+        ]
+      ],
+      "center": [
+        275,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s05",
+        "center_nw",
+        "e_sea_n",
+        "ford_c"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "e_sea_n",
+      "name": "E Sea N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          50
+        ],
+        [
+          350,
+          50
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          300,
+          100
+        ]
+      ],
+      "center": [
+        325,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s06",
+        "center_ne",
+        "blue_port_n",
+        "e_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "blue_port_n",
+      "name": "Blue N Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          50
+        ],
+        [
+          400,
+          50
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          350,
+          100
+        ]
+      ],
+      "center": [
+        375,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s07",
+        "e_sea_n",
+        "blue_n",
+        "blue_port"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_n",
+      "name": "Blue North",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          50
+        ],
+        [
+          450,
+          50
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          400,
+          100
+        ]
+      ],
+      "center": [
+        425,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s08",
+        "blue_port_n",
+        "blue_cap",
+        "blue_ce"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_cap",
+      "name": "Blue Capital",
+      "type": "land",
+      "production": 5,
+      "polygon": [
+        [
+          450,
+          50
+        ],
+        [
+          500,
+          50
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          450,
+          100
+        ]
+      ],
+      "center": [
+        475,
+        75
+      ],
+      "adjacentTo": [
+        "sk_s09",
+        "blue_n",
+        "blue_e"
+      ],
+      "hasFactory": true,
+      "isCapital": true,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "red_w",
+      "name": "Red West",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          0,
+          100
+        ],
+        [
+          50,
+          100
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ],
+      "center": [
+        25,
+        125
+      ],
+      "adjacentTo": [
+        "red_cap",
+        "red_cw",
+        "red_sw"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_cw",
+      "name": "Red Center W",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          50,
+          100
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          50,
+          150
+        ]
+      ],
+      "center": [
+        75,
+        125
+      ],
+      "adjacentTo": [
+        "red_n",
+        "red_w",
+        "red_port",
+        "red_center"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_port",
+      "name": "Red Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          100
+        ],
+        [
+          150,
+          100
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          100,
+          150
+        ]
+      ],
+      "center": [
+        125,
+        125
+      ],
+      "adjacentTo": [
+        "red_port_n",
+        "red_cw",
+        "w_sea",
+        "red_adv"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "w_sea",
+      "name": "W Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          100
+        ],
+        [
+          200,
+          100
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "center": [
+        175,
+        125
+      ],
+      "adjacentTo": [
+        "w_sea_n",
+        "red_port",
+        "ford_n",
+        "red_front"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ford_n",
+      "name": "N Ford",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          100
+        ],
+        [
+          250,
+          100
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          200,
+          150
+        ]
+      ],
+      "center": [
+        225,
+        125
+      ],
+      "adjacentTo": [
+        "center_nw",
+        "w_sea",
+        "ford_c",
+        "nomans_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "ford_c",
+      "name": "C Ford",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          250,
+          100
+        ],
+        [
+          300,
+          100
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          250,
+          150
+        ]
+      ],
+      "center": [
+        275,
+        125
+      ],
+      "adjacentTo": [
+        "center_ne",
+        "ford_n",
+        "e_sea",
+        "nomans_s"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#27ae60"
+    },
+    {
+      "id": "e_sea",
+      "name": "E Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          100
+        ],
+        [
+          350,
+          100
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          300,
+          150
+        ]
+      ],
+      "center": [
+        325,
+        125
+      ],
+      "adjacentTo": [
+        "e_sea_n",
+        "ford_c",
+        "blue_port",
+        "blue_front"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "blue_port",
+      "name": "Blue Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          100
+        ],
+        [
+          400,
+          100
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          350,
+          150
+        ]
+      ],
+      "center": [
+        375,
+        125
+      ],
+      "adjacentTo": [
+        "blue_port_n",
+        "e_sea",
+        "blue_ce",
+        "blue_adv"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_ce",
+      "name": "Blue Center E",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          400,
+          100
+        ],
+        [
+          450,
+          100
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          400,
+          150
+        ]
+      ],
+      "center": [
+        425,
+        125
+      ],
+      "adjacentTo": [
+        "blue_n",
+        "blue_port",
+        "blue_e",
+        "blue_center"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_e",
+      "name": "Blue East",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          100
+        ],
+        [
+          500,
+          100
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          450,
+          150
+        ]
+      ],
+      "center": [
+        475,
+        125
+      ],
+      "adjacentTo": [
+        "blue_cap",
+        "blue_ce",
+        "blue_sw"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "red_sw",
+      "name": "Red SW",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          0,
+          150
+        ],
+        [
+          50,
+          150
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          0,
+          200
+        ]
+      ],
+      "center": [
+        25,
+        175
+      ],
+      "adjacentTo": [
+        "red_w",
+        "red_center",
+        "red_si"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_center",
+      "name": "Red Center",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          50,
+          150
+        ],
+        [
+          100,
+          150
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          50,
+          200
+        ]
+      ],
+      "center": [
+        75,
+        175
+      ],
+      "adjacentTo": [
+        "red_cw",
+        "red_sw",
+        "red_adv",
+        "red_sc"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_adv",
+      "name": "Red Advance",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          150
+        ],
+        [
+          150,
+          150
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          100,
+          200
+        ]
+      ],
+      "center": [
+        125,
+        175
+      ],
+      "adjacentTo": [
+        "red_port",
+        "red_center",
+        "red_front",
+        "red_sa"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_front",
+      "name": "Red Front",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          150
+        ],
+        [
+          200,
+          150
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          150,
+          200
+        ]
+      ],
+      "center": [
+        175,
+        175
+      ],
+      "adjacentTo": [
+        "w_sea",
+        "red_adv",
+        "nomans_n",
+        "red_sf"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "nomans_n",
+      "name": "No Man's N",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          200,
+          150
+        ],
+        [
+          250,
+          150
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          200,
+          200
+        ]
+      ],
+      "center": [
+        225,
+        175
+      ],
+      "adjacentTo": [
+        "ford_n",
+        "red_front",
+        "nomans_s",
+        "valley_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "nomans_s",
+      "name": "No Man's S",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          250,
+          150
+        ],
+        [
+          300,
+          150
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          250,
+          200
+        ]
+      ],
+      "center": [
+        275,
+        175
+      ],
+      "adjacentTo": [
+        "ford_c",
+        "nomans_n",
+        "blue_front",
+        "valley_s"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "blue_front",
+      "name": "Blue Front",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          300,
+          150
+        ],
+        [
+          350,
+          150
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          300,
+          200
+        ]
+      ],
+      "center": [
+        325,
+        175
+      ],
+      "adjacentTo": [
+        "e_sea",
+        "nomans_s",
+        "blue_adv",
+        "blue_sf"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_adv",
+      "name": "Blue Advance",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          150
+        ],
+        [
+          400,
+          150
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          350,
+          200
+        ]
+      ],
+      "center": [
+        375,
+        175
+      ],
+      "adjacentTo": [
+        "blue_port",
+        "blue_front",
+        "blue_center",
+        "blue_sa"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_center",
+      "name": "Blue Center",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          400,
+          150
+        ],
+        [
+          450,
+          150
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          400,
+          200
+        ]
+      ],
+      "center": [
+        425,
+        175
+      ],
+      "adjacentTo": [
+        "blue_ce",
+        "blue_adv",
+        "blue_sw",
+        "blue_sc"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_sw",
+      "name": "Blue SW",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          150
+        ],
+        [
+          500,
+          150
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          450,
+          200
+        ]
+      ],
+      "center": [
+        475,
+        175
+      ],
+      "adjacentTo": [
+        "blue_e",
+        "blue_center",
+        "blue_si"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "red_si",
+      "name": "Red S Inner",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          0,
+          200
+        ],
+        [
+          50,
+          200
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "center": [
+        25,
+        225
+      ],
+      "adjacentTo": [
+        "red_sw",
+        "red_sc",
+        "red_sfar"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_sc",
+      "name": "Red S Center",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          50,
+          200
+        ],
+        [
+          100,
+          200
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          50,
+          250
+        ]
+      ],
+      "center": [
+        75,
+        225
+      ],
+      "adjacentTo": [
+        "red_center",
+        "red_si",
+        "red_sa",
+        "red_sport"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_sa",
+      "name": "Red S Adv",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          100,
+          200
+        ],
+        [
+          150,
+          200
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          100,
+          250
+        ]
+      ],
+      "center": [
+        125,
+        225
+      ],
+      "adjacentTo": [
+        "red_adv",
+        "red_sc",
+        "red_sf",
+        "sw_sea_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_sf",
+      "name": "Red S Front",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          150,
+          200
+        ],
+        [
+          200,
+          200
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          150,
+          250
+        ]
+      ],
+      "center": [
+        175,
+        225
+      ],
+      "adjacentTo": [
+        "red_front",
+        "red_sa",
+        "valley_n",
+        "s_cw"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "valley_n",
+      "name": "Valley N",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          200,
+          200
+        ],
+        [
+          250,
+          200
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          200,
+          250
+        ]
+      ],
+      "center": [
+        225,
+        225
+      ],
+      "adjacentTo": [
+        "nomans_n",
+        "red_sf",
+        "valley_s",
+        "s_valley"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "valley_s",
+      "name": "Valley S",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          200
+        ],
+        [
+          300,
+          200
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          250,
+          250
+        ]
+      ],
+      "center": [
+        275,
+        225
+      ],
+      "adjacentTo": [
+        "nomans_s",
+        "valley_n",
+        "blue_sf",
+        "s_ce"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "blue_sf",
+      "name": "Blue S Front",
+      "type": "land",
+      "production": 1,
+      "polygon": [
+        [
+          300,
+          200
+        ],
+        [
+          350,
+          200
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          300,
+          250
+        ]
+      ],
+      "center": [
+        325,
+        225
+      ],
+      "adjacentTo": [
+        "blue_front",
+        "valley_s",
+        "blue_sa",
+        "se_sea_n"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_sa",
+      "name": "Blue S Adv",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          200
+        ],
+        [
+          400,
+          200
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          350,
+          250
+        ]
+      ],
+      "center": [
+        375,
+        225
+      ],
+      "adjacentTo": [
+        "blue_adv",
+        "blue_sf",
+        "blue_sc",
+        "blue_sport"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_sc",
+      "name": "Blue S Center",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          200
+        ],
+        [
+          450,
+          200
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          400,
+          250
+        ]
+      ],
+      "center": [
+        425,
+        225
+      ],
+      "adjacentTo": [
+        "blue_center",
+        "blue_sa",
+        "blue_si",
+        "blue_sfar"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_si",
+      "name": "Blue S Inner",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          200
+        ],
+        [
+          500,
+          200
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          450,
+          250
+        ]
+      ],
+      "center": [
+        475,
+        225
+      ],
+      "adjacentTo": [
+        "blue_sw",
+        "blue_sc",
+        "blue_sbase"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "red_sfar",
+      "name": "Red S Far",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          0,
+          250
+        ],
+        [
+          50,
+          250
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          0,
+          300
+        ]
+      ],
+      "center": [
+        25,
+        275
+      ],
+      "adjacentTo": [
+        "red_si",
+        "red_sport",
+        "red_cw2"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_sport",
+      "name": "Red S Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          50,
+          250
+        ],
+        [
+          100,
+          250
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          50,
+          300
+        ]
+      ],
+      "center": [
+        75,
+        275
+      ],
+      "adjacentTo": [
+        "red_sc",
+        "red_sfar",
+        "sw_sea_n",
+        "red_coast"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "sw_sea_n",
+      "name": "SW Sea N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          250
+        ],
+        [
+          150,
+          250
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          100,
+          300
+        ]
+      ],
+      "center": [
+        125,
+        275
+      ],
+      "adjacentTo": [
+        "red_sa",
+        "red_sport",
+        "s_cw",
+        "sw_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_cw",
+      "name": "S Center W",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          150,
+          250
+        ],
+        [
+          200,
+          250
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          150,
+          300
+        ]
+      ],
+      "center": [
+        175,
+        275
+      ],
+      "adjacentTo": [
+        "red_sf",
+        "sw_sea_n",
+        "s_valley",
+        "sw_sea2"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "s_valley",
+      "name": "S Valley",
+      "type": "land",
+      "production": 3,
+      "polygon": [
+        [
+          200,
+          250
+        ],
+        [
+          250,
+          250
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          200,
+          300
+        ]
+      ],
+      "center": [
+        225,
+        275
+      ],
+      "adjacentTo": [
+        "valley_n",
+        "s_cw",
+        "s_ce",
+        "s_sea_w"
+      ],
+      "hasFactory": true,
+      "isCapital": false,
+      "color": "#27ae60"
+    },
+    {
+      "id": "s_ce",
+      "name": "S Center E",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          250,
+          250
+        ],
+        [
+          300,
+          250
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          250,
+          300
+        ]
+      ],
+      "center": [
+        275,
+        275
+      ],
+      "adjacentTo": [
+        "valley_s",
+        "s_valley",
+        "se_sea_n",
+        "s_sea_e"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#7f8c8d"
+    },
+    {
+      "id": "se_sea_n",
+      "name": "SE Sea N",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          250
+        ],
+        [
+          350,
+          250
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          300,
+          300
+        ]
+      ],
+      "center": [
+        325,
+        275
+      ],
+      "adjacentTo": [
+        "blue_sf",
+        "s_ce",
+        "blue_sport",
+        "se_sea2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "blue_sport",
+      "name": "Blue S Port",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          350,
+          250
+        ],
+        [
+          400,
+          250
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          350,
+          300
+        ]
+      ],
+      "center": [
+        375,
+        275
+      ],
+      "adjacentTo": [
+        "blue_sa",
+        "se_sea_n",
+        "blue_sfar",
+        "se_sea"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_sfar",
+      "name": "Blue S Far",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          400,
+          250
+        ],
+        [
+          450,
+          250
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          400,
+          300
+        ]
+      ],
+      "center": [
+        425,
+        275
+      ],
+      "adjacentTo": [
+        "blue_sc",
+        "blue_sport",
+        "blue_sbase",
+        "blue_coast"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_sbase",
+      "name": "Blue S Base",
+      "type": "land",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          250
+        ],
+        [
+          500,
+          250
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          450,
+          300
+        ]
+      ],
+      "center": [
+        475,
+        275
+      ],
+      "adjacentTo": [
+        "blue_si",
+        "blue_sfar",
+        "blue_cste"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "red_cw2",
+      "name": "Red Coast W",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          0,
+          300
+        ],
+        [
+          50,
+          300
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center": [
+        25,
+        325
+      ],
+      "adjacentTo": [
+        "red_sfar",
+        "red_coast",
+        "ss0"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "red_coast",
+      "name": "Red Coast",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          50,
+          300
+        ],
+        [
+          100,
+          300
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          50,
+          350
+        ]
+      ],
+      "center": [
+        75,
+        325
+      ],
+      "adjacentTo": [
+        "red_sport",
+        "red_cw2",
+        "sw_sea",
+        "ss1"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#c0392b",
+      "owner": "red_faction",
+      "originalOwner": "red_faction"
+    },
+    {
+      "id": "sw_sea",
+      "name": "SW Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          300
+        ],
+        [
+          150,
+          300
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          100,
+          350
+        ]
+      ],
+      "center": [
+        125,
+        325
+      ],
+      "adjacentTo": [
+        "sw_sea_n",
+        "red_coast",
+        "sw_sea2",
+        "ss2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "sw_sea2",
+      "name": "SW Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          300
+        ],
+        [
+          200,
+          300
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          150,
+          350
+        ]
+      ],
+      "center": [
+        175,
+        325
+      ],
+      "adjacentTo": [
+        "s_cw",
+        "sw_sea",
+        "s_sea_w",
+        "ss3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_sea_w",
+      "name": "S Sea W",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          300
+        ],
+        [
+          250,
+          300
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          200,
+          350
+        ]
+      ],
+      "center": [
+        225,
+        325
+      ],
+      "adjacentTo": [
+        "s_valley",
+        "sw_sea2",
+        "s_sea_e",
+        "ss4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "s_sea_e",
+      "name": "S Sea E",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          300
+        ],
+        [
+          300,
+          300
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          250,
+          350
+        ]
+      ],
+      "center": [
+        275,
+        325
+      ],
+      "adjacentTo": [
+        "s_ce",
+        "s_sea_w",
+        "se_sea2",
+        "ss5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "se_sea2",
+      "name": "SE Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          300
+        ],
+        [
+          350,
+          300
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          300,
+          350
+        ]
+      ],
+      "center": [
+        325,
+        325
+      ],
+      "adjacentTo": [
+        "se_sea_n",
+        "s_sea_e",
+        "se_sea",
+        "ss6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "se_sea",
+      "name": "SE Sea",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          300
+        ],
+        [
+          400,
+          300
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          350,
+          350
+        ]
+      ],
+      "center": [
+        375,
+        325
+      ],
+      "adjacentTo": [
+        "blue_sport",
+        "se_sea2",
+        "blue_coast",
+        "ss7"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "blue_coast",
+      "name": "Blue Coast",
+      "type": "coastal",
+      "production": 1,
+      "polygon": [
+        [
+          400,
+          300
+        ],
+        [
+          450,
+          300
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          400,
+          350
+        ]
+      ],
+      "center": [
+        425,
+        325
+      ],
+      "adjacentTo": [
+        "blue_sfar",
+        "se_sea",
+        "blue_cste",
+        "ss8"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "blue_cste",
+      "name": "Blue Coast E",
+      "type": "coastal",
+      "production": 2,
+      "polygon": [
+        [
+          450,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          450,
+          350
+        ]
+      ],
+      "center": [
+        475,
+        325
+      ],
+      "adjacentTo": [
+        "blue_sbase",
+        "blue_coast",
+        "ss9"
+      ],
+      "hasFactory": false,
+      "isCapital": false,
+      "color": "#2471a3",
+      "owner": "blue_faction",
+      "originalOwner": "blue_faction"
+    },
+    {
+      "id": "ss0",
+      "name": "S Sea 0",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          50,
+          350
+        ],
+        [
+          50,
+          400
+        ],
+        [
+          0,
+          400
+        ]
+      ],
+      "center": [
+        25,
+        375
+      ],
+      "adjacentTo": [
+        "red_cw2",
+        "ss1"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss1",
+      "name": "S Sea 1",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          50,
+          350
+        ],
+        [
+          100,
+          350
+        ],
+        [
+          100,
+          400
+        ],
+        [
+          50,
+          400
+        ]
+      ],
+      "center": [
+        75,
+        375
+      ],
+      "adjacentTo": [
+        "red_coast",
+        "ss0",
+        "ss2"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss2",
+      "name": "S Sea 2",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          100,
+          350
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          150,
+          400
+        ],
+        [
+          100,
+          400
+        ]
+      ],
+      "center": [
+        125,
+        375
+      ],
+      "adjacentTo": [
+        "sw_sea",
+        "ss1",
+        "ss3"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss3",
+      "name": "S Sea 3",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          150,
+          350
+        ],
+        [
+          200,
+          350
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          150,
+          400
+        ]
+      ],
+      "center": [
+        175,
+        375
+      ],
+      "adjacentTo": [
+        "sw_sea2",
+        "ss2",
+        "ss4"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss4",
+      "name": "S Sea 4",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          200,
+          350
+        ],
+        [
+          250,
+          350
+        ],
+        [
+          250,
+          400
+        ],
+        [
+          200,
+          400
+        ]
+      ],
+      "center": [
+        225,
+        375
+      ],
+      "adjacentTo": [
+        "s_sea_w",
+        "ss3",
+        "ss5"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss5",
+      "name": "S Sea 5",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          250,
+          350
+        ],
+        [
+          300,
+          350
+        ],
+        [
+          300,
+          400
+        ],
+        [
+          250,
+          400
+        ]
+      ],
+      "center": [
+        275,
+        375
+      ],
+      "adjacentTo": [
+        "s_sea_e",
+        "ss4",
+        "ss6"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss6",
+      "name": "S Sea 6",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          300,
+          350
+        ],
+        [
+          350,
+          350
+        ],
+        [
+          350,
+          400
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "center": [
+        325,
+        375
+      ],
+      "adjacentTo": [
+        "se_sea2",
+        "ss5",
+        "ss7"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss7",
+      "name": "S Sea 7",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          350,
+          350
+        ],
+        [
+          400,
+          350
+        ],
+        [
+          400,
+          400
+        ],
+        [
+          350,
+          400
+        ]
+      ],
+      "center": [
+        375,
+        375
+      ],
+      "adjacentTo": [
+        "se_sea",
+        "ss6",
+        "ss8"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss8",
+      "name": "S Sea 8",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          400,
+          350
+        ],
+        [
+          450,
+          350
+        ],
+        [
+          450,
+          400
+        ],
+        [
+          400,
+          400
+        ]
+      ],
+      "center": [
+        425,
+        375
+      ],
+      "adjacentTo": [
+        "blue_coast",
+        "ss7",
+        "ss9"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    },
+    {
+      "id": "ss9",
+      "name": "S Sea 9",
+      "type": "sea",
+      "production": 0,
+      "polygon": [
+        [
+          450,
+          350
+        ],
+        [
+          500,
+          350
+        ],
+        [
+          500,
+          400
+        ],
+        [
+          450,
+          400
+        ]
+      ],
+      "center": [
+        475,
+        375
+      ],
+      "adjacentTo": [
+        "blue_cste",
+        "ss8"
+      ],
+      "hasFactory": false,
+      "isCapital": false
+    }
+  ],
+  "startingUnits": []
+}

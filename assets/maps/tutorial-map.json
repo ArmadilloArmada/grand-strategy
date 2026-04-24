@@ -111,22 +111,19 @@
       "isCapital": true
     }
   ],
-  "startingUnits": {
-    "player_capital": [
-      {
-        "typeId": "infantry",
-        "count": 3
-      },
-      {
-        "typeId": "tank",
-        "count": 1
-      }
-    ],
-    "enemy_capital": [
-      {
-        "typeId": "infantry",
-        "count": 3
-      }
-    ]
-  }
+  "startingUnits": [
+    {
+      "territoryId": "player_capital",
+      "units": [
+        { "unitTypeId": "infantry", "count": 3 },
+        { "unitTypeId": "tank", "count": 1 }
+      ]
+    },
+    {
+      "territoryId": "enemy_capital",
+      "units": [
+        { "unitTypeId": "infantry", "count": 3 }
+      ]
+    }
+  ]
 }

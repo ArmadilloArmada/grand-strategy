@@ -129,6 +129,16 @@ export class MultiplayerUI {
   }
 
   private browsLobbies(): void {
+    const content = document.getElementById('mp-content');
+    if (!content) return;
+    content.innerHTML = `
+      <div class="mp-lobby-list">
+        <h3>Browse Lobbies</h3>
+        <p style="color:#888;font-size:0.85rem;text-align:center;">🔄 Searching for open games…</p>
+        <button class="mp-btn mp-btn-secondary" id="lobby-list-back" style="margin-top:1rem;">← Back</button>
+      </div>
+    `;
+    document.getElementById('lobby-list-back')?.addEventListener('click', () => this.renderMainMenu());
     this.network.requestLobbyList();
   }
 
@@ -157,25 +167,41 @@ export class MultiplayerUI {
   private showLobbyList(lobbies: LobbyListItem[]): void {
     const content = document.getElementById('mp-content');
     if (!content) return;
+
+    const emptyMsg = '<p class="mp-empty" style="text-align:center;color:#888;">No open lobbies found</p>';
+    const lobbyRows = lobbies.map(l => `
+      <div class="mp-lobby-item" data-lobby-id="${l.id}" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.25rem;border-bottom:1px solid rgba(0,0,0,0.08);">
+        <span class="lobby-name" style="flex:1;font-weight:600;">${l.name}</span>
+        <span class="lobby-host" style="color:#888;font-size:0.85rem;">${l.host}</span>
+        <span class="lobby-players" style="min-width:3rem;text-align:center;">${l.players}/${l.maxPlayers}</span>
+        <button class="mp-btn mp-btn-small mp-join-btn" data-lobby-id="${l.id}">Join</button>
+      </div>
+    `).join('');
+
     content.innerHTML = `
       <div class="mp-lobby-list">
-        <h3>Available Lobbies</h3>
-        ${lobbies.length === 0 ? '<p class="mp-empty">No lobbies available</p>' :
-          lobbies.map(l => `
-            <div class="mp-lobby-item" data-id="${l.id}">
-              <span class="lobby-name">${l.name}</span>
-              <span class="lobby-host">${l.host}</span>
-              <span class="lobby-players">${l.players}/${l.maxPlayers}</span>
-              <button class="mp-btn mp-btn-small" onclick="document.dispatchEvent(new CustomEvent('mp-join',{detail:'${l.id}'}))">Join</button>
-            </div>
-          `).join('')}
-        <button class="mp-btn mp-btn-secondary" id="lobby-list-back">Back</button>
-        <button class="mp-btn mp-btn-secondary" id="lobby-list-refresh">Refresh</button>
+        <h3 style="margin-top:0;">Available Lobbies</h3>
+        <div id="mp-lobby-rows">${lobbies.length === 0 ? emptyMsg : lobbyRows}</div>
+        <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+          <button class="mp-btn mp-btn-secondary" id="lobby-list-back">← Back</button>
+          <button class="mp-btn mp-btn-secondary" id="lobby-list-refresh">🔄 Refresh</button>
+        </div>
       </div>
     `;
+
     document.getElementById('lobby-list-back')?.addEventListener('click', () => this.renderMainMenu());
-    document.getElementById('lobby-list-refresh')?.addEventListener('click', () => this.network.requestLobbyList());
-    document.addEventListener('mp-join', (e: any) => this.network.joinLobby(e.detail), { once: true });
+    document.getElementById('lobby-list-refresh')?.addEventListener('click', () => {
+      const rows = document.getElementById('mp-lobby-rows');
+      if (rows) rows.innerHTML = '<p style="color:#888;text-align:center;">🔄 Searching…</p>';
+      this.network.requestLobbyList();
+    });
+
+    content.querySelectorAll<HTMLButtonElement>('.mp-join-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lobbyId = btn.dataset.lobbyId;
+        if (lobbyId) this.network.joinLobby(lobbyId);
+      });
+    });
   }
 
   showLobby(lobby: LobbyInfo): void {
@@ -187,30 +213,67 @@ export class MultiplayerUI {
   updateLobbyPlayers(lobby: LobbyInfo): void {
     const content = document.getElementById('mp-content');
     if (!content) return;
+
+    const myId = this.network.getPlayerId();
+    const me = lobby.players.find(p => p.id === myId);
+    const isReady = me?.isReady ?? false;
+    const takenFactions = new Set(lobby.players.map(p => p.faction).filter(Boolean));
+
+    const availableFactions = ['USA', 'Germany', 'USSR', 'UK', 'Japan', 'Italy', 'China', 'France']
+      .filter(f => f === me?.faction || !takenFactions.has(f));
+
+    const factionOptions = availableFactions.map(f =>
+      `<option value="${f}" ${me?.faction === f ? 'selected' : ''}>${f}</option>`
+    ).join('');
+
+    const playerRows = lobby.players.map(p => {
+      const statusIcon = p.isReady ? '✅' : '⏳';
+      const factionLabel = p.faction ?? '<span style="color:#888">–</span>';
+      return `
+        <div class="mp-player" style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid rgba(0,0,0,0.07);">
+          <span style="flex:1;font-weight:${p.id === myId ? '700' : '400'};">${p.name}${p.isHost ? ' 👑' : ''}</span>
+          <span style="min-width:5rem;font-size:0.85rem;">${factionLabel}</span>
+          <span>${statusIcon}</span>
+        </div>`;
+    }).join('');
+
+    const allReady = lobby.players.length > 1 && lobby.players.every(p => p.isReady);
+
     content.innerHTML = `
       <div class="mp-lobby">
-        <h3>${lobby.name}</h3>
-        <div class="mp-player-list">
-          ${lobby.players.map(p => `
-            <div class="mp-player ${p.isReady ? 'ready' : ''}">
-              <span>${p.name}${p.isHost ? ' 👑' : ''}</span>
-              <span>${p.faction ?? 'No faction'}</span>
-              <span>${p.isReady ? '✅' : '⏳'}</span>
-            </div>
-          `).join('')}
+        <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.75rem;">
+          <h3 style="margin:0;flex:1;">${lobby.name}</h3>
+          <span style="font-size:0.75rem;color:#888;">Code: <strong>${lobby.id}</strong></span>
         </div>
-        <div class="mp-lobby-actions">
-          ${this.network.isHost() ? '<button class="mp-btn mp-btn-primary" id="start-game-btn">Start Game</button>' : ''}
-          <button class="mp-btn mp-btn-secondary" id="toggle-ready-btn">Ready</button>
+
+        <div class="mp-player-list" style="margin-bottom:0.75rem;">${playerRows}</div>
+
+        <div class="mp-form-group" style="margin-bottom:0.75rem;">
+          <label style="font-size:0.85rem;color:#888;">Your Faction</label>
+          <select id="mp-faction-select" style="width:100%;">
+            <option value="">– No preference –</option>
+            ${factionOptions}
+          </select>
+        </div>
+
+        <div class="mp-lobby-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          ${this.network.isHost() ? `<button class="mp-btn mp-btn-primary" id="start-game-btn" ${allReady ? '' : 'disabled'}>▶ Start Game</button>` : ''}
+          <button class="mp-btn mp-btn-secondary" id="toggle-ready-btn" style="${isReady ? 'background:#2a7a4a;' : ''}">${isReady ? '✅ Ready' : 'Mark Ready'}</button>
           <button class="mp-btn mp-btn-danger" id="leave-lobby-btn">Leave</button>
         </div>
+        ${this.network.isHost() && !allReady ? '<p style="font-size:0.8rem;color:#888;margin-top:0.5rem;">Waiting for all players to ready up…</p>' : ''}
       </div>
     `;
+
     document.getElementById('start-game-btn')?.addEventListener('click', () => this.network.startGame());
-    document.getElementById('toggle-ready-btn')?.addEventListener('click', () => this.network.setReady(true));
+    document.getElementById('toggle-ready-btn')?.addEventListener('click', () => this.network.setReady(!isReady));
     document.getElementById('leave-lobby-btn')?.addEventListener('click', () => {
       this.network.leaveLobby();
       this.renderMainMenu();
+    });
+    document.getElementById('mp-faction-select')?.addEventListener('change', (e) => {
+      const faction = (e.target as HTMLSelectElement).value;
+      this.network.selectFaction(faction);
     });
   }
 

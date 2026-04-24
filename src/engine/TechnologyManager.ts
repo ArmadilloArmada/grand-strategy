@@ -16,11 +16,17 @@ export interface Technology {
 }
 
 export interface TechEffect {
+  [key: string]: unknown;
   attackBonus?: number;
   defenseBonus?: number;
   movementBonus?: number;
   incomeBonus?: number;
   productionBonus?: number;
+  infantryAttackBonus?: number;
+  infantryDefenseBonus?: number;
+  navalAttackBonus?: number;
+  navalDefenseBonus?: number;
+  airAttackBonus?: number;
   specialAbility?: string;
 }
 
@@ -134,6 +140,112 @@ export const TECHNOLOGIES: Technology[] = [
     category: 'economy',
     prerequisites: ['industrialization'],
   },
+  // Special
+  {
+    id: 'nuclear_program',
+    name: 'Nuclear Program',
+    description: 'Develop nuclear weapons. Readiness charges over 5 turns, then launch a devastating strike.',
+    cost: 40,
+    icon: '☢️',
+    effect: { specialAbility: 'nuclear_strike' },
+    category: 'special',
+    prerequisites: ['jet_engines'],
+  },
+  {
+    id: 'espionage_network',
+    name: 'Espionage Network',
+    description: 'Expand your intelligence services: lower espionage costs and higher success rates.',
+    cost: 20,
+    icon: '🕵️',
+    effect: { specialAbility: 'espionage_bonus' },
+    category: 'special',
+  },
+
+  // Infantry (new)
+  {
+    id: 'fortified_positions',
+    name: 'Fortified Positions',
+    description: 'Infantry dig into prepared defensive positions, gaining +1 Defense.',
+    cost: 10,
+    icon: '🪖',
+    effect: { infantryDefenseBonus: 1 },
+    category: 'infantry',
+  },
+  {
+    id: 'assault_tactics',
+    name: 'Assault Tactics',
+    description: 'Aggressive assault doctrine drives infantry forward with +1 Attack.',
+    cost: 15,
+    icon: '🗡️',
+    effect: { infantryAttackBonus: 1 },
+    category: 'infantry',
+    prerequisites: ['elite_training'],
+  },
+
+  // Armor (new)
+  {
+    id: 'rocket_artillery',
+    name: 'Rocket Artillery',
+    description: 'Long-range rockets suppress enemy offensives, giving all defenders +1 Defense.',
+    cost: 12,
+    icon: '🚀',
+    effect: { defenseBonus: 1 },
+    category: 'armor',
+    prerequisites: ['heavy_tanks'],
+  },
+
+  // Air (new)
+  {
+    id: 'radar_network',
+    name: 'Radar Network',
+    description: 'Radar-guided targeting gives all air units +1 Attack.',
+    cost: 10,
+    icon: '📡',
+    effect: { airAttackBonus: 1 },
+    category: 'air',
+  },
+  {
+    id: 'carrier_superiority',
+    name: 'Carrier Superiority',
+    description: 'Advanced carrier doctrine trains elite naval aviators, giving air units +1 Attack.',
+    cost: 15,
+    icon: '🛩️',
+    effect: { airAttackBonus: 1 },
+    category: 'air',
+    prerequisites: ['long_range_aircraft'],
+  },
+
+  // Naval (new)
+  {
+    id: 'destroyer_screen',
+    name: 'Destroyer Screen',
+    description: 'Destroyer escort formations protect the battle fleet, giving naval units +1 Defense.',
+    cost: 10,
+    icon: '🛡️',
+    effect: { navalDefenseBonus: 1 },
+    category: 'naval',
+  },
+  {
+    id: 'wolfpack_tactics',
+    name: 'Wolfpack Tactics',
+    description: 'Coordinated submarine packs overwhelm convoy escorts, giving naval units +1 Attack.',
+    cost: 12,
+    icon: '🐺',
+    effect: { navalAttackBonus: 1 },
+    category: 'naval',
+    prerequisites: ['submarine_warfare'],
+  },
+
+  // Economy (new)
+  {
+    id: 'lend_lease',
+    name: 'Lend-Lease Protocol',
+    description: 'Allied aid programs and wartime trade boost income by +8%.',
+    cost: 10,
+    icon: '🤝',
+    effect: { incomeBonus: 0.08 },
+    category: 'economy',
+  },
 ];
 
 export class TechnologyManager {
@@ -158,6 +270,11 @@ export class TechnologyManager {
 
   getResearched(factionId: string): Set<string> {
     return this.getFactionTech(factionId).researched;
+  }
+
+  /** Public accessor for espionage/external systems */
+  getFactionTechPublic(factionId: string): FactionTech {
+    return this.getFactionTech(factionId);
   }
 
   getResearchedTech(factionId: string): Technology[] {
@@ -210,15 +327,25 @@ export class TechnologyManager {
 
   getTechEffect(factionId: string): TechEffect {
     const ft = this.getFactionTech(factionId);
-    const combined: TechEffect = {};
+    const combined: TechEffect = {
+      attackBonus: 0, defenseBonus: 0, movementBonus: 0,
+      incomeBonus: 0, productionBonus: 0,
+      infantryAttackBonus: 0, infantryDefenseBonus: 0,
+      navalAttackBonus: 0, navalDefenseBonus: 0, airAttackBonus: 0,
+    };
     for (const techId of ft.researched) {
       const tech = TECHNOLOGIES.find(t => t.id === techId);
       if (!tech) continue;
-      if (tech.effect.attackBonus) combined.attackBonus = (combined.attackBonus ?? 0) + tech.effect.attackBonus;
-      if (tech.effect.defenseBonus) combined.defenseBonus = (combined.defenseBonus ?? 0) + tech.effect.defenseBonus;
-      if (tech.effect.movementBonus) combined.movementBonus = (combined.movementBonus ?? 0) + tech.effect.movementBonus;
-      if (tech.effect.incomeBonus) combined.incomeBonus = (combined.incomeBonus ?? 0) + tech.effect.incomeBonus;
-      if (tech.effect.productionBonus) combined.productionBonus = (combined.productionBonus ?? 0) + tech.effect.productionBonus;
+      combined.attackBonus!          += tech.effect.attackBonus          ?? 0;
+      combined.defenseBonus!         += tech.effect.defenseBonus         ?? 0;
+      combined.movementBonus!        += tech.effect.movementBonus        ?? 0;
+      combined.incomeBonus!          += tech.effect.incomeBonus          ?? 0;
+      combined.productionBonus!      += tech.effect.productionBonus      ?? 0;
+      combined.infantryAttackBonus!  += tech.effect.infantryAttackBonus  ?? 0;
+      combined.infantryDefenseBonus! += tech.effect.infantryDefenseBonus ?? 0;
+      combined.navalAttackBonus!     += tech.effect.navalAttackBonus     ?? 0;
+      combined.navalDefenseBonus!    += tech.effect.navalDefenseBonus    ?? 0;
+      combined.airAttackBonus!       += tech.effect.airAttackBonus       ?? 0;
     }
     return combined;
   }
