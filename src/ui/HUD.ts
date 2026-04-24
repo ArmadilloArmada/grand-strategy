@@ -275,6 +275,7 @@ export class HUD {
     // Nuclear strike announcement listener
     this.state.on('nuclear_strike', (e: any) => {
       const d = e.data as { factionId: string; targetTerritoryName: string; unitsDestroyed: number };
+      soundManager.play('nuclear');
       visualEffects.nuclearFlash();
       visualEffects.shockwave(window.innerWidth / 2, window.innerHeight / 2);
       setTimeout(() => {
@@ -520,7 +521,24 @@ export class HUD {
     this.state.on('combat_round', (e) => this.onCombatRound(e.data as { combat: { territoryId: string; attackingFactionId: string; defendingFactionId: string }; result: { attackerHits: number; defenderHits: number; attackerCriticals: number } }));
     this.state.on('game_event', (e) => {
       const d = e.data as { event: { name: string; description: string; type: string }; factionId: string };
-      this.showEventAnnouncement(d.event, d.factionId);
+      if (d?.event) this.showEventAnnouncement(d.event, d.factionId);
+    });
+
+    this.state.on('game_event', (e) => {
+      const d = e.data as { type?: string; message?: string; factionColor?: string };
+      if (d?.type === 'victory_warning' && d.message) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'toast error';
+        toast.style.cssText = `border-left: 4px solid ${d.factionColor ?? '#ef4444'};font-weight:bold;`;
+        toast.innerHTML = `⚠️ ${d.message}`;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => toast.remove(), 300);
+        }, 6000);
+      }
     });
     this.state.on('diplomacy_proposal', (e) => {
       const d = e.data as { fromId: string; toId: string; type: import('../engine/DiplomacyManager').ProposalType; duration: number; terms?: { ipcPerTurn?: number } };
@@ -2512,8 +2530,54 @@ export class HUD {
 
     // Emit game started event
     this.events.emit('gameStarted', { config: this.gameConfig });
-    
+
     this.showToast('Game started!', 'success');
+    this.maybeOfferTutorial();
+  }
+
+  private maybeOfferTutorial(): void {
+    if (localStorage.getItem('grand_strategy_ever_played')) return;
+    localStorage.setItem('grand_strategy_ever_played', '1');
+
+    // First-time player: offer tutorial via a styled overlay dialog
+    const overlay = document.createElement('div');
+    overlay.id = 'tutorial-offer-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8000;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    overlay.innerHTML = `
+      <div style="
+        background:#1a2035;border:2px solid #4a90d9;border-radius:12px;
+        padding:2rem 2.5rem;max-width:420px;text-align:center;color:#e2e8f0;
+        box-shadow:0 0 40px rgba(74,144,217,0.4);
+      ">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem;">🎖️</div>
+        <h2 style="margin:0 0 0.5rem;color:#60a5fa;font-size:1.4rem;">Welcome, Commander!</h2>
+        <p style="margin:0 0 1.5rem;color:#94a3b8;line-height:1.5;">
+          This is your first game. Would you like a quick tutorial covering
+          map controls, combat, economy, and victory conditions?
+        </p>
+        <div style="display:flex;gap:1rem;justify-content:center;">
+          <button id="tutorial-offer-yes" style="
+            background:#2563eb;color:#fff;border:none;border-radius:8px;
+            padding:0.6rem 1.4rem;font-size:1rem;cursor:pointer;font-weight:bold;
+          ">Yes, show me!</button>
+          <button id="tutorial-offer-no" style="
+            background:#374151;color:#9ca3af;border:none;border-radius:8px;
+            padding:0.6rem 1.4rem;font-size:1rem;cursor:pointer;
+          ">Skip for now</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const dismiss = () => overlay.remove();
+    document.getElementById('tutorial-offer-yes')?.addEventListener('click', () => {
+      dismiss();
+      this.showTutorial();
+    });
+    document.getElementById('tutorial-offer-no')?.addEventListener('click', dismiss);
   }
 
   // ==================== HOT SEAT ====================

@@ -99,6 +99,8 @@ export class TurnManager {
       return;
     }
 
+    this.checkVictoryProximity();
+
     const nextIndex = (currentIndex + 1) % factions.length;
     const nextFaction = factions[nextIndex];
 
@@ -215,6 +217,57 @@ export class TurnManager {
       total: faction.ipcs,
       season: this.state.currentSeason,
     });
+  }
+
+  /**
+   * Emit a warning event when any faction is one step from winning.
+   * Fires at most once per turn number per faction to avoid spam.
+   */
+  private proximityWarningsThisTurn: Set<string> = new Set();
+
+  private checkVictoryProximity(): void {
+    const rules = this.state.rules;
+    const factions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
+    const warningKey = (fId: string) => `${this.state.turnNumber}-${fId}`;
+
+    for (const faction of factions) {
+      if (this.proximityWarningsThisTurn.has(warningKey(faction.id))) continue;
+
+      let warning: string | null = null;
+
+      if (rules.victoryType === 'capital') {
+        let caps = 0;
+        for (const other of this.state.factionRegistry.getAll()) {
+          if (faction.isEnemyOf(other.id) &&
+              this.state.territories.get(other.capital)?.owner === faction.id) caps++;
+        }
+        if (caps >= rules.victoryCapitalsRequired - 1 && caps < rules.victoryCapitalsRequired) {
+          warning = `${faction.name} needs just 1 more enemy capital to win!`;
+        }
+      } else if (rules.victoryType === 'economic') {
+        const threshold = rules.victoryIPCThreshold;
+        if (faction.ipcs >= threshold * 0.85) {
+          const pct = Math.round((faction.ipcs / threshold) * 100);
+          warning = `${faction.name} is at ${pct}% of the economic victory threshold!`;
+        }
+      } else if (rules.victoryType === 'territorial') {
+        const owned = this.state.getTerritoriesOwnedBy(faction.id).length;
+        if (owned >= rules.victoryTerritoryCount - 3) {
+          warning = `${faction.name} needs only ${rules.victoryTerritoryCount - owned} more territories to win!`;
+        }
+      }
+
+      if (warning) {
+        this.proximityWarningsThisTurn.add(warningKey(faction.id));
+        this.state.emit('game_event', {
+          type: 'victory_warning',
+          factionId: faction.id,
+          factionName: faction.name,
+          factionColor: faction.color,
+          message: warning,
+        });
+      }
+    }
   }
 
   checkVictory(): Faction | null {

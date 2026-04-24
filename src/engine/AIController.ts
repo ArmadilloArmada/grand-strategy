@@ -182,6 +182,7 @@ export class AIController {
 
     this.state.emit("ai_thinking", { message: "Planning strategy..." });
     this.considerDiplomacy(faction);
+    this.considerEspionage(faction);
 
     while (true) {
       await this.processPhase(evaluations);
@@ -282,6 +283,58 @@ export class AIController {
         }
       }
     }
+  }
+
+  /**
+   * AI espionage — launch covert operations based on personality and available IPCs.
+   * Aggressive AI sabotages factories; economic AI disrupts finances; all AI steals intel.
+   */
+  private considerEspionage(faction: Faction): void {
+    const espionage = this.state.systems.espionageSystem;
+    if (!espionage?.executeOperation) return;
+
+    // Only act if we have a decent war chest (avoid bankrupting ourselves)
+    if (faction.ipcs < 20) return;
+
+    // Don't launch ops every turn — probability based on personality
+    const actionChance = 0.25 + this.personality.aggression * 0.3;
+    if (Math.random() > actionChance) return;
+
+    // Find the best target: biggest grudge first, then nearest enemy
+    const enemies = this.state.factionRegistry.getAll().filter(f =>
+      f.id !== faction.id && !f.isDefeated && faction.isEnemyOf(f.id)
+    );
+    if (enemies.length === 0) return;
+
+    const biggestEnemyId = this.getBiggestEnemy(faction.id);
+    const grudgeTarget = biggestEnemyId ? enemies.find(f => f.id === biggestEnemyId) : undefined;
+    const target = grudgeTarget ??
+      enemies.reduce((best, f) =>
+        this.state.getTerritoriesOwnedBy(f.id).length >
+        this.state.getTerritoriesOwnedBy(best.id).length ? f : best
+      );
+
+    // Pick operation based on personality and IPC budget
+    type Op = { type: string; cost: number };
+    const ops: Op[] = [];
+
+    if (faction.ipcs >= 5) ops.push({ type: 'steal_intel', cost: 5 });
+    if (faction.ipcs >= 10 && this.personality.aggression > 0.5)
+      ops.push({ type: 'sabotage', cost: 10 });
+    if (faction.ipcs >= 10 && this.personality.aggression > 0.4)
+      ops.push({ type: 'propaganda_campaign', cost: 10 });
+    if (faction.ipcs >= 15 && this.personality.economy > 0.5)
+      ops.push({ type: 'economic_disruption', cost: 15 });
+    if (faction.ipcs >= 15 && this.personality.economy > 0.6)
+      ops.push({ type: 'steal_tech', cost: 15 });
+    if (faction.ipcs >= 20 && this.personality.aggression > 0.7)
+      ops.push({ type: 'infrastructure_attack', cost: 20 });
+
+    if (ops.length === 0) return;
+
+    // Weight toward personality-aligned ops
+    const pick = ops[Math.floor(Math.random() * ops.length)];
+    espionage.executeOperation(faction.id, target.id, pick.type);
   }
 
   // ── Grudge System ────────────────────────────────────────────────────────

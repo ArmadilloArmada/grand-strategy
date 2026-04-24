@@ -28,7 +28,8 @@ type SoundType =
   | 'retreat'
   | 'research'
   | 'achievement'
-  | 'event';
+  | 'event'
+  | 'nuclear';
 
 type MusicTrack = 'menu' | 'gameplay' | 'combat' | 'victory_theme' | 'defeat_theme';
 
@@ -154,6 +155,9 @@ export class SoundManager {
         break;
       case 'event':
         this.playEvent();
+        break;
+      case 'nuclear':
+        this.playNuclear();
         break;
     }
   }
@@ -700,6 +704,46 @@ export class SoundManager {
       osc.start(ctx.currentTime + delay);
       osc.stop(ctx.currentTime + delay + 0.25);
     });
+  }
+
+  private playNuclear(): void {
+    const ctx = this.audioContext!;
+    const vol = this.getVolume();
+
+    // Rising siren tone — distinct missile launch warning
+    const siren = ctx.createOscillator();
+    const sirenGain = ctx.createGain();
+    siren.type = 'sawtooth';
+    siren.frequency.setValueAtTime(300, ctx.currentTime);
+    siren.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.6);
+    siren.frequency.linearRampToValueAtTime(300, ctx.currentTime + 1.0);
+    sirenGain.gain.setValueAtTime(vol * 0.4, ctx.currentTime);
+    sirenGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
+    siren.connect(sirenGain);
+    sirenGain.connect(ctx.destination);
+    siren.start(ctx.currentTime);
+    siren.stop(ctx.currentTime + 1.0);
+
+    // Massive low-frequency boom after siren
+    const bufferSize = Math.floor(ctx.sampleRate * 1.5);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+    }
+    const boom = ctx.createBufferSource();
+    boom.buffer = buffer;
+    const boomFilter = ctx.createBiquadFilter();
+    boomFilter.type = 'lowpass';
+    boomFilter.frequency.setValueAtTime(200, ctx.currentTime + 1.0);
+    const boomGain = ctx.createGain();
+    boomGain.gain.setValueAtTime(0, ctx.currentTime + 1.0);
+    boomGain.gain.linearRampToValueAtTime(vol * 0.9, ctx.currentTime + 1.1);
+    boomGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 2.5);
+    boom.connect(boomFilter);
+    boomFilter.connect(boomGain);
+    boomGain.connect(ctx.destination);
+    boom.start(ctx.currentTime + 1.0);
   }
 
   // ==================== BACKGROUND MUSIC SYSTEM ====================

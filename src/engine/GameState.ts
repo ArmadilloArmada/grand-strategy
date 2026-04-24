@@ -42,6 +42,7 @@ export interface SystemRegistry {
     tick?(): void;
     isIntelRevealed?(territoryId: string): boolean;
     revealFactionIntel?(targetFactionId: string, turns: number): void;
+    executeOperation?(initiatorId: string, targetFactionId: string, opType: string): { success: boolean; detail: string };
   };
   nuclearSystem?: {
     tick?(): void;
