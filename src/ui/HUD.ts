@@ -75,6 +75,9 @@ export class HUD {
   // Event announcement dismiss timer
   private eventDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Commander move mode
+  private commanderMoveSource: string | null = null;
+
   // First-time tips system
   private shownTips: Set<string> = new Set(JSON.parse(localStorage.getItem('shownTips') || '[]'));
 
@@ -975,6 +978,17 @@ export class HUD {
     const territory = this.state.territories.get(territoryId);
     if (!territory) return;
 
+    // Handle commander move mode
+    if (this.commanderMoveSource !== null) {
+      if (territoryId === this.commanderMoveSource) {
+        this.commanderMoveSource = null;
+        this.showToast('Commander move cancelled.', 'info');
+      } else {
+        this.executeCommanderMove(this.commanderMoveSource, territoryId);
+      }
+      return;
+    }
+
     // Handle placement mode (placing purchased units)
     if (this.isPlacementMode) {
       this.handlePlacementClick(territoryId);
@@ -1030,6 +1044,58 @@ export class HUD {
     this.isPlacementMode = false;
     this.unitsToPlace = [];
     this.showDeploymentModal();
+  }
+
+  /** Enter commander move mode — next territory click moves the commander there. */
+  startCommanderMove(fromTerritoryId: string): void {
+    this.commanderMoveSource = fromTerritoryId;
+    const territory = this.state.territories.get(fromTerritoryId);
+    const commanderName = territory?.units.find((u: any) => u.commander)?.commander?.name ?? 'Commander';
+    this.showToast(`Select a friendly territory to move ${commanderName} to. Click same territory to cancel.`, 'info');
+  }
+
+  /** Move the commander from one territory to another friendly territory. */
+  private executeCommanderMove(fromId: string, toId: string): void {
+    this.commanderMoveSource = null;
+    const faction = this.state.getCurrentFaction();
+    const from = this.state.territories.get(fromId);
+    const to = this.state.territories.get(toId);
+
+    if (!from || !to || !faction) return;
+    if (to.owner !== faction.id) {
+      this.showToast('Commanders can only move to friendly territory.', 'error');
+      return;
+    }
+    if (!from.adjacentTo.includes(toId) && from.id !== toId) {
+      this.showToast('Commander must move to an adjacent territory.', 'error');
+      return;
+    }
+
+    const unitWithCommander = from.units.find((u: any) => u.commander);
+    if (!unitWithCommander) {
+      this.showToast('No commander found in source territory.', 'error');
+      return;
+    }
+
+    const commander = (unitWithCommander as any).commander;
+    delete (unitWithCommander as any).commander;
+
+    // Attach to first land unit in destination, or first unit if no land units
+    const destUnit = to.units.find(u => {
+      const ut = this.state.unitRegistry.get(u.unitTypeId);
+      return ut?.domain === 'land';
+    }) ?? to.units[0];
+
+    if (destUnit) {
+      (destUnit as any).commander = commander;
+      this.showToast(`${commander.name} moved to ${to.name}.`, 'success');
+    } else {
+      // No units in destination — commander travels alone (attach to first unit that arrives)
+      (from.units[0] as any).commander = commander;
+      this.showToast('Destination has no units. Commander stays until units are present.', 'info');
+    }
+
+    this.updateSelectionInfo();
   }
 
   /**
@@ -1649,9 +1715,11 @@ export class HUD {
         const cmd = commanderUnit.commander;
         const atkSign = cmd.attackBonus > 0 ? '+' : '';
         const defSign = cmd.defenseBonus > 0 ? '+' : '';
+        const canMoveCmd = isOwnedTerritory && !['combat', 'combat_move'].includes(this.state.currentPhase);
         html += `<div class="commander-card">
           ⭐ <strong>${cmd.name}</strong>
           <span class="commander-stats">${atkSign}${cmd.attackBonus} ATK / ${defSign}${cmd.defenseBonus} DEF</span>
+          ${canMoveCmd ? `<button class="btn-sm" style="margin-left:auto;font-size:0.7rem;padding:2px 6px" onclick="window.__hudInstance?.startCommanderMove('${territory.id}')">Move</button>` : ''}
         </div>`;
       }
 

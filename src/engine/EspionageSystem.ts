@@ -183,10 +183,13 @@ export class EspionageSystem {
       case 'steal_tech': {
         const techManager = this.state.systems.technologyManager;
         if (techManager) {
-          const ft = techManager.getFactionTechPublic?.(initiatorId);
-          if (ft && ft.currentResearch) {
-            ft.researchProgress = (ft.researchProgress ?? 0) + 5;
-            return `5 research points stolen from ${target.name}.`;
+          const targetTech = techManager.getFactionTechPublic?.(targetFactionId);
+          if (targetTech?.currentResearch) {
+            const initiatorTech = techManager.getFactionTechPublic?.(initiatorId);
+            if (initiatorTech) {
+              initiatorTech.researchProgress = (initiatorTech.researchProgress ?? 0) + 5;
+              return `5 research points stolen from ${target.name}'s ${targetTech.currentResearch} program.`;
+            }
           }
         }
         const stolen = Math.floor(target.ipcs * 0.05);

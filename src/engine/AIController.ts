@@ -156,7 +156,7 @@ export class AIController {
           this.workerEvaluations = e.data.evaluations;
           resolve();
         };
-        this.worker!.onerror = () => resolve(); // fallback on error
+        this.worker!.onerror = () => { this.workerEvaluations = []; resolve(); };
         this.worker!.postMessage({ state: workerState });
       });
     } catch {

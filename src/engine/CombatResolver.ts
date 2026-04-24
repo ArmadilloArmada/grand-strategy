@@ -558,6 +558,15 @@ export class CombatResolver {
       }
     }
 
+    // Record casualties in morale system so war weariness reflects actual losses
+    const moraleSystem = this.state.systems.moraleSystem;
+    if (moraleSystem?.recordCasualties) {
+      const atkCasualties = combat.attackers.reduce((s, cu) => s + cu.casualties, 0);
+      const defCasualties = combat.defenders.reduce((s, cu) => s + cu.casualties, 0);
+      moraleSystem.recordCasualties(combat.attackingFactionId, atkCasualties);
+      moraleSystem.recordCasualties(combat.defendingFactionId, defCasualties);
+    }
+
     this.state.emit("combat_end", { combat });
   }
 

@@ -36,6 +36,7 @@ export interface SystemRegistry {
     tickAll?(): void;
     getCombatModifier?(factionId: string): number;
     getIncomeModifier?(factionId: string): number;
+    recordCasualties?(factionId: string, count: number): void;
   };
   espionageSystem?: {
     tick?(): void;

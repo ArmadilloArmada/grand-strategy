@@ -253,6 +253,9 @@ export class TechUI {
 
     const success = this.technologyManager.startResearch(faction.id, techId);
     if (success) {
+      faction.ipcs -= tech.cost;
+      this.technologyManager.advanceResearch(faction.id, tech.cost);
+      this.state.emit('tech_researched', { factionId: faction.id, techId });
       this.callbacks.showToast(`Researched ${tech.name}!`, 'success');
       soundManager.play('build');
       statisticsManager.trackTechResearched(faction.id);
