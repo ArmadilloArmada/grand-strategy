@@ -517,6 +517,7 @@ export class HUD {
       }
     });
     this.state.on('combat_end', (e) => this.onCombatEnd(e));
+    this.state.on('combat_round', (e) => this.onCombatRound(e.data as { combat: { territoryId: string; attackingFactionId: string; defendingFactionId: string }; result: { attackerHits: number; defenderHits: number; attackerCriticals: number } }));
     this.state.on('game_event', (e) => {
       const d = e.data as { event: { name: string; description: string; type: string }; factionId: string };
       this.showEventAnnouncement(d.event, d.factionId);
@@ -539,6 +540,15 @@ export class HUD {
       const data = e.data as { factionId: string; amount: number };
       statisticsManager.trackIncome(data.factionId, data.amount);
       this.showIncomeNotification(data);
+
+      if (data.amount > 0) {
+        const faction = this.state.factionRegistry.get(data.factionId);
+        const capital = faction ? this.state.territories.get(faction.capital) : null;
+        if (capital) {
+          const screen = this.renderer.worldToScreen(capital.center[0], capital.center[1]);
+          visualEffects.floatText(screen.x, screen.y, `+${data.amount} IPC`, faction!.color, 18);
+        }
+      }
     });
   }
 
@@ -609,6 +619,9 @@ export class HUD {
       // Visual effects for capture
       const isCapital = territory?.isCapital;
       const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+
+      // Color-bleed animation on the captured territory for all captures (player + AI)
+      this.renderer.startCaptureAnimation(combat.territoryId, attackerFaction?.color ?? '#22c55e');
 
       if (isPlayerAttacker) {
         // Player captured territory!
@@ -712,6 +725,27 @@ export class HUD {
       attackerFaction.color,
       narration
     );
+  }
+
+  /** Floating damage numbers over the territory on each combat round. */
+  private onCombatRound(data: { combat: { territoryId: string; attackingFactionId: string; defendingFactionId: string }; result: { attackerHits: number; defenderHits: number; attackerCriticals: number } }): void {
+    const { combat, result } = data;
+    const territory = this.state.territories.get(combat.territoryId);
+    if (!territory) return;
+
+    const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+    const jitter = () => (Math.random() - 0.5) * 50;
+
+    if (result.attackerHits > 0) {
+      const color = this.state.factionRegistry.get(combat.attackingFactionId)?.color ?? '#ff4444';
+      const size = result.attackerCriticals > 0 ? 28 : 20;
+      const label = result.attackerCriticals > 0 ? `💥 -${result.attackerHits}` : `-${result.attackerHits}`;
+      visualEffects.floatText(screen.x + jitter(), screen.y - 20 + jitter(), label, color, size);
+    }
+    if (result.defenderHits > 0) {
+      const color = this.state.factionRegistry.get(combat.defendingFactionId)?.color ?? '#4488ff';
+      visualEffects.floatText(screen.x + jitter(), screen.y + 20 + jitter(), `-${result.defenderHits}`, color, 20);
+    }
   }
 
   /**

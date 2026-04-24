@@ -48,6 +48,10 @@ export class MapRenderer {
   private overlayMode: 'off' | 'range' | 'threat' = 'off';
   private threatTerritoryIds: Set<string> = new Set();
 
+  // Capture color-bleed animations: territoryId → {startTime, factionColor}
+  private captureAnimations: Map<string, { startTime: number; factionColor: string }> = new Map();
+  private captureRafId: number | null = null;
+
   // Render options
   private options: RenderOptions = {
     showGrid: false,
@@ -146,6 +150,24 @@ export class MapRenderer {
   setOverlayMode(mode: 'off' | 'range' | 'threat', threatIds?: Set<string>): void {
     this.overlayMode = mode;
     this.threatTerritoryIds = threatIds ?? new Set();
+  }
+
+  /** Start a 1.5s color-bleed animation on a captured territory. */
+  startCaptureAnimation(territoryId: string, factionColor: string): void {
+    this.captureAnimations.set(territoryId, { startTime: Date.now(), factionColor });
+    if (this.captureRafId === null) this.runCaptureLoop();
+  }
+
+  private runCaptureLoop(): void {
+    const now = Date.now();
+    let anyActive = false;
+    for (const [id, anim] of this.captureAnimations) {
+      if (now - anim.startTime > 1600) this.captureAnimations.delete(id);
+      else anyActive = true;
+    }
+    this.render();
+    if (anyActive) this.captureRafId = requestAnimationFrame(() => this.runCaptureLoop());
+    else this.captureRafId = null;
   }
 
   /**
@@ -331,9 +353,25 @@ export class MapRenderer {
     gradient.addColorStop(1, this.darkenColor(fillColor, 8));
 
     this.ctx.fillStyle = gradient;
-    
+
     this.ctx.fill();
     this.ctx.globalAlpha = 1;
+
+    // Capture color-bleed: faction color pulses in then out over 1.5s
+    const captureAnim = !isSea ? this.captureAnimations.get(territory.id) : undefined;
+    if (captureAnim) {
+      const progress = Math.min(1, (Date.now() - captureAnim.startTime) / 1600);
+      const alpha = Math.sin(progress * Math.PI) * 0.55;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+      this.ctx.closePath();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = captureAnim.factionColor;
+      this.ctx.fill();
+      this.ctx.restore();
+    }
 
     // Fog of war: draw a dark overlay polygon on top of hidden territories
     if (!isVisible && !isSea) {

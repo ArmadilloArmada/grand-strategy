@@ -207,6 +207,29 @@ export class CombatResolver {
   }
 
   /**
+   * Bonus attack when an attacker type hard-counters the defenders present.
+   * Creates rock-paper-scissors feel without adding new unit types.
+   */
+  private getCounterBonus(attackerTypeId: string, defenders: CombatUnit[]): number {
+    const defIds = new Set(defenders.map(cu => cu.unitType.id));
+    const hasAir = defenders.some(cu => cu.unitType.domain === 'air');
+    if (attackerTypeId === 'fighter' && defIds.has('bomber')) return 2;
+    if (attackerTypeId === 'destroyer' && defIds.has('submarine')) return 2;
+    if (attackerTypeId === 'submarine' && (defIds.has('battleship') || defIds.has('carrier'))) return 1;
+    if (attackerTypeId === 'tank' && defIds.has('artillery') && !hasAir) return 1;
+    return 0;
+  }
+
+  private getDefenderCounterBonus(defenderTypeId: string, attackers: CombatUnit[]): number {
+    const hasAir = attackers.some(cu => cu.unitType.domain === 'air');
+    const atkIds = new Set(attackers.map(cu => cu.unitType.id));
+    if (defenderTypeId === 'anti_air' && hasAir) return 2;
+    if (defenderTypeId === 'destroyer' && atkIds.has('submarine')) return 2;
+    if (defenderTypeId === 'fighter' && atkIds.has('bomber')) return 1;
+    return 0;
+  }
+
+  /**
    * Roll dice for one round of combat
    */
   resolveCombatRound(combat: CombatState): CombatRoundResult {
@@ -281,6 +304,12 @@ export class CombatResolver {
         attackValue += combinedArmsBonus;
       }
 
+      // Counter bonus: unit type hard-counters specific defender types
+      attackValue += this.getCounterBonus(cu.unitType.id, combat.defenders);
+
+      // Battle attrition: units that have lost >40% of their stack fight less effectively
+      if (cu.casualties > cu.count * 0.4) attackValue = Math.max(1, attackValue - 1);
+
       // Supply and weather penalties (land units only for weather)
       attackValue -= attackerSupplyPenalty;
       if (isWinter && cu.unitType.domain === 'land') {
@@ -333,6 +362,12 @@ export class CombatResolver {
       if (cu.unitType.domain === 'sea') {
         defenseValue += defenderBonuses.navalDefenseBonus;
       }
+
+      // Counter bonus: defender type hard-counters specific attacker types
+      defenseValue += this.getDefenderCounterBonus(cu.unitType.id, combat.attackers);
+
+      // Battle attrition: heavily-hit defenders fight less effectively
+      if (cu.casualties > cu.count * 0.4) defenseValue = Math.max(1, defenseValue - 1);
 
       // Supply and weather penalties
       defenseValue -= defenderSupplyPenalty;

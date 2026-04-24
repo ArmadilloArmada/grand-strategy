@@ -7,6 +7,7 @@ export class VisualEffects {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private particles: Particle[] = [];
+  private floatTexts: FloatText[] = [];
   private shakeIntensity: number = 0;
   private shakeDecay: number = 0.9;
   private animationFrame: number | null = null;
@@ -57,7 +58,14 @@ export class VisualEffects {
       p.life -= p.decay;
       p.rotation += p.rotationSpeed;
     }
-    
+
+    // Update floating text
+    this.floatTexts = this.floatTexts.filter(t => t.life > 0);
+    for (const t of this.floatTexts) {
+      t.y += t.vy;
+      t.life -= 1;
+    }
+
     // Decay screen shake
     this.shakeIntensity *= this.shakeDecay;
     if (this.shakeIntensity < 0.1) this.shakeIntensity = 0;
@@ -75,6 +83,21 @@ export class VisualEffects {
       document.body.style.transform = '';
     }
     
+    // Draw floating combat/income text
+    for (const t of this.floatTexts) {
+      this.ctx.save();
+      this.ctx.globalAlpha = Math.min(1, t.life / 25);
+      this.ctx.font = `bold ${t.size}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      this.ctx.lineWidth = 3;
+      this.ctx.strokeText(t.text, t.x, t.y);
+      this.ctx.fillStyle = t.color;
+      this.ctx.fillText(t.text, t.x, t.y);
+      this.ctx.restore();
+    }
+
     // Draw particles
     for (const p of this.particles) {
       this.ctx.save();
@@ -180,6 +203,10 @@ export class VisualEffects {
     }
   }
 
+  spawnFloatText(x: number, y: number, text: string, color: string, size: number = 22): void {
+    this.floatTexts.push({ x, y, text, color, size, life: 70, vy: -1.2 });
+  }
+
   triggerExplosion(x: number, y: number, intensity: number = 1): void {
     const count = Math.floor(20 * intensity);
     this.spawnParticles(x, y, count, 'explosion',
@@ -260,6 +287,16 @@ export class VisualEffects {
   }
 }
 
+interface FloatText {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  size: number;
+  life: number;
+  vy: number;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -315,6 +352,10 @@ class VisualEffectsProxy {
 
   shockwave(x: number, y: number): void {
     this.get().triggerShockwave(x, y);
+  }
+
+  floatText(x: number, y: number, text: string, color: string, size?: number): void {
+    this.get().spawnFloatText(x, y, text, color, size);
   }
 }
 
