@@ -8,6 +8,7 @@ import { UnitRegistry } from '../data/Unit';
 import { Faction, FactionRegistry, FactionData } from '../data/Faction';
 import { GameRules, GamePhase } from '../data/GameRules';
 import { DiplomacyManager } from './DiplomacyManager';
+import { SupplySystem } from './SupplySystem';
 
 /**
  * Registry of optional subsystems wired onto GameState after construction.
@@ -37,21 +38,53 @@ export interface SystemRegistry {
     getCombatModifier?(factionId: string): number;
     getIncomeModifier?(factionId: string): number;
     recordCasualties?(factionId: string, count: number): void;
+    recordVictory?(factionId: string, isCapital?: boolean, hasFactory?: boolean): void;
   };
   espionageSystem?: {
     tick?(): void;
     isIntelRevealed?(territoryId: string): boolean;
     revealFactionIntel?(targetFactionId: string, turns: number): void;
-    executeOperation?(initiatorId: string, targetFactionId: string, opType: string): { success: boolean; detail: string };
+    getCooldownUntil?(factionId: string): number;
+    getHistory?(factionId: string, limit?: number): Array<{ turn: number; opType: string; targetFactionId: string; success: boolean; exposed: boolean }>;
+    executeOperation?(initiatorId: string, targetFactionId: string, opType: string): { success: boolean; exposed: boolean; detail: string };
   };
   nuclearSystem?: {
     tick?(): void;
     tickReadiness?(): void;
     canLaunch?(factionId: string): boolean;
+    launchStrike?(factionId: string, targetTerritoryId: string): unknown;
   };
   aiController?: {
     fadeGrudges?(): void;
     recordGrievance?(offenderId: string, holderId: string, severity: number): void;
+  };
+  reserveSystem?: {
+    serialize(): { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] };
+    restore(data: { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] }): void;
+  };
+  weatherSystem?: {
+    tick(): void;
+    getWeatherModifiers(terrain: import('../data/Territory').TerrainType): import('./WeatherSystem').WeatherModifiers;
+    getDisplayString(): string;
+    serialize(): object;
+    restore(data: object): void;
+    currentEvent: import('./WeatherSystem').WeatherEvent;
+  };
+  commanderProgression?: {
+    playerFactionIds: string[];
+  };
+  fortificationSystem?: {
+    canBuild(territoryId: string, factionId: string): boolean;
+    build(territoryId: string, factionId: string): boolean;
+    getDefenseBonus(territoryId: string): number;
+    getUpgradeCost(territoryId: string): number | null;
+    onCapture(territoryId: string): void;
+  };
+  abilityState?: {
+    /** Faction abilities that applied effects still in flight this game session */
+    pendingIPCBonuses: Map<string, number>;      // factionId → IPC bonus on next income
+    scorchedTerritories: Map<string, number>;    // territoryId → turn it expires
+    islandHoppingTurns: Map<string, number>;     // factionId → turn it was activated
   };
 }
 
@@ -82,8 +115,13 @@ export type GameEventType =
   | 'diplomacy_accepted'
   | 'diplomacy_declined'
   | 'nuclear_strike'
+  | 'alliance_formed'
   | 'alliance_betrayed'
-  | 'espionage_result';
+  | 'pact_formed'
+  | 'espionage_result'
+  | 'objective_reward'
+  | 'tension_level_change'
+  | 'fortification_built';
 
 export interface GameEvent {
   type: GameEventType;
@@ -117,6 +155,13 @@ export interface GameStateSnapshot {
   pendingMoves: PendingMove[];
   purchaseOrders: PurchaseOrder[];
   diplomacy?: unknown;
+  reserves?: { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] };
+  abilityState?: {
+    pendingIPCBonuses: [string, number][];
+    scorchedTerritories: [string, number][];
+    islandHoppingTurns: [string, number][];
+  };
+  weather?: { condition: string; name: string; description: string; duration: number; expiresAtTurn: number };
 }
 
 export class GameState {
@@ -147,6 +192,19 @@ export class GameState {
 
   // Optional subsystems registered after construction (avoids (state as any) casts)
   public systems: SystemRegistry = {};
+
+  // Territory ownership history: territoryId → array of { factionId, turnNumber }
+  // Only the last 5 owners are kept per territory to bound memory.
+  public ownershipHistory: Map<string, Array<{ factionId: string; turnNumber: number }>> = new Map();
+
+  /** Record that a territory changed owner. Called by CombatResolver/movement code. */
+  recordOwnershipChange(territoryId: string, previousOwnerId: string | null, turnNumber: number): void {
+    if (previousOwnerId === null) return;
+    if (!this.ownershipHistory.has(territoryId)) this.ownershipHistory.set(territoryId, []);
+    const history = this.ownershipHistory.get(territoryId)!;
+    history.push({ factionId: previousOwnerId, turnNumber });
+    if (history.length > 5) history.shift();
+  }
 
   // Event system
   private listeners: Map<GameEventType, Set<GameEventListener>> = new Map();
@@ -231,8 +289,15 @@ export class GameState {
     const faction = this.factionRegistry.get(factionId);
     if (!faction) return 0;
 
+    const supplySystem = new SupplySystem(this);
+    const scorchedTerritories = this.systems.abilityState?.scorchedTerritories;
     let income = 0;
     for (const territory of this.getTerritoriesOwnedBy(factionId)) {
+      // Naval blockade: coastal territories surrounded by enemy sea power earn 0
+      if (supplySystem.isNavalBlockaded(territory.id, factionId)) continue;
+      // Scorched Earth ability: territory generates no income until the effect expires
+      if (scorchedTerritories?.has(territory.id) &&
+          (scorchedTerritories.get(territory.id) ?? 0) > this.turnNumber) continue;
       income += territory.production * this.rules.baseIncomeMultiplier;
     }
 
@@ -277,6 +342,49 @@ export class GameState {
   }
 
   /**
+   * Itemized income breakdown for display in the HUD tooltip.
+   */
+  calculateIncomeBreakdown(factionId: string): {
+    territorial: number; capital: number; factory: number; resource: number;
+    trade: number; techMultiplier: number; factionMultiplier: number;
+    blockadeLoss: number; scorchedLoss: number; total: number;
+  } {
+    const faction = this.factionRegistry.get(factionId);
+    if (!faction) return { territorial: 0, capital: 0, factory: 0, resource: 0, trade: 0, techMultiplier: 0, factionMultiplier: 0, blockadeLoss: 0, scorchedLoss: 0, total: 0 };
+
+    const supplySystem = new SupplySystem(this);
+    const scorchedTerritories = this.systems.abilityState?.scorchedTerritories;
+    let territorial = 0, blockadeLoss = 0, scorchedLoss = 0, resource = 0;
+
+    for (const territory of this.getTerritoriesOwnedBy(factionId)) {
+      const base = territory.production * this.rules.baseIncomeMultiplier;
+      if (supplySystem.isNavalBlockaded(territory.id, factionId)) { blockadeLoss += base; continue; }
+      if (scorchedTerritories?.has(territory.id) && (scorchedTerritories.get(territory.id) ?? 0) > this.turnNumber) { scorchedLoss += base; continue; }
+      territorial += base;
+      if (territory.resource === 'oil') resource += 2;
+      else if (territory.resource === 'steel') resource += 1;
+      else if (territory.resource === 'food') resource += 1;
+      else if (territory.resource === 'rare_earth') resource += 2;
+    }
+
+    const capital = this.territories.get(faction.capital)?.owner === factionId ? this.rules.capitalBonusIPCs : 0;
+    const bonusPerFactory = faction.bonuses?.ipcPerFactory ?? 0;
+    const factory = bonusPerFactory > 0 ? this.getFactories(factionId).length * bonusPerFactory : 0;
+    const trade = this.diplomacyManager.getTradeIncome(factionId);
+
+    const subtotal = territorial + capital + factory + resource + trade;
+    const factionMultiplierBonus = faction.bonuses?.incomeMultiplierBonus ?? 0;
+    const factionMultiplier = factionMultiplierBonus > 0 ? Math.round(subtotal * factionMultiplierBonus) : 0;
+
+    const techManager = this.systems.technologyManager;
+    const incomeBonus = techManager ? (techManager.getTechEffect(factionId).incomeBonus ?? 0) : 0;
+    const techMultiplier = incomeBonus > 0 ? Math.round((subtotal + factionMultiplier) * incomeBonus) : 0;
+
+    const total = subtotal + factionMultiplier + techMultiplier;
+    return { territorial, capital, factory, resource, trade, techMultiplier, factionMultiplier, blockadeLoss, scorchedLoss, total };
+  }
+
+  /**
    * Get factories owned by a faction (excluding bombed/disabled this turn)
    */
   getFactories(factionId: string): Territory[] {
@@ -297,6 +405,13 @@ export class GameState {
       pendingMoves: [...this.pendingMoves],
       purchaseOrders: [...this.purchaseOrders],
       diplomacy: this.diplomacyManager.serialize(),
+      reserves: this.systems.reserveSystem?.serialize(),
+      abilityState: this.systems.abilityState ? {
+        pendingIPCBonuses: [...this.systems.abilityState.pendingIPCBonuses.entries()],
+        scorchedTerritories: [...this.systems.abilityState.scorchedTerritories.entries()],
+        islandHoppingTurns: [...this.systems.abilityState.islandHoppingTurns.entries()],
+      } : undefined,
+      weather: this.systems.weatherSystem?.serialize() as any,
     };
   }
 
@@ -335,6 +450,20 @@ export class GameState {
 
     if (snapshot.diplomacy) {
       this.diplomacyManager.restore(snapshot.diplomacy);
+    }
+
+    if (snapshot.reserves && this.systems.reserveSystem) {
+      this.systems.reserveSystem.restore(snapshot.reserves);
+    }
+
+    if (snapshot.abilityState && this.systems.abilityState) {
+      this.systems.abilityState.pendingIPCBonuses = new Map(snapshot.abilityState.pendingIPCBonuses);
+      this.systems.abilityState.scorchedTerritories = new Map(snapshot.abilityState.scorchedTerritories);
+      this.systems.abilityState.islandHoppingTurns = new Map(snapshot.abilityState.islandHoppingTurns);
+    }
+
+    if (snapshot.weather && this.systems.weatherSystem) {
+      this.systems.weatherSystem.restore(snapshot.weather as any);
     }
 
     this.emit('state_loaded', {});

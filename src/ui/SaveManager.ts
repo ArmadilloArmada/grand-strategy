@@ -210,6 +210,61 @@ export class SaveManager {
   }
 
   /**
+   * Export a save slot to a JSON file download
+   */
+  exportToFile(slotId: number): boolean {
+    const key = slotId === 0 ? 'grand-strategy-autosave' : `grand-strategy-save-${slotId}`;
+    const data = localStorage.getItem(key);
+    if (!data) return false;
+    try {
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const parsed = JSON.parse(data) as SaveData;
+      a.href = url;
+      a.download = `grand-strategy-${parsed.name.replace(/\s+/g, '-').toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Import a save from a JSON file into a slot
+   */
+  importFromFile(slotId: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) { resolve(false); return; }
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text) as Partial<SaveData>;
+          if (!parsed.snapshot) { resolve(false); return; }
+          const saveData: SaveData = {
+            version: parsed.version ?? SAVE_VERSION,
+            slot: slotId,
+            name: parsed.name ?? `Imported Save ${slotId}`,
+            timestamp: Date.now(),
+            snapshot: parsed.snapshot,
+          };
+          const key = `grand-strategy-save-${slotId}`;
+          localStorage.setItem(key, JSON.stringify(saveData));
+          resolve(true);
+        } catch {
+          resolve(false);
+        }
+      };
+      input.click();
+    });
+  }
+
+  /**
    * Format timestamp for display
    */
   formatTimestamp(timestamp: number): string {

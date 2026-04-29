@@ -189,6 +189,17 @@ export class ModManager {
       };
 
       this.mods.set(manifest.id, loadedMod);
+
+      // Warn if declared dependencies are not loaded
+      const depCheck = this.validateDependencies(manifest);
+      if (!depCheck.valid) {
+        console.warn(
+          `[ModManager] "${manifest.name}" (${manifest.id}) has unsatisfied dependencies: ` +
+          depCheck.missing.join(', ') +
+          '. Load the required mods first or some features may not work correctly.'
+        );
+      }
+
       this.saveConfig();
 
       return true;
@@ -347,6 +358,50 @@ export class ModManager {
     return conflicts;
   }
   
+  /**
+   * Check whether all declared dependencies of a manifest are currently loaded and enabled.
+   * Returns { valid: true } when all deps are satisfied, or { valid: false, missing } listing
+   * which dependency IDs are absent.
+   */
+  validateDependencies(manifest: ModManifest): { valid: boolean; missing: string[] } {
+    if (!manifest.dependencies || manifest.dependencies.length === 0) {
+      return { valid: true, missing: [] };
+    }
+    const missing: string[] = [];
+    for (const depId of manifest.dependencies) {
+      const dep = this.mods.get(depId);
+      if (!dep || !dep.enabled) missing.push(depId);
+    }
+    return { valid: missing.length === 0, missing };
+  }
+
+  /**
+   * Returns mods sorted in dependency order (dependencies first) using topological sort.
+   * Mods with circular dependencies are appended at the end.
+   */
+  getModsInDependencyOrder(): LoadedMod[] {
+    const enabled = this.getEnabledMods();
+    const result: LoadedMod[] = [];
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+
+    const visit = (mod: LoadedMod) => {
+      if (visited.has(mod.manifest.id)) return;
+      if (visiting.has(mod.manifest.id)) return; // cycle — skip
+      visiting.add(mod.manifest.id);
+      for (const depId of mod.manifest.dependencies ?? []) {
+        const dep = this.mods.get(depId);
+        if (dep && dep.enabled) visit(dep);
+      }
+      visiting.delete(mod.manifest.id);
+      visited.add(mod.manifest.id);
+      result.push(mod);
+    };
+
+    for (const mod of enabled) visit(mod);
+    return result;
+  }
+
   /**
    * Install a mod from JSON string (mod archive).
    * In Electron this also writes the mod to the userData/mods/ folder so it

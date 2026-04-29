@@ -1,0 +1,19 @@
+"AppBuild"
+{
+	// !! Replace 480 with your real Steam App ID from the Steamworks Partner Portal !!
+	"AppID"		"480"
+	"Desc"		"Grand Strategy"
+
+	// Leave empty to not go live automatically; set to "beta" or "default" to push a branch
+	"SetLive"	""
+
+	// Output folder for steamcmd build logs (relative to this file)
+	"BuildOutput"	"..\steam_build_output\"
+
+	"Depots"
+	{
+		// !! Replace 481 with your real depot ID (Steamworks → App → Depots) !!
+		// Windows depot
+		"481"	"..\steam\depot_build_win.vdf"
+	}
+}

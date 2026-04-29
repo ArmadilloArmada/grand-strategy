@@ -200,6 +200,7 @@ export function checkVictory(
   
   // Turn limit reached - winner by territory count
   if (config.turnLimit > 0 && state.turnNumber >= config.turnLimit) {
+    if (factions.length === 0) return { winner: null, reason: 'Draw — all factions eliminated.' };
     let maxTerritories = 0;
     let leader = factions[0];
     

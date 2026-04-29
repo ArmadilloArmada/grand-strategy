@@ -6,6 +6,7 @@ import { GameState } from "./GameState";
 import { PlacedUnit } from "../data/Territory";
 import { UnitType } from "../data/Unit";
 import { SupplySystem } from "./SupplySystem";
+import { getCommanderCombatBonuses, processBattleXP, BattleXPOutcome } from "./CommanderProgression";
 
 export interface CombatUnit {
   unitType: UnitType;
@@ -13,6 +14,7 @@ export interface CombatUnit {
   hits: number;
   casualties: number;
   veteranCount?: number; // +1 attack/defense per veteran
+  batteredUntilTurn?: number; // -1 attack while battered (from retreat)
 }
 
 export interface CombatRoundResult {
@@ -52,6 +54,8 @@ export interface CombatState {
   rounds: CombatRoundResult[];
   isComplete: boolean;
   winner: "attacker" | "defender" | "draw" | null;
+  /** +1 attack bonus when attackers converge from multiple territories */
+  flankingBonus?: number;
 }
 
 export interface BombardmentResult {
@@ -157,7 +161,7 @@ export class CombatResolver {
       return null; // Can't attack own territory
     }
 
-    // Build attacker units (with veterancy bonus)
+    // Build attacker units (with veterancy bonus and battered status)
     const attackers: CombatUnit[] = [];
     for (const pu of attackingUnits) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
@@ -168,6 +172,7 @@ export class CombatResolver {
           hits: 0,
           casualties: 0,
           veteranCount: pu.veteranCount ?? 0,
+          batteredUntilTurn: pu.batteredUntilTurn ?? 0,
         });
       }
     }
@@ -200,6 +205,7 @@ export class CombatResolver {
       rounds: [],
       isComplete: false,
       winner: null,
+      flankingBonus: 0,
     };
 
     this.state.emit("combat_start", { combat });
@@ -240,8 +246,11 @@ export class CombatResolver {
     const territory = this.state.territories.get(combat.territoryId);
     const terrainBonus = territory?.defenseBonus ?? 0;
 
-    // Capital/factory fortification bonus (first round only — defenders are prepared)
-    const fortificationBonus = (roundNumber === 1 && territory && (territory.isCapital || territory.hasFactory)) ? 1 : 0;
+    // Fortification defense bonus — built structures stack on top of terrain
+    const builtFortBonus = this.state.systems.fortificationSystem?.getDefenseBonus(combat.territoryId) ?? 0;
+    // Built-in capital/factory prep bonus (round 1 only) when no player-built fortification
+    const prepBonus = (roundNumber === 1 && builtFortBonus === 0 && territory && (territory.isCapital || territory.hasFactory)) ? 1 : 0;
+    const fortificationBonus = builtFortBonus + prepBonus;
 
     // Supply penalties: out-of-supply units fight at -1 attack/defense
     const attackerSourceId = combat.sourceTerritory ?? combat.territoryId;
@@ -250,8 +259,12 @@ export class CombatResolver {
     const attackerSupplyPenalty = attackerInSupply ? 0 : 1;
     const defenderSupplyPenalty = defenderInSupply ? 0 : 1;
 
-    // Winter weather: -1 to all land unit attack/defense
-    const isWinter = this.state.currentSeason === 'winter';
+    // Weather modifiers — replaces the old isWinter boolean check
+    const terrain = territory?.terrain ?? 'plains';
+    const weatherSystem = this.state.systems.weatherSystem;
+    const weather = weatherSystem
+      ? weatherSystem.getWeatherModifiers(terrain)
+      : { landAttackMod: this.state.currentSeason === 'winter' ? -1 : 0, landDefenseMod: this.state.currentSeason === 'winter' ? -1 : 0, airAttackMod: 0, airGrounded: false, movementPenalty: 0, supplyDisrupted: false, terrainDefenseBonus: 0 };
 
     // Get faction-specific bonuses
     const attackerBonuses = this.getFactionBonuses(combat.attackingFactionId, true, combat.territoryId);
@@ -269,14 +282,34 @@ export class CombatResolver {
     const defTerritory = this.state.territories.get(combat.territoryId);
     const atkCommander = attackSource?.units.find(u => u.commander)?.commander ?? null;
     const defCommander = defTerritory?.units.find(u => u.commander)?.commander ?? null;
-    if (atkCommander) attackerBonuses.attackBonus += atkCommander.attackBonus;
-    if (defCommander) defenderBonuses.defenseBonus += defCommander.defenseBonus;
+
+    const atkActiveCount = combat.attackers.reduce((s, cu) => s + (cu.count - cu.casualties), 0);
+    const defActiveCount = combat.defenders.reduce((s, cu) => s + (cu.count - cu.casualties), 0);
+
+    const atkCmdBonuses = atkCommander
+      ? getCommanderCombatBonuses(atkCommander, atkActiveCount, roundNumber)
+      : null;
+    const defCmdBonuses = defCommander
+      ? getCommanderCombatBonuses(defCommander, defActiveCount, roundNumber)
+      : null;
+
+    if (atkCmdBonuses) {
+      attackerBonuses.attackBonus  += atkCmdBonuses.attackBonus + atkCmdBonuses.round1AttackBonus;
+      attackerBonuses.defenseBonus += atkCmdBonuses.defenseBonus;
+      attackerBonuses.airAttackBonus += atkCmdBonuses.airAttackBonus;
+    }
+    if (defCmdBonuses) {
+      defenderBonuses.defenseBonus += defCmdBonuses.defenseBonus + defCmdBonuses.lastStandDefenseBonus;
+      defenderBonuses.attackBonus  += defCmdBonuses.attackBonus;
+      defenderBonuses.airAttackBonus += defCmdBonuses.airAttackBonus;
+    }
 
     // Roll for attackers
     const attackerRolls: DiceRoll[] = [];
     let attackerHits = 0;
 
-    const veteranBonus = 1; // +1 attack/defense for veterans
+    // Veteran bonus: 1 normally, 2 if commander has veteran_eye trait
+    const veteranBonus = (atkCmdBonuses?.veteranMultiplier ?? 1);
 
     // Artillery boost: count artillery to boost infantry attacks
     const artilleryCount = combat.attackers
@@ -304,17 +337,29 @@ export class CombatResolver {
         attackValue += combinedArmsBonus;
       }
 
+      // Flanking bonus: attackers converging from multiple territories
+      attackValue += combat.flankingBonus ?? 0;
+
+      // Battered penalty: unit retreated last turn, still recovering
+      if (cu.batteredUntilTurn && cu.batteredUntilTurn > this.state.turnNumber) {
+        attackValue = Math.max(1, attackValue - 1);
+      }
+
       // Counter bonus: unit type hard-counters specific defender types
       attackValue += this.getCounterBonus(cu.unitType.id, combat.defenders);
 
       // Battle attrition: units that have lost >40% of their stack fight less effectively
       if (cu.casualties > cu.count * 0.4) attackValue = Math.max(1, attackValue - 1);
 
-      // Supply and weather penalties (land units only for weather)
-      attackValue -= attackerSupplyPenalty;
-      if (isWinter && cu.unitType.domain === 'land') {
-        attackValue -= 1;
+      // Supply penalty (waived if commander has supply_master)
+      if (!(atkCmdBonuses?.ignoreSupplyPenalty) && !weather.supplyDisrupted) {
+        attackValue -= attackerSupplyPenalty;
+      } else if (weather.supplyDisrupted && !(atkCmdBonuses?.ignoreSupplyPenalty)) {
+        attackValue -= 1; // weather supply disruption always applies if no supply_master
       }
+      // Weather penalties for land / air units
+      if (cu.unitType.domain === 'land') attackValue += weather.landAttackMod;
+      if (cu.unitType.domain === 'air')  attackValue += weather.airAttackMod;
       attackValue = Math.max(1, attackValue); // Always at least 1 chance to hit
 
       for (let i = 0; i < activeCount; i++) {
@@ -369,11 +414,18 @@ export class CombatResolver {
       // Battle attrition: heavily-hit defenders fight less effectively
       if (cu.casualties > cu.count * 0.4) defenseValue = Math.max(1, defenseValue - 1);
 
-      // Supply and weather penalties
-      defenseValue -= defenderSupplyPenalty;
-      if (isWinter && cu.unitType.domain === 'land') {
+      // Weather terrain defense bonus (rain/storm benefits defenders in forests, etc.)
+      defenseValue += weather.terrainDefenseBonus;
+
+      // Supply penalty (waived if commander has supply_master)
+      if (!(defCmdBonuses?.ignoreSupplyPenalty) && !weather.supplyDisrupted) {
+        defenseValue -= defenderSupplyPenalty;
+      } else if (weather.supplyDisrupted && !(defCmdBonuses?.ignoreSupplyPenalty)) {
         defenseValue -= 1;
       }
+      // Weather penalties for land / air units
+      if (cu.unitType.domain === 'land') defenseValue += weather.landDefenseMod;
+      if (cu.unitType.domain === 'air')  defenseValue += weather.airAttackMod;
       defenseValue = Math.max(1, defenseValue);
 
       for (let i = 0; i < activeCount; i++) {
@@ -552,6 +604,10 @@ export class CombatResolver {
     if (!territory) return;
 
     if (combat.winner === "attacker") {
+      // Record history before changing owner
+      this.state.recordOwnershipChange(territory.id, territory.owner, this.state.turnNumber);
+      // Degrade fortification on capture (blasted through or partially inherited)
+      this.state.systems.fortificationSystem?.onCapture(territory.id);
       // Transfer ownership
       territory.owner = combat.attackingFactionId;
 
@@ -602,7 +658,24 @@ export class CombatResolver {
       moraleSystem.recordCasualties(combat.defendingFactionId, defCasualties);
     }
 
-    this.state.emit("combat_end", { combat });
+    // Commander XP awards
+    const playerFactionIds = this.state.systems.commanderProgression?.playerFactionIds ?? [];
+    const atkSrc = combat.sourceTerritory ? this.state.territories.get(combat.sourceTerritory) : null;
+    const defTer = this.state.territories.get(combat.territoryId);
+    const atkCmd = atkSrc?.units.find(u => u.commander)?.commander ?? null;
+    const defCmd = defTer?.units.find(u => u.commander)?.commander ?? null;
+
+    const xpOutcome: BattleXPOutcome = processBattleXP(combat, atkCmd, defCmd, playerFactionIds);
+
+    // If a commander died, remove them from their stack
+    if (xpOutcome.attackerResult?.commanderDied && atkSrc) {
+      for (const unit of atkSrc.units) delete unit.commander;
+    }
+    if (xpOutcome.defenderResult?.commanderDied && defTer) {
+      for (const unit of defTer.units) delete unit.commander;
+    }
+
+    this.state.emit("combat_end", { combat, xpOutcome });
   }
 
   /**
@@ -670,7 +743,57 @@ export class CombatResolver {
   }
 
   /**
-   * Process retreat
+   * Air superiority interception: defending fighters fire at attacking air units
+   * before round 1. Each fighter rolls at its attack value; hits kill bombers first.
+   * This represents defensive air patrols contesting enemy air incursions.
+   */
+  performFighterIntercept(combat: CombatState): BombardmentResult {
+    const diceSides = this.state.rules.diceSides;
+    const rolls: DiceRoll[] = [];
+    let hits = 0;
+
+    // Only defending fighters intercept
+    const interceptors = combat.defenders.filter(cu => cu.unitType.id === 'fighter');
+    // Only air attackers are targeted
+    const airAttackers = combat.attackers.filter(cu => cu.unitType.domain === 'air');
+    if (interceptors.length === 0 || airAttackers.length === 0) {
+      return { rolls, hits, casualties: [] };
+    }
+
+    for (const cu of interceptors) {
+      const active = cu.count - cu.casualties;
+      for (let i = 0; i < active; i++) {
+        const roll = this.rollDie(diceSides);
+        const isHit = roll <= cu.unitType.attack;
+        const isCritical = isHit && cu.unitType.attack >= 3 && this.isCriticalHit(roll);
+        rolls.push({
+          unitTypeId: cu.unitType.id,
+          unitName: cu.unitType.name,
+          targetValue: cu.unitType.attack,
+          roll,
+          isHit,
+          isCritical,
+        });
+        if (isHit) hits += isCritical ? 2 : 1;
+      }
+    }
+
+    // Apply hits only to air attacking units (bombers first, then fighters)
+    const airUnitsForCasualties = [...airAttackers].sort((a, b) => a.unitType.cost - b.unitType.cost);
+    const casualties = this.applyCasualties(airUnitsForCasualties, hits);
+    // Propagate casualties back to the original combat.attackers
+    for (const c of casualties) {
+      const src = combat.attackers.find(cu => cu.unitType.id === c.unitTypeId);
+      if (src) src.casualties += c.count;
+    }
+
+    return { rolls, hits, casualties };
+  }
+
+  /**
+   * Process retreat — surviving attackers fall back to a friendly adjacent territory.
+   * Defenders get one free "pursuit" salvo before the retreaters escape.
+   * Retreating units are marked battered for the next turn (-1 attack).
    */
   processRetreat(combat: CombatState, retreatToTerritoryId: string): boolean {
     if (!this.canRetreat(combat)) return false;
@@ -683,18 +806,36 @@ export class CombatResolver {
     if (!combatTerritory?.isAdjacentTo(retreatToTerritoryId)) return false;
     if (retreatTerritory.owner !== combat.attackingFactionId) return false;
 
-    // Move surviving attackers to retreat territory
+    // Pursuit fire: each surviving defender rolls once at their attack value
+    const diceSides = this.state.rules.diceSides;
+    let pursuitHits = 0;
+    for (const cu of combat.defenders) {
+      const active = cu.count - cu.casualties;
+      for (let i = 0; i < active; i++) {
+        const roll = this.rollDie(diceSides);
+        if (roll <= cu.unitType.attack) pursuitHits++;
+      }
+    }
+    // Apply pursuit hits to retreating attackers (cheapest first)
+    if (pursuitHits > 0) this.applyCasualties(combat.attackers, pursuitHits);
+
+    const nextTurn = this.state.turnNumber + 1;
+
+    // Move surviving attackers to retreat territory, marking them battered
     for (const cu of combat.attackers) {
       const surviving = cu.count - cu.casualties;
       if (surviving > 0) {
         retreatTerritory.addUnits(cu.unitType.id, surviving);
+        // Mark the newly added stack as battered
+        const stack = retreatTerritory.units.find(u => u.unitTypeId === cu.unitType.id);
+        if (stack) stack.batteredUntilTurn = nextTurn;
       }
     }
 
     combat.isComplete = true;
     combat.winner = "defender";
 
-    this.state.emit("combat_end", { combat, retreated: true });
+    this.state.emit("combat_end", { combat, retreated: true, pursuitHits });
     return true;
   }
 }

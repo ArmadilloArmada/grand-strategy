@@ -18,11 +18,38 @@ export interface TerritoryData {
   hasFactory: boolean;
   isCapital: boolean;
   bombedUntilTurn?: number; // Strategic bombing: factory disabled until this turn
+  fortificationLevel?: 0 | 1 | 2;
   // Strategic enhancements
   resource?: ResourceType;
   terrain?: TerrainType;
   victoryPoints?: number; // Key strategic locations worth extra VPs
   defenseBonus?: number; // Natural defensive terrain bonus
+}
+
+export type CommanderAbilityType = 'blitz' | 'inspire' | 'fortify' | 'rally';
+
+export interface CommanderAbility {
+  type: CommanderAbilityType;
+  name: string;
+  description: string;
+  cooldownTurns: number;
+  lastUsedTurn?: number;
+}
+
+export type CommanderTraitId =
+  | 'iron_discipline'   // +1 defense for all units
+  | 'aggressive_push'   // +1 attack for all units
+  | 'veteran_eye'       // veteran bonus doubled
+  | 'last_stand'        // +2 defense when own unit count < 3
+  | 'shock_doctrine'    // +1 attack in round 1 only
+  | 'supply_master'     // ignores out-of-supply penalty
+  | 'legendary'         // +1 attack AND +1 defense (level 5 only)
+  | 'air_coordination'; // +1 to air unit attack/defense in same combat
+
+export interface CommanderTrait {
+  id: CommanderTraitId;
+  name: string;
+  description: string;
 }
 
 export interface Commander {
@@ -31,6 +58,13 @@ export interface Commander {
   attackBonus: number;
   defenseBonus: number;
   factionId: string;
+  ability?: CommanderAbility;
+  // Progression fields (default 0/1/[] for legacy commanders)
+  xp?: number;
+  level?: number;
+  battlesWon?: number;
+  battlesLost?: number;
+  traits?: CommanderTrait[];
 }
 
 export interface PlacedUnit {
@@ -39,6 +73,7 @@ export interface PlacedUnit {
   veteranCount?: number; // Battles survived; adds +1 attack/defense when > 0
   movedCount?: number; // Units that have already moved/attacked this turn
   commander?: Commander; // Named general attached to this unit stack
+  batteredUntilTurn?: number; // After retreat: -1 attack until this turn passes
 }
 
 export class Territory {
@@ -60,6 +95,7 @@ export class Territory {
   public owner: string | null;
   public units: PlacedUnit[] = [];
   public bombedUntilTurn: number = 0; // 0 = not bombed; factory disabled until turn N
+  public fortificationLevel: 0 | 1 | 2 = 0; // 0 = none, 1 = earthworks, 2 = bunker complex
 
   constructor(data: TerritoryData) {
     this.id = data.id;
@@ -74,6 +110,7 @@ export class Territory {
     this.hasFactory = data.hasFactory;
     this.isCapital = data.isCapital;
     this.bombedUntilTurn = (data as any).bombedUntilTurn ?? 0;
+    this.fortificationLevel = (data as any).fortificationLevel ?? 0;
     // Strategic properties with defaults
     this.resource = data.resource ?? null;
     this.terrain = data.terrain ?? 'plains';
@@ -219,6 +256,7 @@ export class Territory {
       hasFactory: this.hasFactory,
       isCapital: this.isCapital,
       bombedUntilTurn: this.bombedUntilTurn,
+      fortificationLevel: this.fortificationLevel,
       resource: this.resource,
       terrain: this.terrain,
       victoryPoints: this.victoryPoints,

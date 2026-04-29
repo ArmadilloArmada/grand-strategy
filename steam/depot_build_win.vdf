@@ -1,0 +1,23 @@
+"DepotBuild"
+{
+	// !! Replace 481 with your real depot ID !!
+	"DepotID"	"481"
+
+	// Path to the packaged Windows build produced by: npm run dist:steam
+	// electron-builder outputs to release/steam/Grand Strategy Setup X.X.X.exe
+	// For SteamPipe we want the unpacked directory, not the installer.
+	// Run: npm run pack  (produces release/win-unpacked/)
+	// or:  npx electron-builder --win --dir  (skip installer, just folder)
+	"ContentRoot"	"..\release\win-unpacked\"
+
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"Recursive"	"1"
+	}
+
+	// Exclude debug symbols from the depot
+	"FileExclusion"	"*.pdb"
+	"FileExclusion"	"*.map"
+}

@@ -2,6 +2,7 @@
  * CampaignManager - Handles campaign mode with linked scenarios
  * Tracks progress and carries bonuses between missions
  */
+import { achievementManager } from './AchievementManager';
 
 export interface CampaignMission {
   id: string;
@@ -351,6 +352,82 @@ export const CAMPAIGNS: Campaign[] = [
       },
     ],
   },
+  {
+    id: 'cold_war_campaign',
+    name: 'Cold War Crisis',
+    description: 'Navigate proxy wars and nuclear brinkmanship in three tense missions',
+    icon: '☢️',
+    unlockCondition: 'pacific_campaign',
+    missions: [
+      {
+        id: 'cold_war_1',
+        name: 'Proxy Conflict',
+        description: 'Support your allied faction in a regional proxy war without triggering open conflict',
+        mapId: 'grid-arctic',
+        faction: 'atlantic_alliance',
+        difficulty: 'normal',
+        objectives: [
+          { id: 'obj1', description: 'Capture 3 strategic territories', type: 'capture', target: 3 },
+          { id: 'obj2', description: 'Produce 10 units for your proxy forces', type: 'produce', target: 10 },
+        ],
+        bonusObjectives: [
+          { id: 'bonus1', description: 'Win without losing your capital', type: 'defend', target: 'capital' },
+        ],
+        rewards: [
+          { type: 'ipcs', value: 30, description: '+30 IPCs — CIA black budget' },
+          { type: 'tech', value: 'improved_infantry', description: 'Unlock Special Forces doctrine' },
+        ],
+        briefing: 'The superpowers fight in the shadows. Arm and support your proxy faction to seize regional control — but keep our direct involvement deniable.',
+        debriefingWin: 'The proxy war is won. Our faction now controls the region. Moscow is furious but powerless.',
+        debriefingLoss: 'Our proxy forces have been defeated. The region falls under enemy influence.',
+      },
+      {
+        id: 'cold_war_2',
+        name: 'Missile Crisis',
+        description: 'Enemy missiles have been detected. Blockade and negotiate before the clock runs out',
+        mapId: 'grid-arctic',
+        faction: 'atlantic_alliance',
+        difficulty: 'hard',
+        objectives: [
+          { id: 'obj1', description: 'Survive 6 turns without losing your capital', type: 'survive', target: 6 },
+          { id: 'obj2', description: 'Destroy the enemy missile sites (capture 2 territories)', type: 'capture', target: 2 },
+        ],
+        bonusObjectives: [
+          { id: 'bonus1', description: 'Complete within 8 turns', type: 'survive', target: 8 },
+        ],
+        rewards: [
+          { type: 'units', value: 'bomber:2,fighter:3', description: 'Strategic air wing deployed' },
+          { type: 'ipcs', value: 40, description: '+40 IPCs — defense emergency funding' },
+        ],
+        unlockCondition: 'cold_war_1',
+        briefing: 'Intelligence confirms enemy nuclear missiles within striking distance. We have days — not weeks — to resolve this. Show of force first, diplomacy if possible.',
+        debriefingWin: 'The crisis is defused. The missiles are gone. History will call this the closest the world ever came to annihilation.',
+        debriefingLoss: 'The standoff has broken down. The world holds its breath.',
+      },
+      {
+        id: 'cold_war_3',
+        name: 'Endgame',
+        description: 'The Cold War turns hot. Win decisively before mutual destruction becomes inevitable',
+        mapId: 'grid',
+        faction: 'atlantic_alliance',
+        difficulty: 'hard',
+        objectives: [
+          { id: 'obj1', description: 'Capture all enemy capitals', type: 'capture', target: 'all_capitals' },
+          { id: 'obj2', description: 'Eliminate all enemy forces', type: 'destroy', target: 'all' },
+        ],
+        bonusObjectives: [
+          { id: 'bonus1', description: 'Win in under 15 turns', type: 'survive', target: 15 },
+        ],
+        rewards: [
+          { type: 'bonus', value: 'victory_cold_war', description: 'Cold War Victory — You prevented the apocalypse.' },
+        ],
+        unlockCondition: 'cold_war_2',
+        briefing: 'Diplomacy has failed. The Cold War is hot. Strike fast, strike hard — conventional victory is the only way to prevent nuclear escalation.',
+        debriefingWin: 'Against all odds, you achieved conventional victory before either side reached for the button. The world is safe — for now.',
+        debriefingLoss: 'The war of attrition has ground your forces down. The enemy still stands.',
+      },
+    ],
+  },
 ];
 
 /** Minimal game state interface for objective checking */
@@ -605,6 +682,7 @@ export class CampaignManager {
     // Check if campaign complete
     if (progress.currentMissionIndex >= campaign.missions.length) {
       progress.completedAt = Date.now();
+      achievementManager.updateProgress('complete_campaign', 1, { mapId: campaignId });
     }
     
     this.save();

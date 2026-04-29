@@ -285,9 +285,9 @@ export class ReserveSystem {
     // Clear pending deployments
     this.pendingDeployments = [];
 
-    this.state.emit('units_deployed', {
-      factionId: faction.id, 
-      count: deployed,
+    this.state.emit('units_produced', {
+      factionId: faction.id,
+      placedCount: deployed,
       territories: Array.from(territories)
     });
 

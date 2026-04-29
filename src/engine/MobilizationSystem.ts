@@ -146,6 +146,31 @@ export class MobilizationSystem {
       cost = Math.max(1, cost - unitCostDiscount * totalUnits);
     }
 
+    // Resource bonuses — territories with strategic resources grant production advantages
+    if (territory.resource) {
+      switch (territory.resource) {
+        case 'oil':
+          // Oil: reduces mobilization cost by 2 (fuel subsidizes logistics)
+          cost = Math.max(1, cost - 2);
+          break;
+        case 'steel':
+          // Steel: factory territories add an extra tank to output
+          if (type === 'factory') units.push({ unitTypeId: 'tank', count: 1 });
+          break;
+        case 'food':
+          // Food: land territories add an extra infantry to output
+          if (type === 'land' || type === 'capital') units.push({ unitTypeId: 'infantry', count: 1 });
+          break;
+        case 'rare_earth':
+          // Rare earth: reduces cost slightly (export revenue funds the war chest)
+          cost = Math.max(1, cost - 1);
+          break;
+        case 'uranium':
+          // Uranium: already boosts nuclear readiness in NuclearSystem
+          break;
+      }
+    }
+
     // Check if can mobilize
     if (alreadyMobilized) {
       canMobilize = false;

@@ -51,11 +51,17 @@ export class DataLoader {
     factions: string;
     map: string;
   }): Promise<void> {
+    const fetchJson = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status} ${res.statusText}`);
+      return res.json();
+    };
+
     const [rulesData, unitsData, factionsData, mapData] = await Promise.all([
-      urls.rules ? fetch(urls.rules).then(r => r.json()) : Promise.resolve(undefined),
-      fetch(urls.units).then(r => r.json()),
-      fetch(urls.factions).then(r => r.json()),
-      fetch(urls.map).then(r => r.json()),
+      urls.rules ? fetchJson(urls.rules) : Promise.resolve(undefined),
+      fetchJson(urls.units),
+      fetchJson(urls.factions),
+      fetchJson(urls.map),
     ]);
 
     this.loadBundle({

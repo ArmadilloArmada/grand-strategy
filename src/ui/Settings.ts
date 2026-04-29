@@ -19,9 +19,24 @@ export interface GameSettings {
   masterVolume: number;
   sfxVolume: number;
   musicVolume: number;
+  // Display
+  theme: 'dark' | 'light';        // Dark war-room or light accessibility theme
+  // Dynamic Features (can be toggled independently)
+  battleNarratives: boolean;      // Story blurbs after each battle
+  commanderAbilities: boolean;    // Active commander skills with cooldowns
+  supplyLinePenalties: boolean;   // Show supply status; already in combat math
+  warTension: boolean;            // Escalating war tension that amplifies events
+  factionAbilities: boolean;      // Unique faction special powers
+  midGameObjectives: boolean;     // Random mid-game bonus objectives
+  aiTaunts: boolean;              // AI personality flavor text in toasts
+  battleAnimations: boolean;      // Pre-combat clash animation
+  commanderProgression: boolean;  // Commander XP leveling and trait unlocks
+  dynamicWeather: boolean;        // Seasonal weather events that affect combat
+  fortifications: boolean;        // Buildable earthworks and bunkers that boost defense
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
+  theme: 'dark',
   gameSpeed: 'normal',
   aiDifficulty: 'medium',
   aiPersonality: 'default',
@@ -34,6 +49,18 @@ const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   sfxVolume: 80,
   musicVolume: 60,
+  // Dynamic Features — all on by default
+  battleNarratives: true,
+  commanderAbilities: true,
+  supplyLinePenalties: true,
+  warTension: true,
+  factionAbilities: true,
+  midGameObjectives: true,
+  aiTaunts: true,
+  battleAnimations: true,
+  commanderProgression: true,
+  dynamicWeather: true,
+  fortifications: true,
 };
 
 class SettingsManager {
@@ -85,6 +112,15 @@ class SettingsManager {
       case 'slow': return 1200;
       case 'fast': return 300;
       default: return 600;
+    }
+  }
+
+  /** Convert gameSpeed to an AIController.setSpeed() multiplier */
+  getAISpeedMultiplier(): number {
+    switch (this.settings.gameSpeed) {
+      case 'slow': return 2.0;
+      case 'fast': return 0.25;
+      default: return 1.0;
     }
   }
 

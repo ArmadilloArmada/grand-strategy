@@ -24,6 +24,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showSaveDialog: () => ipcRenderer.invoke('show-save-dialog'),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
 
+  // Steam Workshop
+  getWorkshopItems: (query, tags) => ipcRenderer.invoke('get-workshop-items', query, tags),
+  subscribeWorkshopItem: (itemId) => ipcRenderer.invoke('subscribe-workshop-item', itemId),
+  unsubscribeWorkshopItem: (itemId) => ipcRenderer.invoke('unsubscribe-workshop-item', itemId),
+  publishToWorkshop: (args) => ipcRenderer.invoke('workshop-publish', args),
+  updateWorkshopItem: (args) => ipcRenderer.invoke('workshop-update', args),
+
   // Mod filesystem
   scanModsFolder: () => ipcRenderer.invoke('scan-mods-folder'),
   importModFile: () => ipcRenderer.invoke('import-mod-file'),

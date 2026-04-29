@@ -12,10 +12,10 @@ import { HUD } from './ui/HUD';
 import { SaveManager } from './ui/SaveManager';
 import { settings } from './ui/Settings';
 import { soundManager } from './audio/SoundManager';
-import { MultiplayerUI } from './network/MultiplayerUI';
 
 // New feature imports
 import { achievementManager } from './engine/AchievementManager';
+import { statisticsManager } from './engine/StatisticsManager';
 import { campaignManager, CampaignMission } from './engine/CampaignManager';
 import { tutorialManager } from './engine/TutorialManager';
 import { replayManager } from './engine/ReplayManager';
@@ -27,10 +27,14 @@ import { MoraleSystem } from './engine/MoraleSystem';
 import { EspionageSystem } from './engine/EspionageSystem';
 import { NuclearSystem } from './engine/NuclearSystem';
 import { getStartingCommander } from './data/commanders';
-import { networkManager, GameAction } from './network/NetworkManager';
+import { getAITaunt } from './engine/AITaunts';
+import { factionAbilityManager } from './engine/FactionAbilities';
 import { DebugPanel } from './ui/DebugPanel';
 import { ReplayUI } from './ui/ReplayUI';
 import { cloudSaveManager } from './engine/CloudSaveManager';
+import { WeatherSystem } from './engine/WeatherSystem';
+import { FortificationSystem } from './engine/FortificationSystem';
+import { dragManager } from './ui/DragManager';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -58,7 +62,11 @@ import _gridAmericasData from '../assets/maps/grid-americas.json';
 import _gridAfricaData from '../assets/maps/grid-africa.json';
 import _gridEasternFrontData from '../assets/maps/grid-eastern-front.json';
 import _gridSkirmishData from '../assets/maps/grid-skirmish.json';
-import { registerMap, getMapById } from './data/mapRegistry';
+import _gridMediterraneanData from '../assets/maps/grid-mediterranean.json';
+import _gridArcticData from '../assets/maps/grid-arctic.json';
+import _gridArchipelagoData from '../assets/maps/grid-archipelago.json';
+import { registerMap, getMapEntry, getMapById } from './data/mapRegistry';
+import { EUROPE_FACTIONS, PACIFIC_FACTIONS, AMERICAS_FACTIONS, AFRICA_FACTIONS, EASTERN_FRONT_FACTIONS, SKIRMISH_FACTIONS, MEDITERRANEAN_FACTIONS, ARCTIC_FACTIONS, ARCHIPELAGO_FACTIONS } from './data/mapFactions';
 import type { MapData } from './loaders/MapLoader';
 const gridMapData = _gridMapData as unknown as MapData;
 const tutorialMapData = _tutorialMapData as unknown as MapData;
@@ -68,6 +76,9 @@ const gridAmericasData = _gridAmericasData as unknown as MapData;
 const gridAfricaData = _gridAfricaData as unknown as MapData;
 const gridEasternFrontData = _gridEasternFrontData as unknown as MapData;
 const gridSkirmishData = _gridSkirmishData as unknown as MapData;
+const gridMediterraneanData = _gridMediterraneanData as unknown as MapData;
+const gridArcticData = _gridArcticData as unknown as MapData;
+const gridArchipelagoData = _gridArchipelagoData as unknown as MapData;
 
 /**
  * Main Game class - orchestrates all systems
@@ -80,7 +91,6 @@ class Game {
   private aiController: AIController;
   private dataLoader: DataLoader;
   private saveManager: SaveManager;
-  private multiplayerUI: MultiplayerUI;
   private eventsSystem: EventsSystem;
   private moraleSystem: MoraleSystem;
   private espionageSystem: EspionageSystem;
@@ -103,7 +113,6 @@ class Game {
     this.turnManager = new TurnManager(this.state);
     this.aiController = new AIController(this.state, this.turnManager);
     this.saveManager = new SaveManager(this.state);
-    this.multiplayerUI = new MultiplayerUI();
     this.eventsSystem = new EventsSystem(this.state);
     this.moraleSystem = new MoraleSystem(this.state);
     this.espionageSystem = new EspionageSystem(this.state);
@@ -114,23 +123,30 @@ class Game {
     this.state.systems.nuclearSystem = this.nuclearSystem;
     this.state.systems.aiController = this.aiController;
 
-    // Apply AI difficulty from settings
+    // Apply theme immediately from saved settings
+    this.applyTheme(settings.getSetting('theme') ?? 'dark');
+
+    // Apply AI difficulty and speed from settings
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
+    this.aiController.setSpeed(settings.getAISpeedMultiplier());
   }
 
   /**
    * Initialize the game
    */
   async init(): Promise<void> {
-    // Register available maps (grid maps only)
+    // Register available maps — themed maps supply their own faction definitions
     registerMap('grid', 'World at War (Grid)', gridMapData);
     registerMap('tutorial', 'Tutorial', tutorialMapData);
-    registerMap('grid-europe', 'European Theater (Grid)', gridEuropeData);
-    registerMap('grid-pacific', 'Pacific Ring (Grid)', gridPacificData);
-    registerMap('grid-americas', 'Western Hemisphere (Grid)', gridAmericasData);
-    registerMap('grid-africa', 'African Campaign (Grid)', gridAfricaData);
-    registerMap('grid-eastern-front', 'Eastern Front (Grid)', gridEasternFrontData);
-    registerMap('grid-skirmish', 'Skirmish 2v2 (Grid)', gridSkirmishData);
+    registerMap('grid-europe',        'European Theater (Grid)',   gridEuropeData,       undefined, EUROPE_FACTIONS);
+    registerMap('grid-pacific',       'Pacific Ring (Grid)',       gridPacificData,      undefined, PACIFIC_FACTIONS);
+    registerMap('grid-americas',      'Western Hemisphere (Grid)', gridAmericasData,     undefined, AMERICAS_FACTIONS);
+    registerMap('grid-africa',        'African Campaign (Grid)',   gridAfricaData,       undefined, AFRICA_FACTIONS);
+    registerMap('grid-eastern-front',  'Eastern Front (Grid)',       gridEasternFrontData,  undefined, EASTERN_FRONT_FACTIONS);
+    registerMap('grid-skirmish',       'Skirmish 2v2 (Grid)',        gridSkirmishData,      undefined, SKIRMISH_FACTIONS);
+    registerMap('grid-mediterranean',  'Mediterranean Theater (Grid)', gridMediterraneanData, undefined, MEDITERRANEAN_FACTIONS);
+    registerMap('grid-arctic',         'Arctic Circle (Grid)',        gridArcticData,        undefined, ARCTIC_FACTIONS);
+    registerMap('grid-archipelago',    'Island Chains (Grid)',        gridArchipelagoData,   undefined, ARCHIPELAGO_FACTIONS);
 
     // Load game data (default map - grid for easier clicking)
     this.dataLoader.loadBundle({
@@ -142,6 +158,7 @@ class Game {
     // Initialize renderer and HUD
     this.renderer = new MapRenderer(this.state, 'game-canvas');
     this.hud = new HUD(this.state, this.turnManager, this.renderer);
+    this.hud.setAISpeedCallback((multiplier) => this.aiController.setSpeed(multiplier));
     // DebugPanel registers DOM/keyboard listeners and manages its own lifecycle
     new DebugPanel(this.state, this.turnManager);
 
@@ -157,43 +174,15 @@ class Game {
     this.state.on('phase_end', () => this.autoSave());
     this.state.on('turn_end', () => this.checkVictory());
 
-    // Multiplayer: apply incoming actions from other players
-    networkManager.on('game_action', (raw: any) => this.applyNetworkAction(raw as GameAction));
-
-    // Multiplayer: handle desync detection
-    networkManager.on('state_verify', (msg: { checksum: number; turnNumber: number; phase: string }) => {
-      const localChecksum = this.state.computeChecksum();
-      if (localChecksum !== msg.checksum) {
-        console.error(
-          `[Desync] Turn ${msg.turnNumber} phase "${msg.phase}": ` +
-          `remote=${msg.checksum} local=${localChecksum}`
-        );
-        this.hud.showToast(
-          `⚠️ State desync on turn ${msg.turnNumber}. Reload from host to resync.`,
-          'info'
-        );
-      }
-    });
-
-    // Multiplayer: surface connection loss to the player
-    networkManager.on('connection_lost', (data: { attempt: number; maxAttempts: number }) => {
-      if (this.isGameStarted) {
-        this.hud.showToast(
-          `🔌 Connection lost — reconnecting (${data.attempt}/${data.maxAttempts})…`,
-          'info'
-        );
-      }
-    });
-    networkManager.on('connection_failed', () => {
-      if (this.isGameStarted) {
-        this.hud.showToast('❌ Connection lost. Could not reconnect to server.', 'info');
-      }
-    });
+    // Stamp the build version into the main-menu version label
+    const versionEl = document.getElementById('main-menu-version');
+    if (versionEl) versionEl.textContent = `v${__APP_VERSION__} · Press H for help`;
 
     // Setup UI event listeners
     this.setupMenuListeners();
     this.setupSettingsListeners();
     this.setupKeyboardShortcuts();
+    this.setupElectronMenuListeners();
     this.setupCrashHandler();
 
     // Initialize Steam integration (if available)
@@ -246,10 +235,31 @@ class Game {
       steamManager.unlockAchievement(achievement.id);
     });
 
+    // Wire dynamic feature callbacks
+    this.hud.setupObjectiveCallbacks();
+
+    // Faction ability button
+    document.getElementById('btn-faction-ability')?.addEventListener('click', () => {
+      this.hud.onFactionAbilityClick();
+    });
+
     // Wire replay recording events (recordAction is a no-op when not recording)
     this.state.on('combat_end', (e: any) => {
-      const data = e.data as { attackingFactionId: string };
-      replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, data.attackingFactionId ?? '', 'combat_result', e.data);
+      const data = e.data as { combat?: { winner?: string; attackingFactionId?: string; defendingFactionId?: string; territoryId?: string }; attackingFactionId?: string; xpOutcome?: { attackerResult?: { leveledUp?: boolean }; defenderResult?: { leveledUp?: boolean } } };
+      const combat = data.combat;
+      const attackerId = combat?.attackingFactionId ?? data.attackingFactionId ?? '';
+      replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, attackerId, 'combat_result', e.data);
+      if (data.xpOutcome?.attackerResult?.leveledUp) achievementManager.updateProgress('commander_leveled', 1);
+      if (data.xpOutcome?.defenderResult?.leveledUp) achievementManager.updateProgress('commander_leveled', 1);
+      // Morale: battle victory reduces war weariness for the winning side
+      if (combat?.winner === 'attacker' && combat.attackingFactionId) {
+        const ter = combat.territoryId ? this.state.territories.get(combat.territoryId) : null;
+        this.state.systems.moraleSystem?.recordVictory?.(
+          combat.attackingFactionId,
+          ter?.isCapital ?? false,
+          ter?.hasFactory ?? false,
+        );
+      }
     });
     this.state.on('units_produced', (e: any) => {
       const data = e.data as { factionId: string };
@@ -258,6 +268,48 @@ class Game {
     this.state.on('phase_end', () => {
       const faction = this.state.getCurrentFaction();
       replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, faction?.id ?? '', 'phase_end', { phase: this.state.currentPhase });
+    });
+    this.state.on('units_moved', (e: any) => {
+      const d = e.data as { unitTypeId: string; count: number; from: string; to: string };
+      const faction = this.state.getCurrentFaction();
+      replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, faction?.id ?? '', 'move', {
+        unitTypeId: d.unitTypeId,
+        count: d.count,
+        fromId: d.from,
+        toId: d.to,
+      });
+    });
+    this.state.on('tech_researched', (e: any) => {
+      const d = e.data as { factionId: string; techId: string };
+      replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, d.factionId, 'research', { techId: d.techId });
+    });
+    this.state.on('espionage_result', (e: any) => {
+      achievementManager.updateProgress('espionage_op', 1);
+      const d = e.data as { factionId?: string; success?: boolean };
+      if (d.factionId) statisticsManager.trackEspionageOp(d.factionId, d.success ?? false);
+    });
+    this.state.on('nuclear_strike', (e: any) => {
+      achievementManager.updateProgress('nuclear_strike', 1);
+      const d = e.data as { factionId?: string };
+      if (d.factionId) statisticsManager.trackNukeLaunched(d.factionId);
+    });
+    this.state.on('fortification_built', (e: any) => {
+      achievementManager.updateProgress('fortification_built', 1);
+      const d = e.data as { factionId?: string };
+      if (d.factionId) statisticsManager.trackFortificationBuilt(d.factionId);
+    });
+    this.state.on('alliance_formed', (e: any) => {
+      achievementManager.updateProgress('alliance_formed', 1);
+      const d = e.data as { factionId?: string };
+      if (d.factionId) statisticsManager.trackAllianceFormed(d.factionId);
+    });
+    this.state.on('pact_formed', (e: any) => {
+      const d = e.data as { factionId?: string };
+      if (d.factionId) statisticsManager.trackPactFormed(d.factionId);
+    });
+    this.state.on('alliance_betrayed', (e: any) => {
+      const d = e.data as { factionId?: string };
+      if (d.factionId) statisticsManager.trackBetrayal(d.factionId);
     });
 
     // If the map editor stored a preview map, auto-start with it
@@ -284,6 +336,9 @@ class Game {
     }
 
     console.log('✓ Game initialized!');
+
+    // Set up drag for panels visible on the main menu screen
+    dragManager.setup();
   }
 
   /**
@@ -310,15 +365,17 @@ class Game {
    */
   startNewGame(): void {
     const mapId = this.hud.gameConfig.mapId ?? 'grid';
-    const mapToLoad = getMapById(mapId) ?? gridMapData;
-    
+    const mapEntry = getMapEntry(mapId);
+    const mapToLoad = mapEntry?.data ?? gridMapData;
+    const mapFactions = (mapEntry?.factions ?? factionsData) as import('./data/Faction').FactionData[];
+
     // Get units for selected era
     const unitEra = this.hud.gameConfig.unitEra ?? 'wwii';
     const eraUnits = UNIT_ERAS[unitEra]?.data ?? wwiiUnitsData;
     // Reset game state by reloading data
     this.dataLoader.loadBundle({
       units: eraUnits as import('./data/Unit').UnitTypeData[],
-      factions: factionsData,
+      factions: mapFactions,
       map: mapToLoad,
     });
 
@@ -343,6 +400,40 @@ class Game {
 
     // Start the game
     this.turnManager.startGame();
+
+    // Reset dynamic feature systems for fresh game
+    this.hud.tensionSystem.reset();
+    factionAbilityManager.reset();
+
+    // Wire optional systems based on settings
+    if (settings.getSetting('dynamicWeather')) {
+      this.state.systems.weatherSystem = new WeatherSystem(this.state);
+    } else {
+      this.state.systems.weatherSystem = undefined;
+    }
+
+    const humanFactionIds = this.hud.gameConfig.humanFactions ?? [];
+    if (settings.getSetting('commanderProgression') && humanFactionIds.length > 0) {
+      // When commanderAbilities is off, pass empty array so all trait picks are auto-selected
+      this.state.systems.commanderProgression = {
+        playerFactionIds: settings.getSetting('commanderAbilities') ? humanFactionIds : [],
+      };
+    } else {
+      this.state.systems.commanderProgression = undefined;
+    }
+
+    if (settings.getSetting('fortifications')) {
+      this.state.systems.fortificationSystem = new FortificationSystem(this.state);
+    } else {
+      this.state.systems.fortificationSystem = undefined;
+    }
+
+    // Fresh ability state for this game session (tracks in-flight ability effects)
+    this.state.systems.abilityState = {
+      pendingIPCBonuses: new Map(),
+      scorchedTerritories: new Map(),
+      islandHoppingTurns: new Map(),
+    };
 
     // Start replay recording
     const recordFactions = this.state.factionRegistry.getAll().map(f => f.id);
@@ -393,8 +484,8 @@ class Game {
           if (!this.activeCampaignId) return;
           const combat = (e.data as any)?.combat;
           if (!combat) return;
-          const humanFaction = this.hud.gameConfig.humanFactions?.[0];
-          if (combat.attackingFactionId === humanFaction) {
+          const humanFactions = this.hud.gameConfig.humanFactions ?? [];
+          if (humanFactions.includes(combat.attackingFactionId)) {
             const defenderLosses = (combat.defenders as Array<{ casualties: number }>)
               ?.reduce((sum: number, d: { casualties: number }) => sum + (d.casualties ?? 0), 0) ?? 0;
             if (defenderLosses > 0) campaignManager.trackUnitsDestroyed(defenderLosses);
@@ -404,8 +495,8 @@ class Game {
         this.state.on('territory_mobilized', (e) => {
           if (!this.activeCampaignId) return;
           const data = e.data as any;
-          const humanFaction = this.hud.gameConfig.humanFactions?.[0];
-          if (data?.factionId === humanFaction && data?.count) {
+          const humanFactions = this.hud.gameConfig.humanFactions ?? [];
+          if (humanFactions.includes(data?.factionId) && data?.count) {
             campaignManager.trackUnitsProduced(data.count as number);
           }
         })
@@ -453,6 +544,12 @@ class Game {
     const modal = document.getElementById('main-menu-modal');
     if (modal) modal.classList.remove('hidden');
 
+    // Hide HUD elements that have no meaning without an active game
+    document.getElementById('turn-info')?.classList.add('hidden');
+    document.getElementById('resources')?.classList.add('hidden');
+    document.getElementById('action-buttons')?.classList.add('hidden');
+    document.getElementById('selection-info')?.classList.add('hidden');
+
     // Update continue button state
     const continueBtn = document.getElementById('btn-continue-game') as HTMLButtonElement;
     if (continueBtn) {
@@ -466,6 +563,15 @@ class Game {
   hideMainMenu(): void {
     const modal = document.getElementById('main-menu-modal');
     if (modal) modal.classList.add('hidden');
+
+    // Restore HUD elements
+    document.getElementById('turn-info')?.classList.remove('hidden');
+    document.getElementById('resources')?.classList.remove('hidden');
+    document.getElementById('action-buttons')?.classList.remove('hidden');
+    document.getElementById('selection-info')?.classList.remove('hidden');
+
+    // Enable drag for gameplay panels now that they are visible
+    requestAnimationFrame(() => dragManager.setup());
   }
 
   /**
@@ -584,28 +690,6 @@ class Game {
   hideSaveLoadModal(): void {
     const modal = document.getElementById('save-load-modal');
     if (modal) modal.classList.add('hidden');
-  }
-
-  /**
-   * Show multiplayer modal
-   */
-  showMultiplayer(): void {
-    const modal = document.getElementById('multiplayer-modal');
-    if (modal) modal.classList.remove('hidden');
-    
-    const content = document.getElementById('multiplayer-content');
-    if (content) {
-      this.multiplayerUI.show(content);
-    }
-  }
-
-  /**
-   * Hide multiplayer modal
-   */
-  hideMultiplayer(): void {
-    const modal = document.getElementById('multiplayer-modal');
-    if (modal) modal.classList.add('hidden');
-    this.multiplayerUI.hide();
   }
 
   /**
@@ -980,11 +1064,11 @@ class Game {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
-        if (confirm('Delete this save?')) {
+        this.showConfirm('Delete Save?', 'This save slot will be permanently deleted.', () => {
           this.saveManager.deleteSlot(slotId);
           this.renderSaveSlots();
           this.hud.showToast('Save deleted', 'info');
-        }
+        });
       });
     });
   }
@@ -1008,6 +1092,18 @@ class Game {
     (document.getElementById('setting-master-volume') as HTMLInputElement).value = s.masterVolume.toString();
     (document.getElementById('setting-animations') as HTMLInputElement).checked = s.animationsEnabled;
     (document.getElementById('setting-territory-names') as HTMLInputElement).checked = s.showTerritoryNames;
+    (document.getElementById('setting-battle-narratives') as HTMLInputElement).checked = s.battleNarratives ?? true;
+    (document.getElementById('setting-commander-abilities') as HTMLInputElement).checked = s.commanderAbilities ?? true;
+    (document.getElementById('setting-supply-lines') as HTMLInputElement).checked = s.supplyLinePenalties ?? true;
+    (document.getElementById('setting-war-tension') as HTMLInputElement).checked = s.warTension ?? true;
+    (document.getElementById('setting-faction-abilities') as HTMLInputElement).checked = s.factionAbilities ?? true;
+    (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked = s.midGameObjectives ?? true;
+    (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked = s.aiTaunts ?? true;
+    (document.getElementById('setting-battle-animations') as HTMLInputElement).checked = s.battleAnimations ?? true;
+    (document.getElementById('setting-commander-progression') as HTMLInputElement).checked = s.commanderProgression ?? true;
+    (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
+    (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
+    (document.getElementById('setting-theme') as HTMLSelectElement).value = s.theme ?? 'dark';
   }
 
   /**
@@ -1033,7 +1129,21 @@ class Game {
       masterVolume: parseInt((document.getElementById('setting-master-volume') as HTMLInputElement).value),
       animationsEnabled: (document.getElementById('setting-animations') as HTMLInputElement).checked,
       showTerritoryNames: (document.getElementById('setting-territory-names') as HTMLInputElement).checked,
+      battleNarratives: (document.getElementById('setting-battle-narratives') as HTMLInputElement).checked,
+      commanderAbilities: (document.getElementById('setting-commander-abilities') as HTMLInputElement).checked,
+      supplyLinePenalties: (document.getElementById('setting-supply-lines') as HTMLInputElement).checked,
+      warTension: (document.getElementById('setting-war-tension') as HTMLInputElement).checked,
+      factionAbilities: (document.getElementById('setting-faction-abilities') as HTMLInputElement).checked,
+      midGameObjectives: (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked,
+      aiTaunts: (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked,
+      battleAnimations: (document.getElementById('setting-battle-animations') as HTMLInputElement).checked,
+      commanderProgression: (document.getElementById('setting-commander-progression') as HTMLInputElement).checked,
+      dynamicWeather: (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked,
+      fortifications: (document.getElementById('setting-fortifications') as HTMLInputElement).checked,
+      theme: (document.getElementById('setting-theme') as HTMLSelectElement).value as 'dark' | 'light',
     });
+
+    this.applyTheme(settings.getSetting('theme'));
 
     // Apply AI difficulty and personality
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -1043,10 +1153,25 @@ class Game {
     this.hud.showToast('Settings saved!', 'success');
   }
 
+  applyTheme(theme: 'dark' | 'light'): void {
+    document.body.classList.toggle('theme-dark', theme === 'dark');
+    document.body.classList.toggle('theme-light', theme === 'light');
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+
   /**
    * Setup menu button listeners
    */
   private setupMenuListeners(): void {
+    // Theme toggle button in HUD
+    document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+      const current = settings.getSetting('theme') ?? 'dark';
+      const next: 'dark' | 'light' = current === 'dark' ? 'light' : 'dark';
+      settings.update({ theme: next });
+      this.applyTheme(next);
+    });
+
     // Quick Start - Classic Mode
     document.getElementById('btn-quick-classic')?.addEventListener('click', () => {
       this.confirmLeaveGame(() => {
@@ -1074,10 +1199,17 @@ class Game {
       this.startNewGame();
     });
 
-    // Track victory winner for campaign debriefing
+    // Track victory winner for campaign debriefing + AI victory taunts
     this.state.on('victory', (e) => {
       const data = e.data as { winner: string };
       this.lastGameWinnerFaction = data.winner;
+      if (settings.getSetting('aiTaunts')) {
+        const winner = this.state.factionRegistry.get(data.winner);
+        if (winner?.controlledBy === 'ai') {
+          const taunt = getAITaunt(data.winner, 'victory');
+          setTimeout(() => this.hud.showToast(`💬 ${taunt}`, 'info'), 2000);
+        }
+      }
     });
 
     // Victory/defeat screen: return to main menu (or show campaign debriefing)
@@ -1118,14 +1250,6 @@ class Game {
       this.confirmLeaveGame(() => {
         this.showSaveLoadModal('load');
       });
-    });
-
-    document.getElementById('btn-multiplayer')?.addEventListener('click', () => {
-      this.showMultiplayer();
-    });
-
-    document.getElementById('btn-close-multiplayer')?.addEventListener('click', () => {
-      this.hideMultiplayer();
     });
 
     document.getElementById('btn-open-settings')?.addEventListener('click', () => {
@@ -1207,18 +1331,97 @@ class Game {
       this.hud.showTutorial();
     });
 
+    document.getElementById('btn-resign')?.addEventListener('click', () => {
+      this.hideGameMenu();
+      this.showConfirm(
+        'Resign Game?',
+        'You will be counted as defeated. The game will continue without you.',
+        () => {
+          const humanFaction = this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human');
+          if (!humanFaction) return;
+          humanFaction.defeat();
+          this.state.emit('faction_defeated', { factionId: humanFaction.id, factionName: humanFaction.name });
+          const winner = this.turnManager.checkVictory();
+          if (winner) {
+            this.state.emit('victory', { winner: winner.id });
+          } else {
+            // No winner yet — return to menu since human is out
+            this.isGameStarted = false;
+            this.showMainMenu();
+          }
+        }
+      );
+    });
+
     document.getElementById('btn-main-menu')?.addEventListener('click', () => {
-      if (confirm('Return to main menu? Unsaved progress will be lost.')) {
-        this.hideGameMenu();
-        this.isGameStarted = false;
-        this.showMainMenu();
-      }
+      this.showConfirm(
+        'Return to Main Menu?',
+        'Unsaved progress will be lost.',
+        () => {
+          this.hideGameMenu();
+          this.isGameStarted = false;
+          this.showMainMenu();
+        }
+      );
+    });
+
+    // Confirm modal
+    document.getElementById('confirm-cancel')?.addEventListener('click', () => {
+      document.getElementById('confirm-modal')?.classList.add('hidden');
+    });
+    document.getElementById('confirm-modal')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('confirm-modal'))
+        document.getElementById('confirm-modal')?.classList.add('hidden');
     });
 
     // Save/load modal
     document.getElementById('btn-close-save-load')?.addEventListener('click', () => {
       this.hideSaveLoadModal();
     });
+
+    document.getElementById('btn-export-save')?.addEventListener('click', () => {
+      // Export the first non-empty slot, or slot 1 if all empty
+      const slots = this.saveManager.getSlots();
+      const target = slots.find(s => !s.isEmpty) ?? slots[0];
+      if (!this.saveManager.exportToFile(target.id)) {
+        this.hud.showToast('No save to export', 'info');
+      }
+    });
+
+    document.getElementById('btn-import-save')?.addEventListener('click', async () => {
+      // Import into the first empty slot, or slot 1 if all full
+      const slots = this.saveManager.getSlots();
+      const target = slots.find(s => s.isEmpty) ?? slots[0];
+      const ok = await this.saveManager.importFromFile(target.id);
+      if (ok) {
+        this.renderSaveSlots();
+        this.hud.showToast('Save imported!', 'success');
+      } else {
+        this.hud.showToast('Import failed — invalid save file', 'info');
+      }
+    });
+  }
+
+  /**
+   * Show a styled confirmation dialog instead of the browser-native confirm().
+   */
+  showConfirm(title: string, message: string, onConfirm: () => void): void {
+    const modal = document.getElementById('confirm-modal')!;
+    const titleEl = document.getElementById('confirm-title')!;
+    const msgEl = document.getElementById('confirm-message')!;
+    const okBtn = document.getElementById('confirm-ok')!;
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    modal.classList.remove('hidden');
+
+    const handler = () => {
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', handler);
+      onConfirm();
+    };
+    okBtn.removeEventListener('click', handler);
+    okBtn.addEventListener('click', handler);
   }
 
   /**
@@ -1230,11 +1433,17 @@ class Game {
     });
 
     document.getElementById('btn-reset-settings')?.addEventListener('click', () => {
-      if (confirm('Reset all settings to default?')) {
+      this.showConfirm('Reset Settings?', 'All settings will return to their defaults.', () => {
         settings.reset();
-        this.showSettings(); // Refresh UI
+        this.showSettings();
         this.hud.showToast('Settings reset', 'info');
-      }
+      });
+    });
+
+    document.getElementById('btn-reset-layout')?.addEventListener('click', () => {
+      this.showConfirm('Reset Panel Layout?', 'All panels will return to their default positions.', () => {
+        dragManager.resetLayout();
+      });
     });
   }
 
@@ -1392,7 +1601,9 @@ class Game {
       
       // Hot seat mode - show banner
       if (this.hud.gameConfig.mode === 'hotseat') {
-        await this.hud.showHotSeatBanner(faction.name, faction.color);
+        const humanFactions = this.hud.gameConfig.humanFactions ?? [];
+        const playerNum = humanFactions.indexOf(faction.id) + 1;
+        await this.hud.showHotSeatBanner(faction.name, faction.color, playerNum);
       }
       
       // Update UI for human
@@ -1410,8 +1621,8 @@ class Game {
       this.hud.showToast(`${faction.name}: ${aiEvent.name}`, 'info');
     } else if (aiEvent && aiEvent.type === 'choice' && aiEvent.choices) {
       // AI picks first non-costly option or the cheapest one
-      const affordableChoice = aiEvent.choices.find(c => !c.cost || c.cost <= faction.ipcs) || aiEvent.choices[0];
-      this.eventsSystem.applyEvent(aiEvent, faction.id, affordableChoice.id);
+      const affordableChoice = aiEvent.choices.find(c => !c.cost || c.cost <= faction.ipcs) ?? aiEvent.choices[0];
+      if (affordableChoice) this.eventsSystem.applyEvent(aiEvent, faction.id, affordableChoice.id);
     }
     
     // Show AI indicator
@@ -1550,60 +1761,6 @@ class Game {
   /**
    * Auto save at end of each phase
    */
-  /**
-   * Apply a game action received from another player via multiplayer
-   */
-  private applyNetworkAction(action: GameAction): void {
-    if (!this.isGameStarted) return;
-    switch (action.type) {
-      case 'advance_phase':
-        this.turnManager.advancePhase();
-        break;
-      case 'move_units': {
-        const from = this.state.territories.get(action.fromId);
-        const to   = this.state.territories.get(action.toId);
-        if (from && to) {
-          from.removeUnits(action.unitTypeId, action.count);
-          if (!to.owner && from.owner) to.owner = from.owner;
-          to.addUnits(action.unitTypeId, action.count);
-        }
-        break;
-      }
-      case 'purchase_units': {
-        const t = this.state.territories.get(action.territoryId);
-        if (t) t.addUnits(action.unitTypeId, action.count);
-        break;
-      }
-      case 'research_tech': {
-        const tm = this.state.systems.technologyManager;
-        if (tm?.startResearch) tm.startResearch(action.factionId, action.techId);
-        break;
-      }
-      case 'combat_result': {
-        for (const [uid, count] of Object.entries(action.attackerLosses)) {
-          this.state.territories.get(action.fromId)?.removeUnits(uid, count);
-        }
-        for (const [uid, count] of Object.entries(action.defenderLosses)) {
-          this.state.territories.get(action.toId)?.removeUnits(uid, count);
-        }
-        if (action.captured && action.newOwner) {
-          const to = this.state.territories.get(action.toId);
-          if (to) to.owner = action.newOwner;
-        }
-        break;
-      }
-    }
-    this.renderer.render();
-
-    // Broadcast checksum so peers can verify state consistency
-    if (networkManager.isConnected()) {
-      networkManager.sendStateChecksum(
-        this.state.computeChecksum(),
-        this.state.turnNumber,
-        this.state.currentPhase
-      );
-    }
-  }
 
   private autoSave(): void {
     if (this.isGameStarted && this.hud.gameConfig.autoSave) {
@@ -1704,10 +1861,54 @@ class Game {
       showCrashDialog(msg);
     };
 
-    // Stop cloud sync interval cleanly when the page/app unloads
+    // Auto-save and stop cloud sync cleanly when the page/app unloads
     window.addEventListener('beforeunload', () => {
+      if (this.isGameStarted) this.saveManager.autoSave();
       cloudSaveManager.stopAutoSync();
     });
+  }
+
+  /**
+   * Wire native OS menu items exposed by the Electron preload.
+   * Each handler mirrors the equivalent keyboard shortcut / button action.
+   */
+  private setupElectronMenuListeners(): void {
+    const api = window.electronAPI;
+    if (!api) return;
+
+    api.onMenuNewGame?.(() => {
+      if (this.isGameStarted) {
+        this.showConfirm('Start New Game?', 'Unsaved progress will be lost.', () => {
+          this.isGameStarted = false;
+          this.showMainMenu();
+        });
+      } else {
+        this.showMainMenu();
+      }
+    });
+
+    api.onMenuSaveGame?.(() => {
+      if (this.isGameStarted) {
+        this.saveManager.quickSave();
+        this.hud.showToast('Quick saved!', 'success');
+      }
+    });
+
+    api.onMenuLoadGame?.(() => {
+      if (this.saveManager.quickLoad()) {
+        this.renderer.render();
+        this.hud.updateTurnInfo();
+        this.hud.showToast('Quick loaded!', 'success');
+      }
+    });
+
+    api.onMenuSettings?.(() => this.showSettings());
+
+    api.onMenuHelp?.(() => this.hud.showTutorial());
+
+    api.onMenuZoomIn?.(() => this.renderer.zoom(1.2));
+    api.onMenuZoomOut?.(() => this.renderer.zoom(0.8));
+    api.onMenuZoomReset?.(() => this.renderer.fitToScreen());
   }
 
   /**

@@ -103,6 +103,30 @@ const STEAM_ACHIEVEMENTS: SteamAchievement[] = [
     hidden: false,
   },
   {
+    id: 'war_machine',
+    apiName: 'ACH_WAR_MACHINE',
+    name: 'War Machine',
+    description: 'Produce 500 units',
+    icon: 'ach_war_machine.png',
+    hidden: false,
+  },
+  {
+    id: 'millionaire',
+    apiName: 'ACH_MILLIONAIRE',
+    name: 'Millionaire',
+    description: 'Earn 1000 IPCs total',
+    icon: 'ach_millionaire.png',
+    hidden: false,
+  },
+  {
+    id: 'billionaire',
+    apiName: 'ACH_BILLIONAIRE',
+    name: 'Billionaire',
+    description: 'Earn 10000 IPCs total',
+    icon: 'ach_billionaire.png',
+    hidden: false,
+  },
+  {
     id: 'veteran',
     apiName: 'ACH_VETERAN',
     name: 'Veteran',
@@ -116,6 +140,30 @@ const STEAM_ACHIEVEMENTS: SteamAchievement[] = [
     name: 'Master Strategist',
     description: 'Win 50 games',
     icon: 'ach_master.png',
+    hidden: false,
+  },
+  {
+    id: 'legendary_commander',
+    apiName: 'ACH_LEGENDARY_COMMANDER',
+    name: 'Legendary Commander',
+    description: 'Win 100 games',
+    icon: 'ach_legendary.png',
+    hidden: false,
+  },
+  {
+    id: 'underdog',
+    apiName: 'ACH_UNDERDOG',
+    name: 'Underdog Victory',
+    description: 'Win when controlling fewer territories than enemy',
+    icon: 'ach_underdog.png',
+    hidden: true,
+  },
+  {
+    id: 'winning_streak',
+    apiName: 'ACH_WINNING_STREAK',
+    name: 'On Fire',
+    description: 'Win 5 games in a row',
+    icon: 'ach_streak.png',
     hidden: false,
   },
   {
@@ -254,100 +302,91 @@ export class SteamManager {
    * Get Workshop items (mods) from Steam
    */
   async getWorkshopItems(_query?: string, _tags?: string[]): Promise<WorkshopItem[]> {
-    // In a real implementation, this would call the Steam Workshop API
-    // For now, return mock data
-    
-    return [
-      {
-        id: 'workshop_1',
-        title: 'WWII Realism Mod',
-        description: 'Adds historically accurate unit stats and mechanics',
-        author: 'HistoryBuff42',
-        authorId: '12345',
-        tags: ['gameplay', 'historical'],
-        subscriberCount: 1250,
-        rating: 4.5,
-        createdAt: Date.now() - 86400000 * 30,
-        updatedAt: Date.now() - 86400000 * 5,
-        size: 1024 * 500,
-      },
-      {
-        id: 'workshop_2',
-        title: 'Cold War Map Pack',
-        description: 'New maps set during the Cold War era',
-        author: 'MapMaker99',
-        authorId: '67890',
-        tags: ['maps', 'cold_war'],
-        subscriberCount: 850,
-        rating: 4.2,
-        createdAt: Date.now() - 86400000 * 60,
-        updatedAt: Date.now() - 86400000 * 10,
-        size: 1024 * 1024 * 2,
-      },
-      {
-        id: 'workshop_3',
-        title: 'Modern Warfare Units',
-        description: 'Adds modern military units like drones and stealth fighters',
-        author: 'TechWarrior',
-        authorId: '11111',
-        tags: ['units', 'modern'],
-        subscriberCount: 2100,
-        rating: 4.8,
-        createdAt: Date.now() - 86400000 * 90,
-        updatedAt: Date.now() - 86400000 * 2,
-        size: 1024 * 750,
-      },
-    ];
+    if (!this.isInitialized) return [];
+    try {
+      return (await window.electronAPI?.getWorkshopItems?.(_query, _tags)) ?? [];
+    } catch {
+      return [];
+    }
   }
   
   /**
    * Subscribe to a Workshop item
    */
-  async subscribeToItem(_itemId: string): Promise<boolean> {
-    // Would call Steam Workshop API
-    return true;
+  async subscribeToItem(itemId: string): Promise<boolean> {
+    if (!this.isInitialized) return false;
+    try { return (await window.electronAPI?.subscribeWorkshopItem?.(itemId)) ?? false; } catch { return false; }
   }
 
   /**
    * Unsubscribe from a Workshop item
    */
-  async unsubscribeFromItem(_itemId: string): Promise<boolean> {
-    // Would call Steam Workshop API
-    return true;
+  async unsubscribeFromItem(itemId: string): Promise<boolean> {
+    if (!this.isInitialized) return false;
+    try { return (await window.electronAPI?.unsubscribeWorkshopItem?.(itemId)) ?? false; } catch { return false; }
   }
   
   /**
    * Get subscribed items
    */
   async getSubscribedItems(): Promise<WorkshopItem[]> {
-    // Would call Steam Workshop API
-    return [];
+    return this.getWorkshopItems(undefined, ['subscribed']);
   }
-  
+
   /**
-   * Publish a mod to Workshop
+   * Publish a mod to Workshop.
+   * modData is a JSON string (the mod file content). Returns the new item ID or null on failure.
    */
   async publishToWorkshop(
-    _title: string,
-    _description: string,
-    _tags: string[],
-    _modData: string,
-    _previewImage?: string
+    title: string,
+    description: string,
+    tags: string[],
+    modData: string,
+    previewImage?: string
   ): Promise<string | null> {
-    // Would call Steam Workshop API
-    // Returns workshop item ID on success
-    return `workshop_${Date.now()}`;
+    if (!this.isInitialized) return null;
+    try {
+      // Write modData to a temp file path the main process can read.
+      // We pass the content directly; main.cjs writes it to a temp dir.
+      const result = await (window.electronAPI as any)?.publishToWorkshop?.({
+        title,
+        description,
+        tags,
+        modData,
+        previewPath: previewImage,
+      });
+      if (result?.success) return result.itemId ?? null;
+      if (result?.error) console.warn('[SteamManager] publishToWorkshop:', result.error);
+      return null;
+    } catch (e) {
+      console.error('[SteamManager] publishToWorkshop failed:', e);
+      return null;
+    }
   }
-  
+
   /**
-   * Update a published Workshop item
+   * Update a published Workshop item.
    */
   async updateWorkshopItem(
-    _itemId: string,
-    _updates: Partial<{ title: string; description: string; tags: string[]; modData: string }>
+    itemId: string,
+    updates: Partial<{ title: string; description: string; tags: string[]; modData: string }>
   ): Promise<boolean> {
-    // Would call Steam Workshop API
-    return true;
+    if (!this.isInitialized) return false;
+    try {
+      const result = await (window.electronAPI as any)?.updateWorkshopItem?.({
+        itemId,
+        title: updates.title,
+        description: updates.description,
+        tags: updates.tags,
+        modData: updates.modData,
+      });
+      if (result?.success) return true;
+      if (result?.error) console.warn('[SteamManager] updateWorkshopItem:', result.error);
+      return false;
+    } catch (e) {
+      console.error('[SteamManager] updateWorkshopItem failed:', e);
+      return false;
+    }
   }
   
   /**

@@ -1,14 +1,12 @@
 {
   "name": "grand-strategy",
-  "version": "1.0.0",
-  "description": "A modern grand strategy wargame inspired by TripleA",
+  "version": "0.1.0",
+  "description": "A turn-based grand strategy wargame of global conquest",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:19123 && node electron/launch.cjs\"",
-    "dev:multiplayer": "concurrently \"vite\" \"npm run server\"",
-    "server": "cd server && node index.js",
-    "server:install": "cd server && npm install",
+    "generate-icons": "node scripts/generate-icons.cjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
@@ -18,7 +16,8 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder -mwl",
-    "dist:steam": "npm run build && electron-builder --win --config electron-builder-steam.json"
+    "dist:steam": "npm run build && electron-builder --win --config electron-builder-steam.json",
+    "pack:steam": "npm run build && electron-builder --win --dir"
   },
   "keywords": [
     "strategy",

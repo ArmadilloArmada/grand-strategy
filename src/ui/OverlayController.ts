@@ -1,5 +1,5 @@
 /**
- * OverlayController - Manages map overlay modes (movement range / threat)
+ * OverlayController - Manages map overlay modes (movement range / threat / economic)
  * Extracted from HUD.ts to reduce its size
  */
 
@@ -7,10 +7,10 @@ import { GameState } from '../engine/GameState';
 import { MapRenderer } from '../renderer/MapRenderer';
 
 export interface OverlayCallbacks {
-  showToast: (message: string, type: 'info' | 'success') => void;
+  showToast: (message: string, type: 'info' | 'success' | 'error') => void;
 }
 
-export type OverlayMode = 'off' | 'range' | 'threat';
+export type OverlayMode = 'off' | 'range' | 'threat' | 'economic';
 
 export class OverlayController {
   private mode: OverlayMode = 'off';
@@ -30,10 +30,11 @@ export class OverlayController {
     this.apply();
   }
 
-  /** Cycle through off → range → threat → off */
+  /** Cycle through off → range → threat → economic → off */
   cycle(): void {
     if (this.mode === 'off') this.mode = 'range';
     else if (this.mode === 'range') this.mode = 'threat';
+    else if (this.mode === 'threat') this.mode = 'economic';
     else this.mode = 'off';
 
     this.apply();
@@ -43,6 +44,7 @@ export class OverlayController {
       off: 'Overlays off',
       range: 'Movement/attack range',
       threat: 'Threat (enemy reach)',
+      economic: 'Economic heat map (IPC values)',
     };
     this.callbacks.showToast(labels[this.mode], 'info');
   }
@@ -53,8 +55,10 @@ export class OverlayController {
       this.renderer.setOverlayMode('off');
     } else if (this.mode === 'range') {
       this.renderer.setOverlayMode('range');
-    } else {
+    } else if (this.mode === 'threat') {
       this.renderer.setOverlayMode('threat', this.getThreatTerritoryIds());
+    } else {
+      this.renderer.setOverlayMode('economic');
     }
   }
 

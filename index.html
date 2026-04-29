@@ -5,9 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grand Strategy - Board Game</title>
   <link rel="stylesheet" href="/src/styles/main.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+  <link rel="icon" href="assets/icon.png">
 </head>
 <body>
+  <!-- Crash screen — shown by the error handler below if the app throws before recovering -->
+  <div id="crash-screen" style="display:none;position:fixed;inset:0;background:#0d1a0f;color:#e8e8d0;font-family:Georgia,serif;z-index:99999;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;">
+    <div style="font-size:3rem;margin-bottom:1rem;">⚔️</div>
+    <h1 style="color:#c89620;margin:0 0 0.5rem;letter-spacing:0.1em;">GRAND STRATEGY</h1>
+    <p style="color:#94a3b8;margin:0 0 1.5rem;">An unexpected error occurred. The game cannot continue.</p>
+    <pre id="crash-detail" style="background:#1a2f1a;padding:1rem;border-radius:4px;max-width:640px;overflow:auto;font-size:0.7rem;color:#f87171;text-align:left;white-space:pre-wrap;"></pre>
+    <button onclick="location.reload()" style="margin-top:1.5rem;padding:0.75rem 2.5rem;background:#c89620;color:#0d1a0f;border:none;border-radius:4px;cursor:pointer;font-size:1rem;font-weight:bold;letter-spacing:0.05em;">RELOAD GAME</button>
+  </div>
+  <script>
+    (function () {
+      function showCrash(msg) {
+        var s = document.getElementById('crash-screen');
+        var d = document.getElementById('crash-detail');
+        if (s && d) { s.style.display = 'flex'; d.textContent = msg; }
+      }
+      window.addEventListener('error', function (e) {
+        showCrash(e.error ? (e.error.stack || e.error.message) : String(e.message));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        // Promise rejections are logged but don't hard-crash the UI
+        console.error('[Unhandled Promise]', e.reason);
+      });
+    })();
+  </script>
   <!-- Skip link for keyboard navigation - WCAG 2.1 requirement -->
   <a href="#game-canvas" class="skip-link">Skip to game</a>
   
@@ -26,19 +50,34 @@
     <!-- Zoom Controls -->
     <div id="zoom-controls">
       <button id="btn-zoom-in" title="Zoom In">+</button>
-      <button id="btn-zoom-fit" title="Fit to Screen (F)">⊡</button>
       <button id="btn-zoom-out" title="Zoom Out">−</button>
+      <button id="btn-zoom-fit" title="Reset view to fit the whole map (F)" style="font-size:0.72rem;padding:0.3rem 0.55rem;letter-spacing:0.01em;">⊡ Reset View</button>
       <button id="btn-overlay" title="Toggle overlays: range / threat (O)">⊞ Overlay</button>
     </div>
     
     <!-- Battle Log Panel -->
-    <div id="battle-log-panel" class="collapsed">
+    <div id="battle-log-panel">
       <div id="battle-log-header">
         <span>📜 Battle Log</span>
-        <button id="btn-toggle-log">▼</button>
+        <div style="display:flex;align-items:center;gap:0.3rem;">
+          <button id="btn-clear-log" title="Clear log">🗑</button>
+          <button id="btn-toggle-log">▼</button>
+        </div>
       </div>
       <div id="battle-log-content">
-        <!-- Log entries populated by JS -->
+        <div id="battle-log-search">
+          <input id="blog-filter-text" type="text" placeholder="Search…">
+          <select id="blog-filter-type">
+            <option value="all">All</option>
+            <option value="combat">⚔️ Combat</option>
+            <option value="capture">🚩 Capture</option>
+            <option value="build">🏭 Build</option>
+            <option value="income">💰 Income</option>
+            <option value="move">➡️ Move</option>
+            <option value="general">📋 Event</option>
+          </select>
+        </div>
+        <div id="battle-log-entries"></div>
       </div>
     </div>
 
@@ -60,6 +99,8 @@
           <span id="current-faction">-</span>
           <span id="current-phase">-</span>
           <span id="turn-number">Turn 1</span>
+          <span id="tension-badge" class="hidden" style="font-size:0.6rem;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,0.25);letter-spacing:0.04em;white-space:nowrap;font-family:sans-serif;"></span>
+          <span id="weather-badge" class="hidden" style="font-size:0.6rem;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,0.25);letter-spacing:0.04em;white-space:nowrap;font-family:sans-serif;" title="Current weather"></span>
           <span id="turn-indicator" class="your-turn hidden">YOUR TURN</span>
           <span id="save-indicator" class="save-indicator hidden" title="Game saved">💾 Saved</span>
         </div>
@@ -125,13 +166,15 @@
         <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
         <button id="btn-strategic-bomb" disabled class="hidden" title="Strategic bombing mission" aria-label="Strategic bombing">💣 Bomb Factory</button>
         <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
+        <button id="btn-fortify" disabled class="hidden" title="Build or upgrade fortification (5 IPCs → earthworks, +8 IPCs → bunker)" aria-label="Build fortification">🏰 Fortify</button>
         <div class="btn-separator"></div>
-        <button id="btn-research" class="utility-btn" title="Research technologies" aria-label="Research technologies">🔬</button>
-        <button id="btn-diplomacy" class="utility-btn" title="Diplomatic relations" aria-label="Diplomatic relations">🤝</button>
-        <button id="btn-espionage" class="utility-btn" title="Espionage operations" aria-label="Espionage operations">🕵️</button>
-        <button id="btn-nuclear" class="utility-btn hidden" title="Launch nuclear strike (readiness must be 100%)" aria-label="Launch nuclear strike">☢️</button>
-        <button id="btn-stats" class="utility-btn" title="View game statistics" aria-label="View game statistics">📊</button>
-        <button id="btn-fog-toggle" class="utility-btn" title="Toggle fog of war" aria-label="Toggle fog of war">🌫️</button>
+        <button id="btn-research" class="utility-btn" title="Research technologies" aria-label="Research technologies">🔬 Tech</button>
+        <button id="btn-diplomacy" class="utility-btn" title="Diplomatic relations" aria-label="Diplomatic relations">🤝 Diplo</button>
+        <button id="btn-espionage" class="utility-btn" title="Espionage operations" aria-label="Espionage operations">🕵️ Spy</button>
+        <button id="btn-nuclear" class="utility-btn hidden" title="Launch nuclear strike (readiness must be 100%)" aria-label="Launch nuclear strike">☢️ Nuke</button>
+        <button id="btn-stats" class="utility-btn" title="View game statistics" aria-label="View game statistics">📊 Stats</button>
+        <button id="btn-fog-toggle" class="utility-btn" title="Toggle fog of war" aria-label="Toggle fog of war">🌫️ Fog</button>
+        <button id="btn-theme-toggle" class="utility-btn" title="Toggle dark / light theme" aria-label="Toggle theme">🌓</button>
         <div class="btn-separator"></div>
         <button id="btn-end-phase" aria-label="End current phase">➡️ End Phase</button>
         <button id="btn-menu" title="Open main menu" aria-label="Open main menu">☰</button>
@@ -147,6 +190,32 @@
       </div>
     </div>
     
+    <!-- War Tension Bar -->
+    <!-- tension-bar-container kept for JS compatibility but display handled by #tension-badge in turn-banner -->
+    <div id="tension-bar-container" class="hidden" aria-hidden="true">
+      <div id="tension-label"></div>
+      <div><div id="tension-bar-fill"></div></div>
+    </div>
+
+    <!-- Objectives Panel — right sidebar, below faction panel -->
+    <div id="objectives-panel" class="hidden" style="position:fixed;right:1rem;top:8rem;z-index:200;width:220px;background:rgba(13,26,15,0.92);border:1px solid #2a4f2a;border-radius:6px;padding:8px 10px;backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.4);">
+      <div style="font-size:0.7rem;color:#c89620;letter-spacing:0.08em;margin-bottom:6px;border-bottom:1px solid #2a3f2a;padding-bottom:4px;">⭐ OBJECTIVES</div>
+      <div id="objectives-list" style="display:flex;flex-direction:column;gap:6px;font-size:0.65rem;color:#94a3b8;">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Supply Warning Indicator — sits just above the battle log -->
+    <div id="supply-indicator" class="hidden" style="position:fixed;left:0;bottom:228px;z-index:250;background:rgba(180,60,20,0.92);color:#fff;font-size:0.7rem;padding:4px 12px;border-radius:0 4px 4px 0;border:1px solid #f87171;border-left:none;letter-spacing:0.05em;">
+      ⚠ SUPPLY CRITICAL
+    </div>
+
+    <!-- Faction Ability Button — sits above supply indicator -->
+    <div id="faction-ability-container" class="hidden" style="position:fixed;left:0;bottom:262px;z-index:250;">
+      <button id="btn-faction-ability" style="background:#0f2a1a;border:1px solid #c89620;border-left:none;color:#c89620;padding:5px 12px;border-radius:0 4px 4px 0;cursor:pointer;font-size:0.72rem;letter-spacing:0.04em;white-space:nowrap;">⚡ FACTION ABILITY</button>
+      <div id="faction-ability-desc" style="font-size:0.6rem;color:#94a3b8;margin-top:2px;padding-left:4px;max-width:180px;"></div>
+    </div>
+
     <!-- Toast Container with ARIA live region for screen readers -->
     <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
     
@@ -164,7 +233,7 @@
             <h1 id="main-menu-title" class="main-menu-title">GRAND<br>STRATEGY</h1>
             <p class="main-menu-tagline">A turn-based game of global conquest</p>
           </div>
-          <p class="main-menu-version">v1.0.0 · Press H for help</p>
+          <p class="main-menu-version" id="main-menu-version">v0.1.0 · Press H for help</p>
         </div>
 
         <!-- ── Navigation Panel ── -->
@@ -207,13 +276,6 @@
             <button id="btn-load-game" class="menu-btn">
               <span class="menu-btn-icon">📂</span>
               <div class="menu-btn-label">Load Saved Game</div>
-            </button>
-            <button id="btn-multiplayer" class="menu-btn">
-              <span class="menu-btn-icon">🌐</span>
-              <div>
-                <div class="menu-btn-label">Multiplayer</div>
-                <div class="menu-btn-sub">Online Play</div>
-              </div>
             </button>
           </div>
 
@@ -390,14 +452,27 @@
     <div id="game-menu-modal" class="modal hidden">
       <div class="modal-content" style="text-align: center;">
         <h2>☰ Game Menu</h2>
-        
+
         <div class="menu-button-group">
           <button id="btn-resume" class="primary">▶️ Resume Game</button>
           <button id="btn-save-game">💾 Save Game</button>
           <button id="btn-load-game-ingame">📂 Load Game</button>
           <button id="btn-settings-ingame">⚙️ Settings</button>
           <button id="btn-how-to-play">❓ How to Play</button>
+          <button id="btn-resign" class="danger" style="opacity:0.8;">🏳️ Resign</button>
           <button id="btn-main-menu" class="danger">🏠 Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Dialog Modal -->
+    <div id="confirm-modal" class="modal hidden">
+      <div class="modal-content" style="text-align:center;max-width:400px;">
+        <h2 id="confirm-title">Confirm</h2>
+        <p id="confirm-message" style="color:#94a3b8;margin:0.5rem 0 1.5rem;"></p>
+        <div style="display:flex;gap:0.75rem;justify-content:center;">
+          <button id="confirm-cancel">Cancel</button>
+          <button id="confirm-ok" class="danger">Confirm</button>
         </div>
       </div>
     </div>
@@ -411,7 +486,9 @@
           <!-- Slots populated by JS -->
         </div>
         
-        <div style="text-align: center; margin-top: 1rem;">
+        <div style="text-align: center; margin-top: 1rem; display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+          <button id="btn-export-save" title="Download selected slot as a file">⬇ Export</button>
+          <button id="btn-import-save" title="Load a save file into selected slot">⬆ Import</button>
           <button id="btn-close-save-load">Close</button>
         </div>
       </div>
@@ -485,18 +562,90 @@
         
         <div class="settings-section">
           <h3>Display</h3>
-          
+
+          <div class="setting-row">
+            <label>Theme</label>
+            <select id="setting-theme">
+              <option value="dark">Dark (War Room)</option>
+              <option value="light">Light (Accessibility)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <label>Panel Layout</label>
+            <button id="btn-reset-layout" style="padding:0.35rem 0.9rem;font-size:0.85rem;">↺ Reset Layout</button>
+          </div>
+
           <div class="setting-row">
             <label>Animations</label>
             <input type="checkbox" id="setting-animations" checked>
           </div>
-          
+
           <div class="setting-row">
             <label>Show Territory Names</label>
             <input type="checkbox" id="setting-territory-names" checked>
           </div>
         </div>
-        
+
+        <div class="settings-section">
+          <h3>Dynamic Features</h3>
+
+          <div class="setting-row">
+            <label title="Narrative text after each battle describing the outcome">Battle Narratives</label>
+            <input type="checkbox" id="setting-battle-narratives" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Generals use special abilities during combat (Inspire, Blitz, Fortify, Rally)">Commander Abilities</label>
+            <input type="checkbox" id="setting-commander-abilities" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Units cut off from supply routes fight at reduced effectiveness">Supply Line Penalties</label>
+            <input type="checkbox" id="setting-supply-lines" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Global war tension rises with battles and captures, unlocking escalation events">War Tension Meter</label>
+            <input type="checkbox" id="setting-war-tension" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Each faction has a unique cooldown-based special power">Faction Abilities</label>
+            <input type="checkbox" id="setting-faction-abilities" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Random bonus objectives appear mid-game with IPC and research rewards">Mid-Game Objectives</label>
+            <input type="checkbox" id="setting-mid-objectives" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="AI factions speak contextual flavor lines during battles and diplomacy">AI Taunts</label>
+            <input type="checkbox" id="setting-ai-taunts" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Brief slide-in animation before each battle resolves">Battle Animations</label>
+            <input type="checkbox" id="setting-battle-animations" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Commanders gain XP from battles, level up (1–5), and unlock combat traits">Commander Progression</label>
+            <input type="checkbox" id="setting-commander-progression" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Season-driven weather events (fog, storms, blizzards) alter attack, defense, and movement">Dynamic Weather</label>
+            <input type="checkbox" id="setting-dynamic-weather" checked>
+          </div>
+
+          <div class="setting-row">
+            <label title="Spend IPCs to build earthworks (+1) or bunker complexes (+2) that permanently boost territory defense">Fortifications</label>
+            <input type="checkbox" id="setting-fortifications" checked>
+          </div>
+        </div>
+
         <div style="text-align: center; margin-top: 1.5rem;">
           <button id="btn-save-settings" class="primary">Save Settings</button>
           <button id="btn-reset-settings">Reset to Default</button>
@@ -656,14 +805,16 @@
           <div class="tutorial-text">
             <strong>Espionage &amp; Covert Operations</strong><br><br>
             Open the <strong>🕵️ Espionage</strong> panel to run secret operations against enemies:<br>
-            &nbsp;• <em>Gather Intel</em> (5 IPCs) — reveal enemy units in all their territories<br>
-            &nbsp;• <em>Sabotage Factory</em> (10 IPCs) — shut down a factory for 1 turn<br>
-            &nbsp;• <em>Steal Technology</em> (15 IPCs) — copy research progress from enemies<br>
-            &nbsp;• <em>Economic Disruption</em> (15 IPCs) — steal 15% of their treasury<br>
-            &nbsp;• <em>Propaganda</em> (10 IPCs) — boost enemy war weariness<br>
-            &nbsp;• <em>Nuclear Secrets</em> (25 IPCs) — gain 30% nuclear readiness instantly<br><br>
-            Operations can <strong>fail</strong> (enemy discovers your spy) and even trigger war!
-            The <strong>Eastern Coalition</strong> has built-in counter-intelligence.
+            &nbsp;• <em>Gather Intel</em> (5 IPCs, 70%) — reveal enemy units in one territory for 3 turns<br>
+            &nbsp;• <em>Sabotage Factory</em> (10 IPCs, 55%) — shut down one factory for 1 turn<br>
+            &nbsp;• <em>Propaganda</em> (10 IPCs, 60%) — raise enemy war weariness by 20 points<br>
+            &nbsp;• <em>Steal Technology</em> (15 IPCs, 40%) — copy 5 research points from enemies<br>
+            &nbsp;• <em>Economic Disruption</em> (15 IPCs, 45%) — steal 15% of their treasury<br>
+            &nbsp;• <em>Assassinate General</em> (20 IPCs, 35%) — cut enemy attack by 1 for 3 turns<br>
+            &nbsp;• <em>Infrastructure Attack</em> (20 IPCs, 40%) — disable two factories for 2 turns each<br>
+            &nbsp;• <em>Nuclear Secrets</em> (25 IPCs, 30%) — gain 30% nuclear readiness instantly<br><br>
+            Operations can <strong>fail</strong> and expose your spy — triggering war!
+            The <strong>Eastern Coalition</strong> has +30% counter-intelligence.
           </div>
         </div>
 
@@ -672,14 +823,17 @@
           <div class="tutorial-image">☢️</div>
           <div class="tutorial-text">
             <strong>Technology &amp; Nuclear Weapons</strong><br><br>
-            Open <strong>🔬 Research</strong> to invest IPCs into technologies each turn:<br>
-            &nbsp;• <em>Advanced Industry</em> — cheaper units<br>
-            &nbsp;• <em>Radar</em> — stronger air defense<br>
-            &nbsp;• <em>Nuclear Program</em> — unlocks nuclear strikes<br><br>
-            Once you research <strong>Nuclear Program</strong>, your readiness charges 20%/turn
-            (uranium territories speed this up). At 100%, launch a devastating strike:<br>
+            Open <strong>🔬 Research</strong> to invest IPCs into technologies each turn.
+            Six categories, each with a tree of upgrades:<br>
+            &nbsp;🛡️ <em>Infantry</em> — Improved Infantry → Elite Training → Assault Tactics<br>
+            &nbsp;🔥 <em>Armor</em> — Heavy Tanks → Blitzkrieg Tactics / Rocket Artillery<br>
+            &nbsp;✈️ <em>Air</em> — Radar Network · Long Range Aircraft → Jet Engines / Carrier Superiority<br>
+            &nbsp;⚓ <em>Naval</em> — Advanced Shipyards → Submarine Warfare<br>
+            &nbsp;🏭 <em>Economy</em> — Industrialization (+10% income) → War Economy (+15% production)<br>
+            &nbsp;☢️ <em>Special</em> — Espionage Network · Nuclear Program (requires Jet Engines)<br><br>
+            <strong>Nuclear Program</strong> (40 IPCs) charges readiness over 5 turns. At 100%:<br>
             &nbsp;• Destroys ~80% of units in the target territory<br>
-            &nbsp;• Bombs any factory there for 5 turns<br>
+            &nbsp;• Disables any factory there for 5 turns<br>
             &nbsp;• All factions gain +40 war weariness against you — use wisely!
           </div>
         </div>
@@ -887,6 +1041,9 @@
         <h3>📈 Your Statistics</h3>
         <div id="stats-player" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;"></div>
         
+        <h3>😤 War Weariness</h3>
+        <div id="stats-morale" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+
         <h3>📊 All-Time Stats</h3>
         <div id="stats-persistent" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; font-size: 0.9rem;"></div>
         
@@ -1003,18 +1160,6 @@
       </div>
     </div>
 
-    <!-- Multiplayer Modal -->
-    <div id="multiplayer-modal" class="modal hidden">
-      <div class="modal-content" style="max-width: 600px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h2>🌐 Multiplayer</h2>
-          <button id="btn-close-multiplayer" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: inherit;">×</button>
-        </div>
-        <div id="multiplayer-content">
-          <!-- Populated by MultiplayerUI -->
-        </div>
-      </div>
-    </div>
 
     <!-- Achievements Modal -->
     <div id="achievements-modal" class="modal hidden">

@@ -9,11 +9,8 @@ import { MobilizationSystem, MobilizationOption } from '../engine/MobilizationSy
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
-import { GameAction } from '../network/NetworkManager';
-
 export interface ProductionCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
-  sendAction(action: GameAction): void;
   updateMobilizationHighlights(): void;
   updateSelectionInfo(): void;
 }
@@ -156,10 +153,6 @@ export class ProductionUI {
       this.callbacks.showToast(`Mobilized ${territory?.name}: ${unitsDesc}`, 'success');
       soundManager.play('build');
 
-      for (const u of result.unitsSpawned ?? []) {
-        this.callbacks.sendAction({ type: 'purchase_units', territoryId, unitTypeId: u.unitTypeId, count: u.count });
-      }
-
       const faction = this.state.getCurrentFaction();
       if (faction) {
         battleLog.logBuild(this.state.turnNumber, faction.name, faction.color,
@@ -205,10 +198,6 @@ export class ProductionUI {
 
       this.callbacks.showToast(`⚔️ ${territory?.name}: ${unitsDesc}`, 'success');
       soundManager.play('build');
-
-      for (const u of result.unitsSpawned ?? []) {
-        this.callbacks.sendAction({ type: 'purchase_units', territoryId, unitTypeId: u.unitTypeId, count: u.count });
-      }
 
       const faction = this.state.getCurrentFaction();
       if (faction) {
@@ -391,6 +380,13 @@ export class ProductionUI {
                                  background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.4);
                                  color: #1a7a5c; cursor: pointer; ${reserve.count === 0 || selectedZone.remainingCapacity === 0 ? 'opacity: 0.3; cursor: not-allowed;' : ''}"
                           ${reserve.count === 0 || selectedZone.remainingCapacity === 0 ? 'disabled' : ''}>+</button>
+                  <button class="deploy-all" data-unit="${reserve.unitTypeId}" data-max="${reserve.count}"
+                          title="Queue all ${reserve.count} ${unit?.name ?? ''} to this zone"
+                          style="padding: 0 8px; height: 32px; font-size: 0.7rem; border-radius: 6px;
+                                 background: rgba(99,102,241,0.18); border: 1px solid rgba(99,102,241,0.4);
+                                 color: #818cf8; cursor: pointer; white-space: nowrap;
+                                 ${reserve.count === 0 || selectedZone.remainingCapacity === 0 ? 'opacity: 0.3; cursor: not-allowed;' : ''}"
+                          ${reserve.count === 0 || selectedZone.remainingCapacity === 0 ? 'disabled' : ''}>All</button>
                 </div>
               </div>
             `;
@@ -424,6 +420,26 @@ export class ProductionUI {
                 if (unitTypeId && this.selectedDeployZone) {
                   this.productionManager.removeDeployment(unitTypeId, this.selectedDeployZone, 1);
                   soundManager.play('click');
+                  this.updateDeploymentOptions();
+                }
+              });
+            });
+
+            unitControlsEl.querySelectorAll('.deploy-all:not([disabled])').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const unitTypeId = btn.getAttribute('data-unit');
+                const max = parseInt(btn.getAttribute('data-max') ?? '0', 10);
+                if (!unitTypeId || !this.selectedDeployZone || max <= 0) return;
+                let deployed = 0;
+                for (let i = 0; i < max; i++) {
+                  const result = this.productionManager.queueDeployment(unitTypeId, this.selectedDeployZone, 1);
+                  if (!result.success) break;
+                  deployed++;
+                }
+                if (deployed > 0) {
+                  soundManager.play('click');
+                  this.callbacks.showToast(`Queued all ${deployed} units`, 'success');
                   this.updateDeploymentOptions();
                 }
               });

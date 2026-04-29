@@ -20,9 +20,11 @@ export interface Achievement {
 }
 
 export interface AchievementCondition {
-  type: 'win_games' | 'win_faction' | 'capture_territories' | 'destroy_units' | 
+  type: 'win_games' | 'win_faction' | 'capture_territories' | 'destroy_units' |
         'produce_units' | 'earn_ipcs' | 'complete_campaign' | 'win_streak' |
-        'speed_victory' | 'domination' | 'no_losses' | 'underdog' | 'custom';
+        'speed_victory' | 'domination' | 'no_losses' | 'underdog' | 'custom' |
+        'espionage_op' | 'nuclear_strike' | 'fortification_built' | 'alliance_formed' |
+        'commander_leveled';
   value: number;
   faction?: string;
   mapId?: string;
@@ -219,6 +221,111 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'win_streak', value: 5 },
   },
   
+  // Espionage achievements
+  {
+    id: 'spymaster_novice',
+    name: 'Spymaster',
+    description: 'Execute your first spy operation',
+    icon: '🕵️',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'espionage_op', value: 1 },
+  },
+  {
+    id: 'spymaster_veteran',
+    name: 'Shadow Broker',
+    description: 'Execute 10 spy operations',
+    icon: '🌑',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'espionage_op', value: 10 },
+  },
+  {
+    id: 'spymaster_elite',
+    name: 'Grand Spymaster',
+    description: 'Execute 25 spy operations',
+    icon: '🎭',
+    category: 'special',
+    hidden: true,
+    condition: { type: 'espionage_op', value: 25 },
+  },
+  // Nuclear achievements
+  {
+    id: 'nuclear_deterrent',
+    name: 'Nuclear Deterrent',
+    description: 'Launch a nuclear strike',
+    icon: '☢️',
+    category: 'special',
+    hidden: true,
+    condition: { type: 'nuclear_strike', value: 1 },
+  },
+  {
+    id: 'nuclear_superpower',
+    name: 'Nuclear Superpower',
+    description: 'Launch 3 nuclear strikes',
+    icon: '💥',
+    category: 'special',
+    hidden: true,
+    condition: { type: 'nuclear_strike', value: 3 },
+  },
+  // Fortification achievements
+  {
+    id: 'trench_digger',
+    name: 'Trench Digger',
+    description: 'Build your first fortification',
+    icon: '🏗️',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'fortification_built', value: 1 },
+  },
+  {
+    id: 'fortress_commander',
+    name: 'Fortress Commander',
+    description: 'Build 10 fortifications',
+    icon: '🏰',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'fortification_built', value: 10 },
+  },
+  // Alliance achievements
+  {
+    id: 'diplomat',
+    name: 'Diplomat',
+    description: 'Form your first alliance',
+    icon: '🤝',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'alliance_formed', value: 1 },
+  },
+  {
+    id: 'coalition_builder',
+    name: 'Coalition Builder',
+    description: 'Form 5 alliances across different games',
+    icon: '🌐',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'alliance_formed', value: 5 },
+  },
+  // Commander achievements
+  {
+    id: 'promoted',
+    name: 'Promoted',
+    description: 'Level up a commander',
+    icon: '⭐',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'commander_leveled', value: 1 },
+  },
+  {
+    id: 'field_marshal',
+    name: 'Field Marshal',
+    description: 'Level up commanders 10 times',
+    icon: '🎖️',
+    category: 'special',
+    hidden: false,
+    condition: { type: 'commander_leveled', value: 10 },
+  },
+
   // Campaign achievements
   {
     id: 'campaign_europe',
@@ -248,13 +355,22 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'complete_campaign', value: 1, mapId: 'world' },
   },
   {
+    id: 'campaign_cold_war',
+    name: 'Cold Warrior',
+    description: 'Complete the Cold War Crisis campaign',
+    icon: '☢️',
+    category: 'campaign',
+    hidden: false,
+    condition: { type: 'complete_campaign', value: 1, mapId: 'cold_war_campaign' },
+  },
+  {
     id: 'grand_strategist',
     name: 'Grand Strategist',
     description: 'Complete all campaigns',
     icon: '👑',
     category: 'campaign',
     hidden: true,
-    condition: { type: 'complete_campaign', value: 3 },
+    condition: { type: 'complete_campaign', value: 4 },
   },
 ];
 

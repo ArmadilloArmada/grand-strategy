@@ -81,7 +81,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'turn_info',
         title: 'Turn & Phase',
-        message: 'The game is played in turns. Each turn has phases: Build, Combat, Movement, and Income.',
+        message: 'The game is played in turns. Classic mode has 6 phases: Purchase → Combat Move → Combat → Non-Combat Move → Production → Collect Income. Quick mode simplifies to 3: Build → Move/Attack → End.',
         target: '#turn-info',
         targetType: 'element',
         position: 'bottom',
@@ -111,7 +111,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'unit_types',
         title: 'Unit Types',
-        message: 'Infantry, Tanks, Fighters, Bombers, and Ships - each has different strengths. Infantry are cheap but weak. Tanks are powerful but expensive.',
+        message: 'Land: Infantry (cheap, defensive), Mech Infantry (mobile inf.), Artillery (boosts infantry attack), Tank (powerful, can blitz), Anti-Air (shoots aircraft). Air: Fighter (air superiority), Bomber (strategic bombing). Naval: Submarine (convoy raider), Destroyer (sub hunter), Cruiser, Carrier (hosts 2 fighters, 2 HP), Battleship (2 HP), Transport (carries troops).',
         position: 'center',
         action: 'any',
       },
@@ -192,7 +192,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'unit_costs',
         title: 'Unit Costs (Land)',
-        message: 'Infantry: 4 IPCs · Artillery: 5 IPCs · Mech Infantry: 6 IPCs · Tank: 8 IPCs. Naval: Submarine 8 · Destroyer 10 · Cruiser/Fighter 14 · Carrier 18 · Bomber 16 · Battleship 24. Balance your army by role!',
+        message: 'Land — Infantry: 4 · Artillery: 5 · Anti-Air: 6 · Mech Infantry: 6 · Tank: 8. Air — Fighter: 14 · Bomber: 16. Naval — Submarine: 8 · Transport: 8 · Destroyer: 10 · Cruiser: 14 · Carrier: 18 · Battleship: 24. Balance your purchases by role!',
         position: 'center',
         action: 'any',
       },
@@ -227,7 +227,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'victory_types',
         title: 'Victory Types',
-        message: 'Domination: Control all capitals. Economic: Reach a certain IPC threshold. Elimination: Destroy all enemy units.',
+        message: 'Capitals: Capture 3 enemy capitals. Domination: Control 75% of all territories. Economic: Accumulate 500 total IPCs earned. Elimination: Last faction standing. Victory type is set before the game starts.',
         position: 'center',
         action: 'any',
       },

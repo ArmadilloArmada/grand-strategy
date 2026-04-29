@@ -196,11 +196,13 @@ export class DiplomacyManager {
       case 'pact':
         rel.state = 'pact';
         rel.pactExpiresAt = this.state.turnNumber + proposal.duration;
+        this.state.emit('pact_formed', { factionId: proposal.fromId, toId: proposal.toId });
         break;
 
       case 'alliance':
         rel.state = 'alliance';
         rel.allianceExpiresAt = this.state.turnNumber + proposal.duration;
+        this.state.emit('alliance_formed', { factionId: proposal.fromId, toId: proposal.toId });
         break;
 
       case 'trade_deal':

@@ -8,6 +8,7 @@ import { statisticsManager } from '../engine/StatisticsManager';
 import { achievementManager } from '../engine/AchievementManager';
 import { soundManager } from '../audio/SoundManager';
 import { recordGameEnd } from '../engine/PersistentStats';
+import { settings } from './Settings';
 
 export interface VictoryCallbacks {
   showMainMenu(): void;
@@ -29,7 +30,21 @@ export class VictoryScreen {
     const factionIds = this.state.factionRegistry.getAll().map(f => f.id);
     if (factionIds.length > 0) {
       const durationMin = Math.max(0, (Date.now() - config.startTime) / 60000);
-      recordGameEnd(factionIds, data.winner, durationMin);
+      const killsByFaction: Record<string, number> = {};
+      const lossesByFaction: Record<string, number> = {};
+      for (const fid of factionIds) {
+        const fs = statisticsManager.getFactionStats(fid);
+        killsByFaction[fid] = fs?.unitsKilled ?? 0;
+        lossesByFaction[fid] = fs?.unitsLost ?? 0;
+      }
+      recordGameEnd(factionIds, data.winner, durationMin, {
+        turns: this.state.turnNumber,
+        mapId: config.mapId,
+        mode: config.mode,
+        difficulty: settings.getSetting('aiDifficulty'),
+        killsByFaction,
+        lossesByFaction,
+      });
     }
 
     const humanFaction = this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human');
@@ -139,9 +154,12 @@ export class VictoryScreen {
         <p style="font-size: 1.4rem; font-family: 'Cinzel', serif; color: ${faction?.color ?? '#333'}; margin: 0.25rem 0;">
           <strong>${faction?.name ?? data.winner}</strong>
         </p>
-        <p style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        <p style="font-size: 1rem; color: var(--text-muted); margin-bottom: 0.25rem;">
           ${isPlayerVictory ? 'has conquered the world!' : 'has defeated you!'}
           &nbsp;·&nbsp; Turn ${stats.turns} &nbsp;·&nbsp; ${durationStr}
+        </p>
+        <p style="font-size: 0.9rem; font-style: italic; color: ${faction?.color ?? 'var(--text-muted)'}; margin-bottom: 1.25rem; opacity: 0.85;">
+          "${this.getVictoryFlavorText(data.winner, isPlayerVictory)}"
         </p>
 
         <div style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; text-align: left;">
@@ -196,6 +214,47 @@ export class VictoryScreen {
     if (isPlayerVictory) {
       this.runConfetti(5000);
     }
+  }
+
+  private getVictoryFlavorText(factionId: string, isPlayerWin: boolean): string {
+    const lines: Record<string, { win: string[]; lose: string[] }> = {
+      atlantic_alliance: {
+        win:  ['Liberty does not merely survive — it prevails.',
+               'The cost was great. The cause was greater.',
+               'This is what freedom looks like.'],
+        lose: ['The Alliance does not fall in a day. This is not over.',
+               'We fought for what was right. History will remember that.',
+               'Regroup. Rebuild. Return.'],
+      },
+      eastern_coalition: {
+        win:  ['The Bear does not kneel. It has never kneeled.',
+               'From the frozen steppe to the final capital — ours.',
+               'Victory was inevitable. History agreed.'],
+        lose: ['The Coalition bends but does not break. We will return.',
+               'A setback, not a defeat. Remember the difference.',
+               'The Motherland endures. Always.'],
+      },
+      pacific_union: {
+        win:  ['Swift. Silent. Decisive. As it was always meant to be.',
+               'The Pacific belongs to those who dare to cross it.',
+               'Speed was our weapon. Victory is our reward.'],
+        lose: ['The tide goes out. It also comes back in.',
+               'We moved faster than anyone. Not fast enough today.',
+               'The Union adapts. Watch us.'],
+      },
+      southern_federation: {
+        win:  ['The underdog bites hardest. Remember that.',
+               'Every jungle, every hill — they all fought for us today.',
+               'You cannot defeat a people who refuse to lose.'],
+        lose: ['The South rises. It always has. It always will.',
+               'We were outgunned, not outmatched.',
+               'We have fought with less and won with nothing. We continue.'],
+      },
+    };
+    const pool = lines[factionId];
+    if (!pool) return isPlayerWin ? 'A hard-fought victory.' : 'A battle lost, not the war.';
+    const arr = isPlayerWin ? pool.win : pool.lose;
+    return arr[Math.floor(Math.random() * arr.length)];
   }
 
   runConfetti(durationMs: number): void {

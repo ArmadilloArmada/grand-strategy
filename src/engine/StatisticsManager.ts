@@ -19,6 +19,12 @@ export interface FactionStats {
   veteranUnits: number;
   eliteUnits: number;
   turnCount: number;
+  espionageOpsLaunched: number;
+  espionageSuccesses: number;
+  diplomaticPactsFormed: number;
+  diplomaticAlliancesFormed: number;
+  diplomaticBetrayals: number;
+  fortificationsBuilt: number;
 }
 
 export interface GameStatsSnapshot {
@@ -45,6 +51,12 @@ function defaultStats(factionId: string): FactionStats {
     veteranUnits: 0,
     eliteUnits: 0,
     turnCount: 0,
+    espionageOpsLaunched: 0,
+    espionageSuccesses: 0,
+    diplomaticPactsFormed: 0,
+    diplomaticAlliancesFormed: 0,
+    diplomaticBetrayals: 0,
+    fortificationsBuilt: 0,
   };
 }
 
@@ -117,6 +129,28 @@ class StatisticsManager {
     this.totalTurns++;
   }
 
+  trackEspionageOp(factionId: string, success: boolean): void {
+    const s = this.getFactionStats(factionId);
+    s.espionageOpsLaunched++;
+    if (success) s.espionageSuccesses++;
+  }
+
+  trackPactFormed(factionId: string): void {
+    this.getFactionStats(factionId).diplomaticPactsFormed++;
+  }
+
+  trackAllianceFormed(factionId: string): void {
+    this.getFactionStats(factionId).diplomaticAlliancesFormed++;
+  }
+
+  trackBetrayal(factionId: string): void {
+    this.getFactionStats(factionId).diplomaticBetrayals++;
+  }
+
+  trackFortificationBuilt(factionId: string): void {
+    this.getFactionStats(factionId).fortificationsBuilt++;
+  }
+
   getAllStats(): GameStatsSnapshot {
     let totalBattles = 0;
     for (const stats of this.factionStats.values()) {
@@ -137,7 +171,15 @@ class StatisticsManager {
     return [...this.factionStats.values()]
       .map(stats => ({
         factionId: stats.factionId,
-        score: stats.territoriesCaptured * 3 + stats.battlesWon * 2 + stats.unitsKilled,
+        score: stats.territoriesCaptured * 3
+          + stats.battlesWon * 2
+          + stats.unitsKilled
+          + (stats.techResearched ?? 0) * 5
+          + (stats.espionageSuccesses ?? 0) * 4
+          + (stats.diplomaticAlliancesFormed ?? 0) * 6
+          + (stats.diplomaticPactsFormed ?? 0) * 2
+          + (stats.nukesLaunched ?? 0) * 10
+          + (stats.fortificationsBuilt ?? 0),
         stats,
       }))
       .sort((a, b) => b.score - a.score);

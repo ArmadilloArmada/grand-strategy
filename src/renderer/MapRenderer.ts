@@ -44,13 +44,22 @@ export class MapRenderer {
   // Territory hover callback for tooltips
   private territoryHoverCallback: ((territoryId: string | null, clientX: number, clientY: number) => void) | null = null;
 
-  // Map overlays: movement range, threat (enemy can reach)
-  private overlayMode: 'off' | 'range' | 'threat' = 'off';
+  // Right-click context menu callback
+  private contextMenuCallback: ((territoryId: string, clientX: number, clientY: number) => void) | null = null;
+
+  // Map overlays: movement range, threat (enemy can reach), economic heat map
+  private overlayMode: 'off' | 'range' | 'threat' | 'economic' = 'off';
   private threatTerritoryIds: Set<string> = new Set();
 
   // Capture color-bleed animations: territoryId → {startTime, factionColor}
   private captureAnimations: Map<string, { startTime: number; factionColor: string }> = new Map();
   private captureRafId: number | null = null;
+
+  // AI activity pulse: territoryId → startTime (cyan shimmer for 1.8s)
+  private aiPulseTerritories: Map<string, number> = new Map();
+
+  // RAF-based render debouncing: coalesce multiple render() calls into one per frame
+  private renderPending: boolean = false;
 
   // Render options
   private options: RenderOptions = {
@@ -123,6 +132,7 @@ export class MapRenderer {
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('click', this.onClick.bind(this));
+    this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
     this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this));
     this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this));
     this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
@@ -147,7 +157,7 @@ export class MapRenderer {
     this.territoryHoverCallback = callback;
   }
 
-  setOverlayMode(mode: 'off' | 'range' | 'threat', threatIds?: Set<string>): void {
+  setOverlayMode(mode: 'off' | 'range' | 'threat' | 'economic', threatIds?: Set<string>): void {
     this.overlayMode = mode;
     this.threatTerritoryIds = threatIds ?? new Set();
   }
@@ -165,9 +175,28 @@ export class MapRenderer {
       if (now - anim.startTime > 1600) this.captureAnimations.delete(id);
       else anyActive = true;
     }
-    this.render();
+    for (const [id, startTime] of this.aiPulseTerritories) {
+      if (now - startTime > 1800) this.aiPulseTerritories.delete(id);
+      else anyActive = true;
+    }
+    // Keep loop alive while a territory is selected (animated glow needs continuous frames)
+    if (this.state.selectedTerritoryId !== null) anyActive = true;
+    // Use drawFrame() directly — the animation loop already owns the RAF cadence
+    this.renderPending = false;
+    this.drawFrame();
     if (anyActive) this.captureRafId = requestAnimationFrame(() => this.runCaptureLoop());
     else this.captureRafId = null;
+  }
+
+  /** Trigger a cyan shimmer on a territory to indicate AI activity there. */
+  setAIPulseTerritory(territoryId: string): void {
+    this.aiPulseTerritories.set(territoryId, Date.now());
+    if (this.captureRafId === null) this.runCaptureLoop();
+  }
+
+  /** Start the continuous animation loop (e.g. when selection changes). */
+  startContinuousRender(): void {
+    if (this.captureRafId === null) this.runCaptureLoop();
   }
 
   /**
@@ -191,50 +220,46 @@ export class MapRenderer {
   }
 
   /**
-   * Main render function
+   * Schedule a render on the next animation frame. Multiple calls within the
+   * same frame are collapsed into one draw, preventing redundant canvas work.
    */
   render(): void {
-    // Debug: check if territories exist
-    const territoryCount = this.state.territories.size;
-    if (territoryCount === 0) {
-      console.error('!!! RENDER ERROR: No territories in state!');
-    }
-    
+    if (this.renderPending) return;
+    this.renderPending = true;
+    requestAnimationFrame(() => {
+      this.renderPending = false;
+      this.drawFrame();
+    });
+  }
+
+  /** Immediate synchronous draw — used internally and by the capture animation loop. */
+  private drawFrame(): void {
+    if (this.state.territories.size === 0) return;
+
     this.ctx.clearRect(0, 0, this.width, this.height);
-    
-    // Draw felt background
     this.drawBackground();
-    
-    // Apply camera transform
+
     this.ctx.save();
     this.ctx.translate(this.offsetX, this.offsetY);
     this.ctx.scale(this.scale, this.scale);
-    
-    // Draw sea zones first (below land)
-    this.drawSeaZones();
-    
-    // Draw land territories
-    this.drawLandTerritories();
-    
-    // Draw territory borders with board game style
-    this.drawBorders();
-    
-    // Draw unit tokens
-    if (this.options.showUnitCounts) {
-      this.drawUnitTokens();
-    }
 
-    // Draw capital and factory markers
+    this.drawSeaZones();
+    this.drawLandTerritories();
+    this.drawBorders();
+
+    if (this.options.showUnitCounts) this.drawUnitTokens();
+
     this.drawMarkers();
 
-    // Draw overlay (range or threat) when enabled
-    if (this.overlayMode === 'range' && (this.validMoveTargets.size > 0 || this.attackTargets.size > 0)) {
+    if (this.overlayMode === 'economic') {
+      this.drawEconomicOverlay();
+    } else if (this.overlayMode === 'range' && (this.validMoveTargets.size > 0 || this.attackTargets.size > 0)) {
       this.drawOverlayLayer(this.validMoveTargets, 'rgba(34, 197, 94, 0.25)');
       this.drawOverlayLayer(this.attackTargets, 'rgba(239, 68, 68, 0.3)');
     } else if (this.overlayMode === 'threat' && this.threatTerritoryIds.size > 0) {
       this.drawOverlayLayer(this.threatTerritoryIds, 'rgba(239, 68, 68, 0.35)');
     }
-    
+
     this.ctx.restore();
   }
 
@@ -249,6 +274,42 @@ export class MapRenderer {
       for (let i = 1; i < poly.length; i++) this.ctx.lineTo(poly[i][0], poly[i][1]);
       this.ctx.closePath();
       this.ctx.fill();
+    }
+  }
+
+  /** Render economic heat map: land territories coloured by IPC value (green gradient). */
+  private drawEconomicOverlay(): void {
+    let maxProduction = 1;
+    for (const t of this.state.territories.values()) {
+      if (t.isLand() && t.production > maxProduction) maxProduction = t.production;
+    }
+
+    for (const territory of this.state.territories.values()) {
+      if (territory.isSea() || territory.production <= 0) continue;
+      const poly = territory.polygon;
+      if (poly.length < 3) continue;
+
+      const intensity = territory.production / maxProduction; // 0–1
+      const alpha = 0.15 + intensity * 0.55;
+      // Low value → yellow, high value → deep green
+      const r = Math.round(34 + (255 - 34) * (1 - intensity));
+      const g = Math.round(197 + (220 - 197) * intensity);
+      const b = Math.round(94 * (1 - intensity * 0.6));
+
+      this.ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      this.ctx.beginPath();
+      this.ctx.moveTo(poly[0][0], poly[0][1]);
+      for (let i = 1; i < poly.length; i++) this.ctx.lineTo(poly[i][0], poly[i][1]);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      // IPC label at territory center
+      const [cx, cy] = territory.center;
+      this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      this.ctx.font = `bold ${Math.max(10, Math.round(10 + intensity * 4))}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(`${territory.production}`, cx, cy);
     }
   }
 
@@ -282,7 +343,39 @@ export class MapRenderer {
     for (const territory of this.state.territories.values()) {
       if (!territory.isSea()) continue;
       this.drawTerritory(territory, true);
+      this.drawSeaWaves(territory.polygon);
     }
+  }
+
+  private drawSeaWaves(polygon: [number, number][]): void {
+    if (polygon.length < 3) return;
+    let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+    for (const [px, py] of polygon) {
+      if (px < bMinX) bMinX = px; if (py < bMinY) bMinY = py;
+      if (px > bMaxX) bMaxX = px; if (py > bMaxY) bMaxY = py;
+    }
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+    for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+    this.ctx.closePath();
+    this.ctx.clip();
+    this.ctx.strokeStyle = 'rgba(180, 210, 255, 0.10)';
+    this.ctx.lineWidth = 1;
+    const spacing = 11;
+    const cos30 = Math.cos(Math.PI / 6), sin30 = Math.sin(Math.PI / 6);
+    const diagLen = ((bMaxX - bMinX) + (bMaxY - bMinY)) * 1.4;
+    const steps = Math.ceil(diagLen / spacing) + 2;
+    const midX = (bMinX + bMaxX) / 2, midY = (bMinY + bMaxY) / 2;
+    for (let i = -steps / 2; i < steps / 2; i++) {
+      const ox = midX + (-sin30) * i * spacing;
+      const oy = midY + cos30 * i * spacing;
+      this.ctx.beginPath();
+      this.ctx.moveTo(ox - cos30 * diagLen / 2, oy - sin30 * diagLen / 2);
+      this.ctx.lineTo(ox + cos30 * diagLen / 2, oy + sin30 * diagLen / 2);
+      this.ctx.stroke();
+    }
+    this.ctx.restore();
   }
 
   /**
@@ -346,16 +439,47 @@ export class MapRenderer {
       fillColor = this.blendColors(fillColor, '#ffd700', 0.25);
     }
 
-    // Subtle top-lit map shading (not the billboard "bubble" look)
+    // ZOC tint: land territories in enemy Zone of Control get a subtle orange overlay.
+    // Only shown when valid-move highlighting is active so it doesn't clutter idle view.
+    if (!isSea && this.options.highlightValidMoves
+        && !this.attackTargets.has(territory.id)
+        && !this.validMoveTargets.has(territory.id)) {
+      const currentFaction = this.state.getCurrentFaction();
+      if (currentFaction) {
+        const inZOC = territory.adjacentTo.some(adjId => {
+          const adj = this.state.territories.get(adjId);
+          return adj && adj.type !== 'sea'
+            && adj.owner !== null
+            && currentFaction.isEnemyOf(adj.owner)
+            && adj.getTotalUnitCount() > 0;
+        });
+        if (inZOC) {
+          fillColor = this.blendColors(fillColor, '#ff6600', 0.22);
+        }
+      }
+    }
+
+    // Fill gradient — sea gets a depth gradient, land gets a top-lit shading
     const [cx, cy] = territory.center;
-    const gradient = this.ctx.createLinearGradient(cx, cy - 60, cx, cy + 60);
-    gradient.addColorStop(0, this.lightenColor(fillColor, 8));
-    gradient.addColorStop(1, this.darkenColor(fillColor, 8));
-
+    let gradient: CanvasGradient;
+    if (isSea) {
+      gradient = this.ctx.createLinearGradient(cx, cy - 50, cx, cy + 50);
+      gradient.addColorStop(0,   '#2a4878'); // lighter surface blue
+      gradient.addColorStop(0.5, this.COLORS.seaDeep);
+      gradient.addColorStop(1,   '#121e38'); // deep water dark
+    } else {
+      gradient = this.ctx.createLinearGradient(cx, cy - 60, cx, cy + 60);
+      gradient.addColorStop(0, this.lightenColor(fillColor, 12));
+      gradient.addColorStop(1, this.darkenColor(fillColor, 12));
+    }
     this.ctx.fillStyle = gradient;
-
     this.ctx.fill();
     this.ctx.globalAlpha = 1;
+
+    // Terrain texture overlay — clipped to polygon, drawn before capture animation
+    if (!isSea) {
+      this.drawTerrainTexture(polygon, territory.terrain ?? 'plains');
+    }
 
     // Capture color-bleed: faction color pulses in then out over 1.5s
     const captureAnim = !isSea ? this.captureAnimations.get(territory.id) : undefined;
@@ -369,6 +493,22 @@ export class MapRenderer {
       this.ctx.closePath();
       this.ctx.globalAlpha = alpha;
       this.ctx.fillStyle = captureAnim.factionColor;
+      this.ctx.fill();
+      this.ctx.restore();
+    }
+
+    // AI activity shimmer: teal pulse on territories the AI is currently acting on
+    const aiPulseStart = !isSea ? this.aiPulseTerritories.get(territory.id) : undefined;
+    if (aiPulseStart !== undefined) {
+      const progress = Math.min(1, (Date.now() - aiPulseStart) / 1800);
+      const alpha = Math.sin(progress * Math.PI) * 0.38;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+      this.ctx.closePath();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = '#00d2b8';
       this.ctx.fill();
       this.ctx.restore();
     }
@@ -411,17 +551,26 @@ export class MapRenderer {
       this.ctx.restore();
     }
 
-    // Inner shadow for depth
-    if (!isSea) {
+    // Inner vignette: radial gradient darkens territory edges for genuine depth
+    {
+      let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+      for (const [px, py] of polygon) {
+        if (px < bMinX) bMinX = px; if (py < bMinY) bMinY = py;
+        if (px > bMaxX) bMaxX = px; if (py > bMaxY) bMaxY = py;
+      }
+      const radius = Math.max(bMaxX - bMinX, bMaxY - bMinY) * 0.68;
+      const innerAlpha = isSea ? 0.28 : 0.22;
+      const vig = this.ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, `rgba(0,0,0,${innerAlpha})`);
       this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+      this.ctx.closePath();
       this.ctx.clip();
-      this.ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      this.ctx.shadowBlur = 10;
-      this.ctx.shadowOffsetX = 3;
-      this.ctx.shadowOffsetY = 3;
-      this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-      this.ctx.lineWidth = 8;
-      this.ctx.stroke();
+      this.ctx.fillStyle = vig;
+      this.ctx.fillRect(bMinX, bMinY, bMaxX - bMinX, bMaxY - bMinY);
       this.ctx.restore();
     }
   }
@@ -456,12 +605,16 @@ export class MapRenderer {
         continue;
       }
 
-      // Selected: bright gold highlight
+      // Selected: animated gold glow that pulses in width and opacity
       if (isSelected) {
+        const pulse = (Math.sin(Date.now() / 280) + 1) / 2; // 0→1 over ~1.76s
         tracePath(polygon);
-        this.ctx.strokeStyle = this.COLORS.gold;
-        this.ctx.lineWidth = 4;
+        this.ctx.strokeStyle = `rgba(220, 170, 30, ${0.65 + pulse * 0.35})`;
+        this.ctx.lineWidth = 3 + pulse * 2.5;
+        this.ctx.shadowColor = '#ffd700';
+        this.ctx.shadowBlur = 8 + pulse * 10;
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
         continue;
       }
 
@@ -515,7 +668,6 @@ export class MapRenderer {
       }
       const w = Math.min(36, Math.max(14, (bMaxX - bMinX) * 0.55));
       const h = Math.min(26, Math.max(11, (bMaxY - bMinY) * 0.50));
-      const fontSize = Math.max(9, Math.min(14, h * 0.62));
       const x = cx - w / 2, y = cy - h / 2;
 
       this.ctx.save();
@@ -547,15 +699,35 @@ export class MapRenderer {
       this.ctx.lineWidth = 1;
       this.ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
 
-      // Unit count
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = `bold ${fontSize}px "Courier New", monospace`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
-      this.ctx.shadowBlur = 2;
-      this.ctx.fillText(unitCount.toString(), cx, cy);
-      this.ctx.shadowBlur = 0;
+      // NATO unit symbol + count
+      const primaryUnit = territory.units.reduce((max, pu) => pu.count > max.count ? pu : max, territory.units[0]);
+      const primaryType = primaryUnit ? this.state.unitRegistry.get(primaryUnit.unitTypeId) : null;
+
+      if (primaryType && w >= 18 && h >= 14) {
+        // Symbol in upper ~55% of counter, count in lower strip
+        const symCy = y + h * 0.40;
+        this.drawNATOSymbol(cx, symCy, w * 0.54, h * 0.38, primaryType.domain ?? 'land', primaryUnit.unitTypeId);
+        const countSize = Math.max(7, Math.min(10, h * 0.36));
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `bold ${countSize}px "Courier New", monospace`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        this.ctx.shadowBlur = 2;
+        this.ctx.fillText(unitCount.toString(), cx, y + h * 0.78);
+        this.ctx.shadowBlur = 0;
+      } else {
+        // Small counter: just the count
+        const fontSize = Math.max(9, Math.min(14, h * 0.62));
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        this.ctx.shadowBlur = 2;
+        this.ctx.fillText(unitCount.toString(), cx, cy);
+        this.ctx.shadowBlur = 0;
+      }
 
       this.ctx.restore();
     }
@@ -582,12 +754,26 @@ export class MapRenderer {
         this.drawFactorySymbol(fx, markerY, '#888888', '#2a1808');
       }
 
+      // Fortification badge: small tower symbol based on level
+      const fortLevel = (territory as any).fortificationLevel ?? 0;
+      if (fortLevel > 0) {
+        const fbx = cx - (territory.isCapital ? 26 : 16);
+        this.drawFortificationBadge(fbx, markerY - 8, fortLevel);
+      }
+
       // Commander badge: gold diamond with ⚜ if a named general is present
       const hasCommander = territory.units.some((u: any) => u.commander);
       if (hasCommander) {
         const bx = cx + (territory.isCapital ? 26 : 16);
         const by = markerY - 8;
         this.drawCommanderBadge(bx, by);
+      }
+
+      // Veteran badge: silver star if any unit stack has battle experience
+      const hasVeterans = territory.units.some((u: any) => (u.veteranCount ?? 0) > 0);
+      if (hasVeterans) {
+        const vx = cx + (territory.isCapital || hasCommander ? 38 : 28);
+        this.drawVeteranBadge(vx, markerY - 8);
       }
     }
   }
@@ -608,6 +794,192 @@ export class MapRenderer {
     this.ctx.lineWidth = 0.8;
     this.ctx.stroke();
     this.ctx.restore();
+  }
+
+  /** Draw a small silver star badge for veteran units. */
+  private drawVeteranBadge(cx: number, cy: number): void {
+    this.ctx.save();
+    this.drawStar(cx, cy, 5, '#c0c0c0', '#555555');
+    this.ctx.restore();
+  }
+
+  /** Draw a small fortification badge — brown square tower, darker outline for level 2. */
+  private drawFortificationBadge(cx: number, cy: number, level: 1 | 2): void {
+    this.ctx.save();
+    const w = 8, h = 7;
+    const fill = level >= 2 ? '#4a90d9' : '#a0763e';
+    const stroke = level >= 2 ? '#1a3a6a' : '#5a3a1a';
+    // Tower body
+    this.ctx.fillStyle = fill;
+    this.ctx.strokeStyle = stroke;
+    this.ctx.lineWidth = 0.8;
+    this.ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+    this.ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+    // Battlements (two small squares on top)
+    const bw = 2.5, bh = 2;
+    this.ctx.fillRect(cx - w / 2, cy - h / 2 - bh, bw, bh);
+    this.ctx.strokeRect(cx - w / 2, cy - h / 2 - bh, bw, bh);
+    this.ctx.fillRect(cx + w / 2 - bw, cy - h / 2 - bh, bw, bh);
+    this.ctx.strokeRect(cx + w / 2 - bw, cy - h / 2 - bh, bw, bh);
+    this.ctx.restore();
+  }
+
+  /** Draw a NATO wargame counter symbol inside the unit token upper zone. */
+  private drawNATOSymbol(cx: number, cy: number, w: number, h: number, domain: string, unitTypeId: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const hw = w * 0.5;
+    const hh = h * 0.5;
+
+    if (domain === 'air') {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - hh);
+      ctx.lineTo(cx + hw, cy + hh);
+      ctx.lineTo(cx - hw, cy + hh);
+      ctx.closePath();
+      ctx.globalAlpha = 0.75;
+      ctx.stroke();
+    } else if (domain === 'sea') {
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.arc(cx, cy + hh * 0.25, hw * 0.85, Math.PI, 0, false);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + hh * 0.25);
+      ctx.lineTo(cx, cy - hh);
+      ctx.stroke();
+    } else {
+      const id = unitTypeId.toLowerCase();
+      ctx.globalAlpha = 0.75;
+      if (id.includes('armor') || id.includes('tank') || id.includes('panzer')) {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, hw * 0.82, hh * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.min(hw, hh) * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fill();
+      } else if (id.includes('anti_air') || id.includes('antiair') || id.includes('_aa') || id.includes('flak')) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - hh);
+        ctx.lineTo(cx, cy + hh * 0.45);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - hw * 0.52, cy - hh * 0.28);
+        ctx.lineTo(cx, cy - hh);
+        ctx.lineTo(cx + hw * 0.52, cy - hh * 0.28);
+        ctx.stroke();
+      } else {
+        // Infantry default: X cross
+        ctx.beginPath();
+        ctx.moveTo(cx - hw, cy - hh);
+        ctx.lineTo(cx + hw, cy + hh);
+        ctx.moveTo(cx + hw, cy - hh);
+        ctx.lineTo(cx - hw, cy + hh);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** Draw subtle terrain texture clipped to polygon. */
+  private drawTerrainTexture(polygon: [number, number][], terrain: string): void {
+    if (terrain === 'plains' || terrain === 'coastal') return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(polygon[0][0], polygon[0][1]);
+    for (let i = 1; i < polygon.length; i++) ctx.lineTo(polygon[i][0], polygon[i][1]);
+    ctx.closePath();
+    ctx.clip();
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [px, py] of polygon) {
+      if (px < minX) minX = px;
+      if (py < minY) minY = py;
+      if (px > maxX) maxX = px;
+      if (py > maxY) maxY = py;
+    }
+
+    ctx.globalAlpha = 0.18;
+    switch (terrain) {
+      case 'mountain': {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.7;
+        const sp = 14;
+        for (let y = minY; y <= maxY; y += sp) {
+          ctx.beginPath();
+          for (let x = minX; x <= maxX; x += sp * 1.5) {
+            ctx.moveTo(x, y + sp * 0.5);
+            ctx.lineTo(x + sp * 0.75, y);
+            ctx.lineTo(x + sp * 1.5, y + sp * 0.5);
+          }
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'forest':
+      case 'jungle': {
+        ctx.fillStyle = terrain === 'jungle' ? '#1a3010' : '#2a4020';
+        const ds = 13;
+        for (let y = minY + 5; y <= maxY; y += ds) {
+          const xOff = (Math.floor((y - minY) / ds) % 2 === 0) ? 5 : 11;
+          for (let x = minX + xOff; x <= maxX; x += ds) {
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'desert': {
+        ctx.strokeStyle = '#c08020';
+        ctx.lineWidth = 0.6;
+        const ws = 12;
+        for (let y = minY + 4; y <= maxY; y += ws) {
+          ctx.beginPath();
+          for (let x = minX; x <= maxX; x += 5) {
+            const wy = y + Math.sin((x - minX) * 0.3) * 2;
+            if (x === minX) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+          }
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'arctic': {
+        ctx.strokeStyle = '#c8e8ff';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([4, 8]);
+        const is = 11;
+        for (let y = minY + 4; y <= maxY; y += is) {
+          ctx.beginPath();
+          ctx.moveTo(minX, y);
+          ctx.lineTo(maxX, y);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        break;
+      }
+      case 'urban': {
+        ctx.fillStyle = '#404050';
+        const gs = 11;
+        for (let y = minY + 4; y <= maxY; y += gs) {
+          for (let x = minX + 4; x <= maxX; x += gs) {
+            ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+          }
+        }
+        break;
+      }
+    }
+    ctx.restore();
   }
 
   /** Draw a 5-pointed star centered at (cx, cy) with given outer radius. */
@@ -650,20 +1022,30 @@ export class MapRenderer {
    * Owned territories use a muted faction tint over a parchment base —
    * ownership is primarily communicated via the faction-colored border.
    */
-  private getTerritoryColor(territory: Territory, isSea: boolean): string {
-    if (isSea) {
-      return this.COLORS.seaDeep;
+  private getTerrainBaseColor(terrain: string): string {
+    switch (terrain) {
+      case 'mountain': return '#8a9198'; // gray-slate
+      case 'forest':   return '#4f6840'; // muted forest green
+      case 'desert':   return '#c4a455'; // sandy ochre
+      case 'jungle':   return '#3d5c2a'; // deep jungle green
+      case 'arctic':   return '#aac8e0'; // icy pale blue
+      case 'urban':    return '#6c707c'; // concrete gray
+      case 'coastal':  return '#7a9ea8'; // coastal teal
+      default:         return '#b8aa88'; // plains / parchment
     }
+  }
 
-    if (!territory.owner) {
-      return this.COLORS.neutral;
-    }
+  private getTerritoryColor(territory: Territory, isSea: boolean): string {
+    if (isSea) return this.COLORS.seaDeep;
+
+    const terrainBase = this.getTerrainBaseColor(territory.terrain ?? 'plains');
+    if (!territory.owner) return terrainBase;
 
     const faction = this.state.factionRegistry.get(territory.owner);
-    if (!faction) return this.COLORS.neutral;
+    if (!faction) return terrainBase;
 
-    // 40% faction color blended into a warm parchment/khaki base
-    return this.blendColors('#b8aa88', faction.color, 0.40);
+    // 38% faction color blended into terrain-specific base
+    return this.blendColors(terrainBase, faction.color, 0.38);
   }
 
   /**
@@ -891,18 +1273,31 @@ export class MapRenderer {
 
   private onClick(e: MouseEvent): void {
     if (this.isDragging) return;
-    
+
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const world = this.screenToWorld(x, y);
     const territory = this.getTerritoryAtPoint(world.x, world.y);
-    
+
     if (territory) {
       this.state.selectTerritory(territory.id);
       this.render();
     }
+  }
+
+  private onContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+    if (!this.contextMenuCallback) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    const territory = this.getTerritoryAtPoint(world.x, world.y);
+    if (territory) this.contextMenuCallback(territory.id, e.clientX, e.clientY);
+  }
+
+  setContextMenuCallback(callback: (territoryId: string, clientX: number, clientY: number) => void): void {
+    this.contextMenuCallback = callback;
   }
 
   private onTouchStart(e: TouchEvent): void {

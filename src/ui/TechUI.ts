@@ -6,11 +6,8 @@ import { GameState } from '../engine/GameState';
 import { TechnologyManager, TECHNOLOGIES } from '../engine/TechnologyManager';
 import { statisticsManager } from '../engine/StatisticsManager';
 import { soundManager } from '../audio/SoundManager';
-import { GameAction } from '../network/NetworkManager';
-
 export interface TechCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
-  sendAction(action: GameAction): void;
   updateTurnInfo(): void;
 }
 
@@ -71,6 +68,10 @@ export class TechUI {
 
     const faction = this.state.getCurrentFaction();
     const researchedSet = faction ? this.technologyManager.getResearched(faction.id) : new Set<string>();
+    const currentResearch = faction ? this.technologyManager.getCurrentResearch(faction.id) : null;
+    const researchProgress = faction && currentResearch ? this.technologyManager.getResearchProgress(faction.id) : 0;
+    const currentTech = currentResearch ? TECHNOLOGIES.find(t => t.id === currentResearch) : null;
+    const researchPct = currentTech ? Math.min(100, Math.round((researchProgress / currentTech.cost) * 100)) : 0;
 
     const CATEGORIES = ['infantry', 'armor', 'air', 'naval', 'economy', 'special'] as const;
     const CAT_LABELS: Record<string, string> = {
@@ -154,21 +155,30 @@ export class TechUI {
       const available = !researched && hasPrereqs && faction && faction.ipcs >= tech.cost;
       const locked = !researched && !hasPrereqs;
 
-      const fill = researched ? '#1a7a5c' : available ? '#2a4a8a' : locked ? '#555' : '#3a3a4a';
-      const stroke = researched ? '#22c55e' : available ? '#60a5fa' : '#777';
-      const textFill = researched || available ? '#fff' : '#aaa';
+      const isInProgress = tech.id === currentResearch;
+      const fill = researched ? '#1a7a5c' : isInProgress ? '#2a3a70' : available ? '#2a4a8a' : locked ? '#555' : '#3a3a4a';
+      const stroke = researched ? '#22c55e' : isInProgress ? '#fbbf24' : available ? '#60a5fa' : '#777';
+      const strokeW = researched || isInProgress ? 2 : 1;
+      const textFill = researched || available || isInProgress ? '#fff' : '#aaa';
+      const progressBar = isInProgress ? `
+        <rect x="${p.x + 4}" y="${p.y + NODE_H - 8}" width="${NODE_W - 8}" height="4" rx="2" fill="#333"/>
+        <rect x="${p.x + 4}" y="${p.y + NODE_H - 8}" width="${Math.round((NODE_W - 8) * researchPct / 100)}" height="4" rx="2" fill="#fbbf24"/>
+        <text x="${p.x + NODE_W / 2}" y="${p.y + NODE_H - 11}" font-size="8" text-anchor="middle" fill="#fbbf24" font-family="sans-serif">${researchPct}%</text>
+      ` : '';
+      const progressNode = isInProgress ? NODE_H + 14 : NODE_H;
 
       svgContent += `
         <g class="tech-tree-node" data-tech="${tech.id}" style="cursor:${locked ? 'not-allowed' : 'pointer'}">
-          <rect x="${p.x}" y="${p.y}" width="${NODE_W}" height="${NODE_H}" rx="6"
-                fill="${fill}" stroke="${stroke}" stroke-width="${researched ? 2 : 1}"/>
+          <rect x="${p.x}" y="${p.y}" width="${NODE_W}" height="${isInProgress ? progressNode : NODE_H}" rx="6"
+                fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"/>
           <text x="${p.x + 10}" y="${p.y + 20}" font-size="18" dominant-baseline="middle">${tech.icon}</text>
           <text x="${p.x + 34}" y="${p.y + 16}" font-size="10" fill="${textFill}" font-weight="bold"
                 font-family="sans-serif">${tech.name.length > 15 ? tech.name.slice(0, 14) + '…' : tech.name}</text>
           <text x="${p.x + 34}" y="${p.y + 30}" font-size="9" fill="#aaa" font-family="sans-serif">
-            ${researched ? '✓ Researched' : tech.cost + ' IPCs'}
+            ${researched ? '✓ Researched' : isInProgress ? 'Researching…' : tech.cost + ' IPCs'}
           </text>
           ${researched ? `<text x="${p.x + NODE_W - 6}" y="${p.y + 14}" font-size="12" text-anchor="end">✓</text>` : ''}
+          ${progressBar}
         </g>
       `;
     }
@@ -257,12 +267,11 @@ export class TechUI {
       this.technologyManager.advanceResearch(faction.id, tech.cost);
       this.state.emit('tech_researched', { factionId: faction.id, techId });
       this.callbacks.showToast(`Researched ${tech.name}!`, 'success');
-      soundManager.play('build');
+      soundManager.play('research');
       statisticsManager.trackTechResearched(faction.id);
       statisticsManager.trackSpending(faction.id, tech.cost);
       this.update('all');
       this.callbacks.updateTurnInfo();
-      this.callbacks.sendAction({ type: 'research_tech', factionId: faction.id, techId });
     }
   }
 }

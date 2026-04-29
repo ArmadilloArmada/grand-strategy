@@ -172,6 +172,11 @@ export class AIController {
     const faction = this.state.getCurrentFaction();
     if (!faction || faction.controlledBy !== "ai") return;
 
+    if (this.hasBehavior('random_focus')) this.applyRandomFocusModifiers();
+    if (this.hasBehavior('historical_priorities') || this.hasBehavior('faction_specific')) {
+      this.applyHistoricalPriorities(faction.id);
+    }
+
     this.state.emit("ai_thinking", { message: "Evaluating board..." });
     this.mobilizationSystem.resetForNewTurn();
 
@@ -183,6 +188,7 @@ export class AIController {
     this.state.emit("ai_thinking", { message: "Planning strategy..." });
     this.considerDiplomacy(faction);
     this.considerEspionage(faction);
+    this.considerNuclear(faction);
 
     while (true) {
       await this.processPhase(evaluations);
@@ -286,55 +292,102 @@ export class AIController {
   }
 
   /**
-   * AI espionage — launch covert operations based on personality and available IPCs.
-   * Aggressive AI sabotages factories; economic AI disrupts finances; all AI steals intel.
+   * AI espionage — weighted op selection driven by personality and threat assessment.
+   *
+   * Target scoring: high-grudge enemies are prioritised; ties broken by territory count.
+   * Op scoring: each candidate is assigned a personality-scaled weight so that, e.g., an
+   * aggressive AI is far more likely to pick sabotage than a cautious one, rather than
+   * choosing uniformly from a filtered list.
    */
   private considerEspionage(faction: Faction): void {
     const espionage = this.state.systems.espionageSystem;
     if (!espionage?.executeOperation) return;
 
-    // Only act if we have a decent war chest (avoid bankrupting ourselves)
-    if (faction.ipcs < 20) return;
+    if (faction.ipcs < 5) return;
 
-    // Don't launch ops every turn — probability based on personality
-    const actionChance = 0.25 + this.personality.aggression * 0.3;
+    const actionChance = 0.20 + this.personality.aggression * 0.35 + this.personality.economy * 0.15;
     if (Math.random() > actionChance) return;
 
-    // Find the best target: biggest grudge first, then nearest enemy
     const enemies = this.state.factionRegistry.getAll().filter(f =>
       f.id !== faction.id && !f.isDefeated && faction.isEnemyOf(f.id)
     );
     if (enemies.length === 0) return;
 
-    const biggestEnemyId = this.getBiggestEnemy(faction.id);
-    const grudgeTarget = biggestEnemyId ? enemies.find(f => f.id === biggestEnemyId) : undefined;
-    const target = grudgeTarget ??
-      enemies.reduce((best, f) =>
-        this.state.getTerritoriesOwnedBy(f.id).length >
-        this.state.getTerritoriesOwnedBy(best.id).length ? f : best
-      );
+    // Score each enemy: grudge severity + territory lead over us
+    const myCount = this.state.getTerritoriesOwnedBy(faction.id).length;
+    const target = enemies.reduce((best, f) => {
+      const grudge = this.getGrudgeSeverity(faction.id, f.id);
+      const lead = this.state.getTerritoriesOwnedBy(f.id).length - myCount;
+      const score = grudge + Math.max(0, lead) * 2;
+      const bestScore =
+        this.getGrudgeSeverity(faction.id, best.id) +
+        Math.max(0, this.state.getTerritoriesOwnedBy(best.id).length - myCount) * 2;
+      return score > bestScore ? f : best;
+    });
 
-    // Pick operation based on personality and IPC budget
-    type Op = { type: string; cost: number };
-    const ops: Op[] = [];
+    // Weighted candidate ops — weight reflects how well each op aligns with personality
+    type WeightedOp = { type: string; cost: number; weight: number };
+    const candidates: WeightedOp[] = [];
 
-    if (faction.ipcs >= 5) ops.push({ type: 'steal_intel', cost: 5 });
-    if (faction.ipcs >= 10 && this.personality.aggression > 0.5)
-      ops.push({ type: 'sabotage', cost: 10 });
+    if (faction.ipcs >= 5)
+      candidates.push({ type: 'steal_intel', cost: 5, weight: 0.4 + this.personality.defense * 0.3 });
+    if (faction.ipcs >= 10)
+      candidates.push({ type: 'propaganda_campaign', cost: 10, weight: this.personality.aggression * 0.5 });
     if (faction.ipcs >= 10 && this.personality.aggression > 0.4)
-      ops.push({ type: 'propaganda_campaign', cost: 10 });
+      candidates.push({ type: 'sabotage', cost: 10, weight: this.personality.aggression * 0.8 });
+    if (faction.ipcs >= 15 && this.personality.economy > 0.4)
+      candidates.push({ type: 'economic_disruption', cost: 15, weight: this.personality.economy * 0.7 });
     if (faction.ipcs >= 15 && this.personality.economy > 0.5)
-      ops.push({ type: 'economic_disruption', cost: 15 });
-    if (faction.ipcs >= 15 && this.personality.economy > 0.6)
-      ops.push({ type: 'steal_tech', cost: 15 });
-    if (faction.ipcs >= 20 && this.personality.aggression > 0.7)
-      ops.push({ type: 'infrastructure_attack', cost: 20 });
+      candidates.push({ type: 'steal_tech', cost: 15, weight: this.personality.economy * 0.6 });
+    if (faction.ipcs >= 20 && this.personality.aggression > 0.55)
+      candidates.push({ type: 'assassinate_general', cost: 20, weight: this.personality.aggression * 0.5 });
+    if (faction.ipcs >= 20 && this.personality.aggression > 0.65)
+      candidates.push({ type: 'infrastructure_attack', cost: 20, weight: this.personality.aggression * 0.9 });
+    if (faction.ipcs >= 25 && this.personality.aggression > 0.75)
+      candidates.push({ type: 'steal_nuclear_secrets', cost: 25, weight: this.personality.aggression * 0.4 });
 
-    if (ops.length === 0) return;
+    if (candidates.length === 0) return;
 
-    // Weight toward personality-aligned ops
-    const pick = ops[Math.floor(Math.random() * ops.length)];
+    // Weighted random selection
+    const totalWeight = candidates.reduce((s, c) => s + c.weight, 0);
+    let roll = Math.random() * totalWeight;
+    const pick = candidates.find(c => { roll -= c.weight; return roll <= 0; }) ?? candidates[0];
+
     espionage.executeOperation(faction.id, target.id, pick.type);
+  }
+
+  /**
+   * AI nuclear — launch a strike when readiness reaches 100% and conditions are met.
+   * Aggressive AI fires first; defensive AI waits until losing badly.
+   */
+  private considerNuclear(faction: Faction): void {
+    const nuclearSystem = this.state.systems.nuclearSystem;
+    if (!nuclearSystem?.canLaunch?.(faction.id)) return;
+
+    const isLosing = this.isLosingBadly(faction);
+    const fireChance = isLosing
+      ? 0.70                                        // desperate — almost always fires
+      : 0.15 + this.personality.aggression * 0.50; // aggressive AI fires opportunistically
+
+    if (Math.random() > fireChance) return;
+
+    // Pick the most valuable enemy target: capital > factory-rich > most units
+    const candidates = Array.from(this.state.territories.values()).filter(
+      t => t.owner && faction.isEnemyOf(t.owner) && t.isLand()
+    );
+    if (candidates.length === 0) return;
+
+    const target = candidates.reduce((best, t) => {
+      const score = t.getTotalUnitCount() * 1
+        + (t.hasFactory ? t.production * 3 : 0)
+        + (t.isCapital ? 50 : 0);
+      const bestScore = best.getTotalUnitCount()
+        + (best.hasFactory ? best.production * 3 : 0)
+        + (best.isCapital ? 50 : 0);
+      return score > bestScore ? t : best;
+    });
+
+    nuclearSystem.launchStrike?.(faction.id, target.id);
   }
 
   // ── Grudge System ────────────────────────────────────────────────────────
@@ -537,6 +590,20 @@ export class AIController {
       }
     }
 
+    // Behavior: save_ipcs — only spend at critical sites when IPCs are low
+    if (this.hasBehavior('save_ipcs') && faction.ipcs < 25) {
+      const critical = options.filter(o => {
+        const eval_ = evaluations.get(o.territory.id);
+        return o.territory.isCapital || (eval_?.threatLevel ?? 0) > 15;
+      });
+      if (critical.length > 0) options.splice(0, options.length, ...critical);
+      else return;
+    }
+
+    const factoryScoreBonus = this.hasBehavior('factory_priority') ? 150 : 30;
+    const frontlineScoreBonus = this.hasBehavior('fortify_borders') ? 60
+      : this.aggressiveness > 0.6 ? 30 : 10;
+
     options.sort((a, b) => {
       const evalA = evaluations.get(a.territory.id);
       const evalB = evaluations.get(b.territory.id);
@@ -545,8 +612,8 @@ export class AIController {
       if (evalA?.threatLevel ?? 0 > 0) scoreA += (evalA!.threatLevel) * 2;
       if (evalB?.threatLevel ?? 0 > 0) scoreB += (evalB!.threatLevel) * 2;
 
-      if (a.type === 'factory') scoreA += 30;
-      if (b.type === 'factory') scoreB += 30;
+      if (a.type === 'factory') scoreA += factoryScoreBonus;
+      if (b.type === 'factory') scoreB += factoryScoreBonus;
       if (a.type === 'capital') scoreA += 25;
       if (b.type === 'capital') scoreB += 25;
 
@@ -558,8 +625,8 @@ export class AIController {
         const t = this.state.territories.get(id);
         return t?.owner && faction.isEnemyOf(t.owner);
       });
-      if (aFrontline) scoreA += this.aggressiveness > 0.6 ? 30 : 10;
-      if (bFrontline) scoreB += this.aggressiveness > 0.6 ? 30 : 10;
+      if (aFrontline) scoreA += frontlineScoreBonus;
+      if (bFrontline) scoreB += frontlineScoreBonus;
 
       // Unit composition preference via personality
       const upA = a.units.reduce((sum, u) =>
@@ -640,12 +707,48 @@ export class AIController {
       return pB - pA;
     });
 
+    // Behavior: counterattack_only — only strike factions that have attacked us (grudge > 0)
+    if (this.hasBehavior('counterattack_only')) {
+      const revenge = plans.filter(p => {
+        const owner = this.state.territories.get(p.targetId)?.owner;
+        return owner && this.getGrudgeSeverity(faction.id, owner) > 0;
+      });
+      if (revenge.length > 0) plans.splice(0, plans.length, ...revenge);
+      else return;
+    }
+
+    // Behavior: analyze_threats — don't attack when any home territory is under serious threat
+    if (this.hasBehavior('analyze_threats')) {
+      const homeThreatened = Array.from(evaluations.values()).some(
+        e => e.territory.owner === faction.id && e.threatLevel > 25
+      );
+      if (homeThreatened) return;
+    }
+
+    // Behavior: surprise_attacks — occasionally commit to a non-adjacent target
+    if (this.hasBehavior('surprise_attacks') && Math.random() < 0.35) {
+      this.addSurpriseAttack(plans, evaluations, faction);
+    }
+
     const usedUnits = new Set<string>();
 
-    for (const plan of plans) {
-      const minSuccess = this.personality.id === 'turtle'
+    let behaviorMinSuccess: number;
+    if (this.hasBehavior('maximum_defense')) {
+      behaviorMinSuccess = 0.92;
+    } else if (this.hasBehavior('only_sure_attacks')) {
+      behaviorMinSuccess = 0.85;
+    } else if (this.hasBehavior('ignore_losses')) {
+      behaviorMinSuccess = 0.10;
+    } else if (this.hasBehavior('blitz_attacks')) {
+      behaviorMinSuccess = 0.25;
+    } else {
+      behaviorMinSuccess = this.personality.id === 'turtle'
         ? 0.85
         : this.riskTolerance * (0.5 + this.aggressiveness * 0.3);
+    }
+
+    for (const plan of plans) {
+      const minSuccess = behaviorMinSuccess;
       if (plan.expectedSuccess < minSuccess) continue;
 
       const minValue = 30 * (1 - this.expansionFocus * 0.5);
@@ -731,12 +834,93 @@ export class AIController {
 
       if (attackers.length === 0) continue;
 
+      let planValue = eval_.strategicValue;
+
+      // Behavior: control_seas — prioritize sea zone captures heavily
+      if (this.hasBehavior('control_seas') && target.type === 'sea') planValue *= 3;
+
+      // Behavior: encirclement — reward targets attackable from multiple directions
+      if (this.hasBehavior('encirclement')) {
+        const attackDirs = owned.filter(t => t.adjacentTo.includes(targetId)).length;
+        if (attackDirs >= 3) planValue += 80;
+        else if (attackDirs >= 2) planValue += 40;
+      }
+
+      // Behavior: counter_player — focus attacks on human-controlled enemies
+      if (this.hasBehavior('counter_player')) {
+        const ownerFaction = target.owner ? this.state.factionRegistry.get(target.owner) : null;
+        if (ownerFaction?.controlledBy === 'human' && faction.isEnemyOf(target.owner!)) {
+          planValue += 60;
+        }
+      }
+
       plans.push({
         targetId,
         attackers,
         expectedSuccess: this.estimateSuccessRate(totalAttackPower, eval_.defenseStrength),
-        strategicValue: eval_.strategicValue,
+        strategicValue: planValue,
       });
+    }
+
+    // Behavior: deep_strikes — mobile units (movement >= 2) can attack non-adjacent targets
+    if (this.hasBehavior('deep_strikes')) {
+      for (const t of owned) {
+        for (const pu of t.units) {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          if (!ut || ut.attack === 0 || ut.movement < 2) continue;
+          const reachable = this.movementValidator.getValidMoves(pu.unitTypeId, t.id, true);
+          for (const vm of reachable) {
+            if (!vm.isAttack) continue;
+            if (potentialTargets.has(vm.territoryId)) continue; // normal plan already covers it
+            const eval_ = evaluations.get(vm.territoryId);
+            if (!eval_) continue;
+            plans.push({
+              targetId: vm.territoryId,
+              attackers: [{ fromId: t.id, unitTypeId: pu.unitTypeId, count: pu.count }],
+              expectedSuccess: this.estimateSuccessRate(pu.count * ut.attack, eval_.defenseStrength),
+              strategicValue: eval_.strategicValue + 30,
+            });
+          }
+        }
+      }
+    }
+
+    // Behavior: amphibious_focus — add transport-accessible coastal landing zones
+    if (this.hasBehavior('amphibious_focus')) {
+      for (const seaT of this.state.territories.values()) {
+        if (seaT.type !== 'sea' || seaT.owner !== faction.id) continue;
+        const hasTransport = seaT.units.some(pu => {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          return ut && ut.transportCapacity > 0;
+        });
+        if (!hasTransport) continue;
+        for (const coastId of seaT.adjacentTo) {
+          const coast = this.state.territories.get(coastId);
+          if (!coast || !coast.isLand() || !coast.owner || !faction.isEnemyOf(coast.owner)) continue;
+          if (plans.some(p => p.targetId === coastId)) continue;
+          const eval_ = evaluations.get(coastId);
+          if (!eval_) continue;
+          const landAttackers: AttackPlan['attackers'] = [];
+          let seaPower = 0;
+          for (const adjLandId of seaT.adjacentTo) {
+            if (adjLandId === coastId) continue;
+            const adjLand = this.state.territories.get(adjLandId);
+            if (!adjLand || adjLand.owner !== faction.id || !adjLand.isLand()) continue;
+            const inf = adjLand.units.find(u => u.unitTypeId === 'infantry');
+            if (inf && inf.count > 0) {
+              landAttackers.push({ fromId: adjLandId, unitTypeId: 'infantry', count: inf.count });
+              seaPower += inf.count * (this.state.unitRegistry.get('infantry')?.attack ?? 1);
+            }
+          }
+          if (landAttackers.length === 0) continue;
+          plans.push({
+            targetId: coastId,
+            attackers: landAttackers,
+            expectedSuccess: this.estimateSuccessRate(seaPower, eval_.defenseStrength),
+            strategicValue: eval_.strategicValue + 40,
+          });
+        }
+      }
     }
 
     return plans;
@@ -794,7 +978,8 @@ export class AIController {
       }
 
       // Retreat threshold: turtle bails sooner, aggressive AI pushes harder
-      const retreatThreshold = this.personality.id === 'turtle' ? 0.6
+      const retreatThreshold = this.hasBehavior('ignore_losses') ? 0
+        : this.personality.id === 'turtle' ? 0.6
         : this.personality.aggression > 0.8 ? 0.25 : 0.4;
 
       while (!combat.isComplete) {
@@ -843,8 +1028,9 @@ export class AIController {
       .filter(e => e.territory.owner === faction.id)
       .sort((a, b) => b.threatLevel - a.threatLevel);
 
-    // Turtle keeps 3 home; aggressive keeps 2
-    const keepHome = this.personality.defense > 0.7 ? 3 : 2;
+    const keepHome = this.hasBehavior('maximum_defense') ? 6
+      : this.hasBehavior('fortify_borders') ? 4
+      : this.personality.defense > 0.7 ? 3 : 2;
 
     const excess: { territoryId: string; unitTypeId: string; count: number }[] = [];
     for (const eval_ of ourTerritories) {
@@ -858,7 +1044,10 @@ export class AIController {
       }
     }
 
-    const threatThreshold = this.personality.defense > 0.7 ? 5 : 10;
+    const threatThreshold = this.hasBehavior('maximum_defense') ? 1
+      : this.hasBehavior('analyze_threats') ? 3
+      : this.hasBehavior('fortify_borders') ? 5
+      : this.personality.defense > 0.7 ? 5 : 10;
     for (const threatened of ourTerritories) {
       if (threatened.threatLevel < threatThreshold) continue;
       if (threatened.defenseStrength > threatened.threatLevel * 1.5) continue;
@@ -888,7 +1077,108 @@ export class AIController {
     }
   }
 
+  private hasBehavior(behavior: string): boolean {
+    return this.personality.specialBehaviors.includes(behavior);
+  }
+
+  private applyRandomFocusModifiers(): void {
+    const roll = Math.random();
+    if (roll < 0.2) {
+      this.personality.aggression = 0.9; this.personality.defense = 0.1;
+    } else if (roll < 0.4) {
+      this.personality.aggression = 0.15; this.personality.defense = 0.9;
+    } else if (roll < 0.6) {
+      this.personality.economy = 0.9; this.personality.aggression = 0.25;
+    } else if (roll < 0.8) {
+      this.personality.naval = 0.95; this.personality.air = 0.8;
+    } else {
+      this.personality.air = 0.95; this.personality.aggression = 0.75;
+    }
+  }
+
+  private applyHistoricalPriorities(factionId: string): void {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return;
+
+    // Infer historical archetype from faction bonuses and apply appropriate weights
+    const bonuses = faction.bonuses ?? {};
+
+    if ((bonuses.movementBonus ?? 0) > 0) {
+      // Mobile/blitz faction (e.g. Pacific Union) — fast strikes, expansion
+      this.personality.aggression = Math.min(1, this.personality.aggression + 0.2);
+      this.personality.expansion  = Math.min(1, this.personality.expansion  + 0.15);
+      this.personality.naval      = Math.min(1, this.personality.naval      + 0.1);
+    }
+    if ((bonuses.researchSpeedBonus ?? 0) > 0) {
+      // Tech-focused faction (e.g. Atlantic Alliance) — economy + air power
+      this.personality.economy = Math.min(1, this.personality.economy + 0.2);
+      this.personality.air     = Math.min(1, this.personality.air     + 0.15);
+      this.personality.aggression = Math.max(0, this.personality.aggression - 0.1);
+    }
+    if ((bonuses.unitCostDiscount ?? 0) > 0) {
+      // Mass-production faction (e.g. Southern Federation) — defense + attrition
+      this.personality.defense    = Math.min(1, this.personality.defense    + 0.2);
+      this.personality.economy    = Math.min(1, this.personality.economy    + 0.1);
+      this.personality.riskTolerance = Math.max(0, this.personality.riskTolerance - 0.1);
+    }
+    if ((bonuses.ipcPerFactory ?? 0) > 0) {
+      // Industrial faction — factories first, then overwhelming force
+      this.personality.economy    = Math.min(1, this.personality.economy    + 0.25);
+      this.personality.patience   = Math.min(1, this.personality.patience   + 0.15);
+      this.personality.aggression = Math.max(0, this.personality.aggression - 0.05);
+    }
+    if ((bonuses.incomeMultiplierBonus ?? 0) > 0) {
+      // Wealthy faction — naval and economic dominance
+      this.personality.naval   = Math.min(1, this.personality.naval   + 0.15);
+      this.personality.economy = Math.min(1, this.personality.economy + 0.1);
+    }
+  }
+
+  private addSurpriseAttack(
+    plans: AttackPlan[],
+    evaluations: Map<string, TerritoryEvaluation>,
+    faction: Faction
+  ): void {
+    const candidates = Array.from(this.state.territories.values()).filter(t =>
+      t.owner && faction.isEnemyOf(t.owner) && !plans.some(p => p.targetId === t.id)
+    );
+    if (candidates.length === 0) return;
+    const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
+    const eval_ = evaluations.get(randomTarget.id);
+    if (!eval_) return;
+
+    const attackers: AttackPlan['attackers'] = [];
+    let totalAttackPower = 0;
+    for (const ownedT of this.state.getTerritoriesOwnedBy(faction.id)) {
+      for (const pu of ownedT.units) {
+        const ut = this.state.unitRegistry.get(pu.unitTypeId);
+        if (!ut || ut.attack === 0 || ut.movement < 2) continue;
+        const validMoves = this.movementValidator.getValidMoves(pu.unitTypeId, ownedT.id, true);
+        if (validMoves.some(m => m.territoryId === randomTarget.id)) {
+          attackers.push({ fromId: ownedT.id, unitTypeId: pu.unitTypeId, count: pu.count });
+          totalAttackPower += pu.count * ut.attack;
+        }
+      }
+    }
+    if (attackers.length === 0) return;
+    plans.push({
+      targetId: randomTarget.id,
+      attackers,
+      expectedSuccess: this.estimateSuccessRate(totalAttackPower, eval_.defenseStrength),
+      strategicValue: eval_.strategicValue + 50,
+    });
+  }
+
+  // Speed multiplier: 1.0 = normal, 0.25 = fast, 2.0 = slow/cinematic
+  private speedMultiplier: number = 1.0;
+
+  setSpeed(multiplier: number): void {
+    this.speedMultiplier = Math.max(0.1, Math.min(3.0, multiplier));
+  }
+
+  getSpeed(): number { return this.speedMultiplier; }
+
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms * this.speedMultiplier));
   }
 }

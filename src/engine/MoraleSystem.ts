@@ -17,21 +17,41 @@ export class MoraleSystem {
       if (faction.isDefeated) continue;
 
       const allFactions = this.state.factionRegistry.getAll();
-      const enemyCount = allFactions.filter(
+      const enemies = allFactions.filter(
         f => f.id !== faction.id && !f.isDefeated &&
              this.state.diplomacyManager.getRelation(faction.id, f.id) === 'war'
-      ).length;
+      );
 
-      if (enemyCount > 0) {
-        // At war: weariness climbs
-        faction.warWeariness = Math.min(100, faction.warWeariness + enemyCount * 2);
+      if (enemies.length > 0) {
+        // At war: weariness climbs faster with more enemies
+        const wearyIncrease = enemies.length <= 1 ? 2 : enemies.length <= 2 ? 4 : 6;
+        faction.warWeariness = Math.min(100, faction.warWeariness + wearyIncrease);
+
+        // Territorial dominance partially offsets weariness (winning wars feel different)
+        const myCount = this.state.getTerritoriesOwnedBy(faction.id).length;
+        const enemyAvg = enemies.reduce((s, e) => s + this.state.getTerritoriesOwnedBy(e.id).length, 0) / enemies.length;
+        if (myCount > enemyAvg * 1.5) {
+          faction.warWeariness = Math.max(0, faction.warWeariness - 2);
+        }
       } else {
-        // At peace: weariness recovers
-        faction.warWeariness = Math.max(0, faction.warWeariness - 5);
+        // At peace: weariness recovers faster
+        faction.warWeariness = Math.max(0, faction.warWeariness - 8);
       }
 
       faction.morale = 100 - faction.warWeariness;
     }
+  }
+
+  /**
+   * Call when a faction wins a battle — reduces war weariness slightly.
+   * Capturing a capital or factory provides a larger morale boost.
+   */
+  recordVictory(factionId: string, isCapital: boolean = false, hasFactory: boolean = false): void {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return;
+    const recovery = isCapital ? 8 : hasFactory ? 5 : 3;
+    faction.warWeariness = Math.max(0, faction.warWeariness - recovery);
+    faction.morale = 100 - faction.warWeariness;
   }
 
   /**
@@ -41,9 +61,11 @@ export class MoraleSystem {
   getCombatModifier(factionId: string): number {
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction) return 0;
-    if (faction.morale >= 50) return 0;
-    if (faction.morale >= 25) return -1;
-    return -2;
+    if (faction.morale >= 80) return 1;   // High morale bonus
+    if (faction.morale >= 50) return 0;   // Normal
+    if (faction.morale >= 35) return -1;  // Minor penalty
+    if (faction.morale >= 20) return -2;  // Significant penalty
+    return -3;                            // Severe penalty (near collapse)
   }
 
   /**

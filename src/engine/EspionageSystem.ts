@@ -92,9 +92,34 @@ export interface EspionageResult {
   detail: string;
 }
 
+export interface EspionageHistoryEntry {
+  turn: number;
+  opType: EspionageOpType;
+  targetFactionId: string;
+  success: boolean;
+  exposed: boolean;
+  detail: string;
+}
+
 export class EspionageSystem {
   // territoryId -> turn when intel expires
   private intelRevealed: Map<string, number> = new Map();
+
+  // Per-faction op history (last 10 ops), keyed by initiatorId
+  private opHistory: Map<string, EspionageHistoryEntry[]> = new Map();
+
+  // Per-faction cooldown: factionId -> turn when next op is allowed
+  private cooldowns: Map<string, number> = new Map();
+
+  /** Returns the turn number when the next op is allowed, or 0 if ready. */
+  getCooldownUntil(factionId: string): number {
+    return this.cooldowns.get(factionId) ?? 0;
+  }
+
+  /** Returns last N ops for a faction, most-recent first. */
+  getHistory(factionId: string, limit = 5): EspionageHistoryEntry[] {
+    return (this.opHistory.get(factionId) ?? []).slice(0, limit);
+  }
 
   constructor(private state: GameState) {}
 
@@ -107,16 +132,28 @@ export class EspionageSystem {
     targetFactionId: string,
     opType: EspionageOpType
   ): EspionageResult {
-    const op = ESPIONAGE_OPS.find(o => o.type === opType)!;
+    const op = ESPIONAGE_OPS.find(o => o.type === opType);
     const initiator = this.state.factionRegistry.get(initiatorId);
     const target = this.state.factionRegistry.get(targetFactionId);
 
+    if (!op) {
+      return { success: false, exposed: false, opType, initiatorId, targetFactionId, detail: 'Unknown operation type.' };
+    }
     if (!initiator || !target) {
       return { success: false, exposed: false, opType, initiatorId, targetFactionId, detail: 'Invalid faction.' };
     }
 
     if (initiator.ipcs < op.cost) {
       return { success: false, exposed: false, opType, initiatorId, targetFactionId, detail: 'Insufficient IPCs.' };
+    }
+
+    // Enforce per-faction cooldown (1 turn between ops)
+    const cooldownUntil = this.getCooldownUntil(initiatorId);
+    if (this.state.turnNumber < cooldownUntil) {
+      return {
+        success: false, exposed: false, opType, initiatorId, targetFactionId,
+        detail: `Agents need ${cooldownUntil - this.state.turnNumber} more turn(s) to recover.`,
+      };
     }
 
     initiator.ipcs -= op.cost;
@@ -144,6 +181,15 @@ export class EspionageSystem {
     }
 
     const result: EspionageResult = { success, exposed, opType, initiatorId, targetFactionId, detail };
+
+    // Record history (cap at 10 entries per faction)
+    if (!this.opHistory.has(initiatorId)) this.opHistory.set(initiatorId, []);
+    const history = this.opHistory.get(initiatorId)!;
+    history.unshift({ turn: this.state.turnNumber, opType, targetFactionId, success, exposed, detail });
+    if (history.length > 10) history.pop();
+
+    // Set 1-turn cooldown
+    this.cooldowns.set(initiatorId, this.state.turnNumber + 1);
 
     this.state.emit('espionage_result', result);
     battleLog.logCombat(

@@ -4823,8 +4823,8 @@
       "hasFactory": true,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "india_n",
@@ -4861,8 +4861,8 @@
       "hasFactory": true,
       "isCapital": true,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "med_bot_w",
@@ -5003,8 +5003,8 @@
       "hasFactory": true,
       "isCapital": true,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "syria",
@@ -5041,8 +5041,8 @@
       "hasFactory": true,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "iraq",
@@ -5079,8 +5079,8 @@
       "hasFactory": true,
       "isCapital": true,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "iraq_e",
@@ -5117,8 +5117,8 @@
       "hasFactory": false,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "gulf_n",
@@ -5330,8 +5330,8 @@
       "hasFactory": true,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "india_c",
@@ -5368,8 +5368,8 @@
       "hasFactory": true,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "india_e",
@@ -5406,8 +5406,8 @@
       "hasFactory": false,
       "isCapital": false,
       "color": "#2471a3",
-      "owner": "allies_africa",
-      "originalOwner": "allies_africa"
+      "owner": "western_allies",
+      "originalOwner": "western_allies"
     },
     {
       "id": "indian_e_ef",

@@ -58,6 +58,14 @@ export class MovementValidator {
       return { valid: false, reason: `${unitType.name} cannot enter ${toTerritory.type} territory` };
     }
 
+    // Weather: air units grounded
+    if (unitType.domain === 'air') {
+      const weatherMods = this.state.systems.weatherSystem?.getWeatherModifiers('plains');
+      if (weatherMods?.airGrounded) {
+        return { valid: false, reason: 'Air units are grounded due to weather conditions' };
+      }
+    }
+
     const pathResult = this.findPath(fromTerritoryId, toTerritoryId, unitType);
     if (!pathResult.valid) {
       return pathResult;
@@ -70,7 +78,19 @@ export class MovementValidator {
     const movementBonus = unitType.domain !== 'sea'
       ? (currentFaction.bonuses?.movementBonus ?? 0)
       : 0;
-    const effectiveMovement = unitType.movement + movementBonus;
+
+    // Island Hopping ability: transports gain +1 movement for the turn it was activated
+    const islandHoppingTurns = this.state.systems.abilityState?.islandHoppingTurns;
+    const islandHoppingBonus =
+      unitType.id === 'transport' &&
+      islandHoppingTurns?.get(currentFaction.id) === this.state.turnNumber
+        ? 1 : 0;
+
+    const weatherPenalty = (this.state.systems.weatherSystem && unitType.domain === 'land')
+      ? (this.state.systems.weatherSystem.getWeatherModifiers('plains').movementPenalty ?? 0)
+      : 0;
+
+    const effectiveMovement = Math.max(1, unitType.movement + movementBonus + islandHoppingBonus - weatherPenalty);
 
     if (movementCost > effectiveMovement) {
       return { valid: false, reason: `Movement cost (${movementCost}) exceeds unit range (${effectiveMovement})` };
@@ -103,7 +123,13 @@ export class MovementValidator {
 
     const currentFaction = this.state.getCurrentFaction();
     if (!currentFaction) return [];
-    
+
+    // Weather: air units are grounded during fog/storm/blizzard
+    if (unitType.domain === 'air') {
+      const weatherMods = this.state.systems.weatherSystem?.getWeatherModifiers('plains');
+      if (weatherMods?.airGrounded) return [];
+    }
+
     // Check if there are any available units that haven't acted yet
     const availableCount = this.getAvailableUnits(fromTerritoryId, unitTypeId);
     if (availableCount <= 0) return [];
@@ -143,7 +169,14 @@ export class MovementValidator {
       const factionMoveBonus = unitType.domain !== 'sea'
         ? (currentFaction.bonuses?.movementBonus ?? 0) + techMoveBonus
         : 0;
-      if (current.cost >= unitType.movement + factionMoveBonus) continue;
+
+      // Weather movement penalty (land units only; air immune when not grounded)
+      const weatherSystem = this.state.systems.weatherSystem;
+      const weatherPenalty = (weatherSystem && unitType.domain === 'land')
+        ? (weatherSystem.getWeatherModifiers('plains').movementPenalty ?? 0)
+        : 0;
+
+      if (current.cost >= unitType.movement + factionMoveBonus - weatherPenalty) continue;
 
       const currentTerritory = this.state.territories.get(current.territoryId);
       if (!currentTerritory) continue;
@@ -184,10 +217,26 @@ export class MovementValidator {
           // so it can attack the territory BEYOND it on the next step
         }
 
+        // Zone of Control: during non-combat move, a friendly territory adjacent to an
+        // enemy-occupied territory is a ZOC territory — units entering it must stop.
+        // (Combat moves ignore ZOC; air units are always immune.)
+        const nextPath = [...current.path, adjId];
+        const nextCost = current.cost + 1;
+        if (!isCombatMove && this.isInEnemyZOC(adjId, unitType.domain)) {
+          // Unit CAN enter the ZOC territory but cannot continue beyond it
+          validMoves.push({
+            territoryId: adjId,
+            path: nextPath,
+            movementCost: nextCost,
+            isAttack: false,
+          });
+          continue;
+        }
+
         queue.push({
           territoryId: adjId,
-          path: [...current.path, adjId],
-          cost: current.cost + 1,
+          path: nextPath,
+          cost: nextCost,
         });
       }
     }
@@ -267,6 +316,31 @@ export class MovementValidator {
       }
     }
     return moves;
+  }
+
+  /**
+   * Returns true if a territory is within the Zone of Control (ZOC) of an enemy faction.
+   * A territory is in ZOC if any adjacent territory is owned by an enemy and has units.
+   * Air units are immune to ZOC; sea units are only affected by enemy sea units.
+   */
+  isInEnemyZOC(territoryId: string, unitDomain: string): boolean {
+    if (unitDomain === 'air') return false;
+
+    const territory = this.state.territories.get(territoryId);
+    if (!territory) return false;
+
+    const currentFaction = this.state.getCurrentFaction();
+    if (!currentFaction) return false;
+
+    for (const adjId of territory.adjacentTo) {
+      const adj = this.state.territories.get(adjId);
+      if (!adj || adj.owner === null) continue;
+      if (!currentFaction.isEnemyOf(adj.owner)) continue;
+      if (unitDomain === 'sea' && adj.type !== 'sea') continue;
+      if (unitDomain === 'land' && adj.type === 'sea') continue;
+      if (adj.getTotalUnitCount() > 0) return true;
+    }
+    return false;
   }
 
   /**

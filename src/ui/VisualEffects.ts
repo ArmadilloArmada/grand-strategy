@@ -121,7 +121,7 @@ export class VisualEffects {
     }
   }
   private drawExplosionParticle(p: Particle): void {
-    const size = p.size * (p.life / p.maxLife);
+    const size = Math.max(0, p.size * (p.life / p.maxLife));
     this.ctx.fillStyle = p.color;
     this.ctx.shadowBlur = 10;
     this.ctx.shadowColor = p.color;

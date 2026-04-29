@@ -16,6 +16,11 @@ interface ElectronAPI {
   openSteamOverlay(page: string): void;
   setRichPresence(status: string, details?: Record<string, string>): void;
 
+  // Steam Workshop
+  getWorkshopItems?(query?: string, tags?: string[]): Promise<import('../engine/SteamManager').WorkshopItem[]>;
+  subscribeWorkshopItem?(itemId: string): Promise<boolean>;
+  unsubscribeWorkshopItem?(itemId: string): Promise<boolean>;
+
   // Steam Cloud saves
   steamCloudWrite(filename: string, data: string): Promise<boolean>;
   steamCloudRead(filename: string): Promise<string | null>;
@@ -27,6 +32,17 @@ interface ElectronAPI {
   exportModFile(jsonString: string): Promise<string | null>;
   importModFile(): Promise<unknown>;
   deleteModFile(filename: string): Promise<void>;
+
+  // Native OS menu event listeners (Electron only)
+  onMenuNewGame?(callback: () => void): void;
+  onMenuSaveGame?(callback: () => void): void;
+  onMenuLoadGame?(callback: () => void): void;
+  onMenuSettings?(callback: () => void): void;
+  onMenuHelp?(callback: () => void): void;
+  onMenuZoomIn?(callback: () => void): void;
+  onMenuZoomOut?(callback: () => void): void;
+  onMenuZoomReset?(callback: () => void): void;
+  removeAllListeners?(channel: string): void;
 }
 
 declare global {
@@ -34,5 +50,7 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 }
+
+declare const __APP_VERSION__: string;
 
 export {};

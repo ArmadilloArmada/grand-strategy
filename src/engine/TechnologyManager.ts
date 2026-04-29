@@ -294,6 +294,10 @@ export class TechnologyManager {
     return this.getFactionTech(factionId).currentResearch;
   }
 
+  getResearchProgress(factionId: string): number {
+    return this.getFactionTech(factionId).researchProgress;
+  }
+
   startResearch(factionId: string, techId: string): boolean {
     const tech = TECHNOLOGIES.find(t => t.id === techId);
     if (!tech) return false;
@@ -317,7 +321,16 @@ export class TechnologyManager {
     // Apply faction research speed bonus (Atlantic Alliance gets +25% research points)
     const faction = this.state?.factionRegistry?.get(factionId);
     const speedBonus = faction?.bonuses?.researchSpeedBonus ?? 0;
-    ft.researchProgress += Math.round(points * (1 + speedBonus));
+
+    // Rare earth bonus: each owned rare_earth territory adds +8% research speed
+    const rareEarthCount = this.state?.territories
+      ? Array.from(this.state.territories.values()).filter(
+          t => t.owner === factionId && t.resource === 'rare_earth'
+        ).length
+      : 0;
+    const rareEarthBonus = rareEarthCount * 0.08;
+
+    ft.researchProgress += Math.round(points * (1 + speedBonus + rareEarthBonus));
     if (ft.researchProgress >= tech.cost) {
       ft.researched.add(ft.currentResearch);
       const completed = ft.currentResearch;

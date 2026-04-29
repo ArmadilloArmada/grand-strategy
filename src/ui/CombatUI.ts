@@ -8,11 +8,11 @@ import { MapRenderer } from '../renderer/MapRenderer';
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
-import { GameAction } from '../network/NetworkManager';
+import { generateBattleNarrative } from '../engine/BattleNarrator';
+import { settings } from './Settings';
 
 export interface CombatCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
-  sendAction(action: GameAction): void;
   renderMinimap(): void;
   updateFactionPanel(): void;
   updateSelectionInfo(): void;
@@ -313,15 +313,6 @@ export class CombatUI {
       for (const cu of combat.defenders) {
         if (cu.casualties > 0) defenderLosses[cu.unitType.id] = (defenderLosses[cu.unitType.id] ?? 0) + cu.casualties;
       }
-      this.callbacks.sendAction({
-        type: 'combat_result',
-        fromId: combat.sourceTerritory ?? '',
-        toId: combat.territoryId,
-        attackerLosses,
-        defenderLosses,
-        captured: combat.winner === 'attacker',
-        newOwner: targetTerritory?.owner ?? null,
-      });
 
       if (combat.winner === 'attacker') {
         this.callbacks.showToast(`Victory! Captured ${targetTerritory?.name}!`, 'success');
@@ -330,6 +321,32 @@ export class CombatUI {
         this.callbacks.showToast(`Attack failed. ${targetTerritory?.name} holds!`, 'info');
       } else {
         this.callbacks.showToast('Both sides destroyed!', 'info');
+      }
+
+      // Battle narrative
+      if (settings.getSetting('battleNarratives')) {
+        const atkFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+        const defFaction = this.state.factionRegistry.get(combat.defendingFactionId);
+        const atkCommander = combat.sourceTerritory
+          ? this.state.territories.get(combat.sourceTerritory)?.units.find(u => u.commander)?.commander?.name
+          : undefined;
+        const defCommander = targetTerritory?.units.find(u => u.commander)?.commander?.name;
+        const atkCasualties = combat.attackers.reduce((s, cu) => s + cu.casualties, 0);
+        const defCasualties = combat.defenders.reduce((s, cu) => s + cu.casualties, 0);
+        const narrative = generateBattleNarrative({
+          territoryName: targetTerritory?.name ?? combat.territoryId,
+          attackerFactionName: atkFaction?.name ?? 'Attacker',
+          defenderFactionName: defFaction?.name ?? 'Defender',
+          attackerCasualties: atkCasualties,
+          defenderCasualties: defCasualties,
+          winner: combat.winner,
+          attackerCommander: atkCommander,
+          defenderCommander: defCommander,
+          turnNumber: this.state.turnNumber,
+          isCapital: targetTerritory?.isCapital ?? false,
+          isWinter: this.state.currentSeason === 'winter',
+        });
+        this.showNarrativeToast(narrative);
       }
 
       this.state.pendingMoves = this.state.pendingMoves.filter(
@@ -348,6 +365,63 @@ export class CombatUI {
     const modal = document.getElementById('combat-modal');
     if (modal) modal.classList.add('hidden');
     this.activeCombat = null;
+  }
+
+  private showNarrativeToast(text: string): void {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'toast info';
+    el.style.cssText = 'font-style:italic;border-left:4px solid #c9a227;max-width:380px;line-height:1.4;';
+    el.textContent = `📜 ${text}`;
+    container.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.4s';
+      setTimeout(() => el.remove(), 400);
+    }, 6000);
+  }
+
+  /** Play a brief pre-combat clash animation overlay, then resolve. */
+  playCombatAnimation(attackerName: string, defenderName: string): Promise<void> {
+    if (!settings.getSetting('battleAnimations')) return Promise.resolve();
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.id = 'combat-animation-overlay';
+      overlay.style.cssText = [
+        'position:fixed','inset:0','z-index:8000','pointer-events:none',
+        'display:flex','align-items:center','justify-content:center',
+        'background:rgba(0,0,0,0.55)',
+      ].join(';');
+      overlay.innerHTML = `
+        <div style="display:flex;align-items:center;gap:3rem;font-size:1.8rem;font-weight:bold;color:#fff;
+                    text-shadow:0 2px 8px rgba(0,0,0,0.8);user-select:none;">
+          <span id="anim-atk" style="transform:translateX(-120px);opacity:0;transition:all 0.35s ease;">
+            ⚔️ ${attackerName}
+          </span>
+          <span style="font-size:2.5rem;animation:pulse 0.4s infinite alternate;">💥</span>
+          <span id="anim-def" style="transform:translateX(120px);opacity:0;transition:all 0.35s ease;">
+            ${defenderName} 🛡️
+          </span>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const atk = document.getElementById('anim-atk');
+          const def = document.getElementById('anim-def');
+          if (atk) { atk.style.transform = 'translateX(0)'; atk.style.opacity = '1'; }
+          if (def) { def.style.transform = 'translateX(0)'; def.style.opacity = '1'; }
+        });
+      });
+
+      setTimeout(() => {
+        overlay.style.transition = 'opacity 0.25s';
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.remove(); resolve(); }, 250);
+      }, 800);
+    });
   }
 
   // ==================== ATTACK HANDLING ====================
@@ -419,6 +493,7 @@ export class CombatUI {
       const currentFaction = this.state.getCurrentFaction();
       if (currentFaction) {
         territory.owner = currentFaction.id;
+        territory.units = [];
         for (const unit of attackingUnits) {
           territory.addUnits(unit.unitTypeId, unit.count);
         }
@@ -440,8 +515,27 @@ export class CombatUI {
     );
 
     if (combat) {
+      // Flanking: attackers from more than one source territory get +1 attack
+      const distinctSources = new Set(attackingMoves.map(m => m.fromTerritoryId));
+      if (distinctSources.size > 1) combat.flankingBonus = 1;
+
+      // Air superiority: defending fighters intercept attacking air units pre-combat
+      const interceptResult = this.combatResolver.performFighterIntercept(combat);
+      if (interceptResult.hits > 0) {
+        const faction = this.state.getCurrentFaction();
+        if (faction) {
+          battleLog.logCombat(
+            this.state.turnNumber, faction.name, faction.color,
+            `✈️ Air intercept: ${interceptResult.hits} hit(s) on attacking air units`
+          );
+        }
+      }
+
       this.activeCombat = combat;
-      this.showCombatModal(combat);
+      const atkFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      const defFaction = this.state.factionRegistry.get(combat.defendingFactionId);
+      this.playCombatAnimation(atkFaction?.name ?? 'Attacker', defFaction?.name ?? 'Defender')
+        .then(() => this.showCombatModal(combat));
     } else {
       for (const move of attackingMoves) {
         const fromTerritory = this.state.territories.get(move.fromTerritoryId);
@@ -580,9 +674,12 @@ export class CombatUI {
     if (defendingUnits.length === 0) {
       for (const au of attackingUnits) {
         fromTerritory.removeUnits(au.unitTypeId, au.count);
-        toTerritory.addUnits(au.unitTypeId, au.count);
       }
       toTerritory.owner = faction.id;
+      toTerritory.units = [];
+      for (const au of attackingUnits) {
+        toTerritory.addUnits(au.unitTypeId, au.count);
+      }
       this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
       soundManager.play('capture');
       battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
@@ -591,7 +688,6 @@ export class CombatUI {
       return;
     }
 
-    const savedFrom = this.pendingAttackFrom;
     const combat = this.combatResolver.initiateCombat(
       toTerritory.id,
       faction.id,
@@ -603,7 +699,7 @@ export class CombatUI {
       return;
     }
 
-    combat.sourceTerritory = savedFrom;
+    combat.sourceTerritory = fromTerritory.id;
     this.showCombatModal(combat);
     soundManager.play('combat_start');
     battleLog.logCombat(this.state.turnNumber, faction.name, faction.color, `Attacking ${toTerritory.name}`);

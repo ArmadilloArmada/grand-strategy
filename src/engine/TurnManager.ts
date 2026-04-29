@@ -99,6 +99,7 @@ export class TurnManager {
       return;
     }
 
+    this.checkSurrenders();
     this.checkVictoryProximity();
 
     const nextIndex = (currentIndex + 1) % factions.length;
@@ -112,6 +113,9 @@ export class TurnManager {
 
       // Tick morale/war weariness
       this.state.systems.moraleSystem?.tickAll?.();
+
+      // Tick weather events
+      this.state.systems.weatherSystem?.tick?.();
 
       // Tick nuclear readiness
       this.state.systems.nuclearSystem?.tickReadiness?.();
@@ -208,7 +212,18 @@ export class TurnManager {
 
     const baseIncome = this.state.calculateIncome(faction.id);
     const moraleMultiplier = this.state.systems.moraleSystem?.getIncomeModifier?.(faction.id) ?? 1;
-    const income = Math.floor(baseIncome * moraleMultiplier);
+    let income = Math.floor(baseIncome * moraleMultiplier);
+
+    // Marshall Plan deferred +5 IPC trade dividend
+    const abilityState = this.state.systems.abilityState;
+    if (abilityState) {
+      const bonus = abilityState.pendingIPCBonuses.get(faction.id) ?? 0;
+      if (bonus > 0) {
+        income += bonus;
+        abilityState.pendingIPCBonuses.delete(faction.id);
+      }
+    }
+
     faction.addIPCs(income);
 
     this.state.emit("income_collected", {
@@ -265,6 +280,21 @@ export class TurnManager {
           factionName: faction.name,
           factionColor: faction.color,
           message: warning,
+        });
+      }
+    }
+  }
+
+  private checkSurrenders(): void {
+    for (const faction of this.state.factionRegistry.getAll()) {
+      if (faction.isDefeated) continue;
+      if (faction.warWeariness >= 100) {
+        faction.defeat();
+        this.state.emit('game_event', {
+          type: 'surrender',
+          factionId: faction.id,
+          factionName: faction.name,
+          message: `${faction.name} has surrendered due to war weariness!`,
         });
       }
     }

@@ -194,20 +194,15 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  border: 3px solid var(--bg-elevated);
-  border-radius: var(--radius-lg);
-  box-shadow: 
-    var(--shadow-lg),
-    inset 0 0 30px rgba(0,0,0,0.3);
+  border: 2px solid var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
   cursor: crosshair;
   transition: box-shadow var(--transition-normal);
 }
 
 #game-canvas:hover {
-  box-shadow: 
-    var(--shadow-lg),
-    inset 0 0 30px rgba(0,0,0,0.3),
-    0 0 40px rgba(184, 134, 11, 0.1);
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(184, 134, 11, 0.1);
 }
 
 /* ==================== HUD Layout ==================== */
@@ -348,6 +343,7 @@ body {
   left: 1rem;
   width: 320px;
   padding: 1.25rem;
+  z-index: 300;
   background: var(--panel-bg);
   backdrop-filter: blur(16px);
   border: 1px solid var(--panel-border);
@@ -599,12 +595,26 @@ body {
   flex-shrink: 0;
 }
 
-/* Icon-only utility buttons */
+/* Utility buttons: emoji + short label */
 #action-buttons .utility-btn {
-  padding: 0.55rem 0.7rem;
-  font-size: 1.1rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
   background: rgba(0,0,0,0.03);
   border-color: rgba(0,0,0,0.07);
+  gap: 0.2rem;
+}
+
+/* Phase-active: brighten buttons that are usable in the current phase */
+#action-buttons button.phase-active {
+  background: rgba(184, 134, 11, 0.08);
+  border-color: rgba(184, 134, 11, 0.45);
+  box-shadow: 0 0 8px rgba(184, 134, 11, 0.18);
+}
+#action-buttons button.phase-active:not(:disabled) {
+  opacity: 1;
+}
+#action-buttons button.phase-active:disabled {
+  opacity: 0.45;
 }
 
 @keyframes slideUp {
@@ -699,9 +709,8 @@ body {
   left: 1rem;
   width: 44px;
   height: 44px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--panel-border);
+  background: rgba(240, 230, 210, 1);
+  border: 1px solid rgba(139, 105, 20, 0.45);
   border-radius: var(--radius-full);
   font-family: 'Inter', sans-serif;
   font-size: 1.25rem;
@@ -711,6 +720,13 @@ body {
   box-shadow: var(--shadow-md);
   transition: all var(--transition-normal);
   animation: fadeIn 0.4s ease-out 0.1s both;
+}
+
+body.theme-dark #help-button {
+  background: rgba(18, 28, 52, 1);
+  border-color: rgba(200, 144, 48, 0.5);
+  color: #c89030;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
 #help-button:hover {
@@ -750,6 +766,7 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg);
   padding: 2rem;
+  padding-top: 2.75rem; /* room for the sticky × close button */
   min-width: 400px;
   max-width: 700px;
   max-height: 85vh;
@@ -758,6 +775,35 @@ body {
   box-shadow: var(--shadow-lg), 0 0 40px rgba(0,0,0,0.15);
   position: relative;
   animation: modalSlideUp 0.3s ease-out;
+}
+
+/* Universal × close button — always visible at top-right of modal */
+.modal-x-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  clear: right;
+  margin: -2rem -1.25rem 0.25rem 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  color: #aaa;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  z-index: 10;
+  padding: 0 0 0.1rem 0; /* slight optical correction for × glyph */
+}
+.modal-x-close:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
 }
 
 @keyframes modalSlideUp {
@@ -1456,11 +1502,12 @@ body {
 }
 
 .toast {
-  padding: 0.85rem 1.25rem;
+  padding: 0.55rem 0.9rem;
   background: var(--panel-bg);
   backdrop-filter: blur(16px);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
+  font-size: 0.82rem;
   color: var(--text-light);
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
@@ -1805,110 +1852,162 @@ body {
 /* ==================== Battle Log Panel ==================== */
 
 #battle-log-panel {
-  position: absolute;
-  top: 4rem;
-  left: 1rem;
-  width: 280px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 300px;
   background: var(--panel-bg);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-md);
-  animation: slideInLeft 0.4s ease-out 0.2s both;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
   transition: all var(--transition-normal);
-}
-
-#battle-log-panel:hover {
-  box-shadow: var(--shadow-lg);
 }
 
 #battle-log-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: rgba(0,0,0,0.03);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-light);
+  padding: 0.45rem 0.75rem;
+  background: rgba(184, 134, 11, 0.07);
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--gold-bright);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  user-select: none;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  border-radius: 10px 10px 0 0;
 }
 
 #battle-log-header:hover {
-  background: rgba(0,0,0,0.04);
+  background: rgba(184, 134, 11, 0.12);
 }
 
 #battle-log-header button {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all var(--transition-fast);
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
+  padding: 0;
 }
 
 #battle-log-header button:hover {
   background: rgba(0,0,0,0.08);
-  color: var(--text-light);
+  color: var(--text-dark);
 }
 
-#battle-log-panel.collapsed #battle-log-header button {
-  transform: rotate(-90deg);
+#battle-log-panel.collapsed #battle-log-header #btn-toggle-log {
+  transform: rotate(180deg);
 }
 
 #battle-log-content {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+  max-height: 220px;
 }
 
 #battle-log-panel.collapsed #battle-log-content {
-  display: none;
+  max-height: 0;
+}
+
+#battle-log-search {
+  display: flex;
+  gap: 4px;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--panel-border);
+  flex-shrink: 0;
+}
+
+#blog-filter-text {
+  flex: 1;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text-light);
+  padding: 3px 8px;
+  font-size: 0.73rem;
+  outline: none;
+}
+
+#blog-filter-text:focus {
+  border-color: var(--accent);
+}
+
+#blog-filter-type {
+  background: rgba(0,0,0,0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 3px 4px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+#battle-log-entries {
+  overflow-y: auto;
+  padding: 4px 6px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+  flex: 1;
+}
+
+#battle-log-entries::-webkit-scrollbar {
+  width: 4px;
+}
+
+#battle-log-entries::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#battle-log-entries::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  border-radius: 2px;
 }
 
 .log-entry {
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.35rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  border-left: 3px solid var(--panel-border);
-  background: rgba(0,0,0,0.02);
-  transition: all var(--transition-fast);
+  padding: 0.3rem 0.4rem;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  font-size: 0.73rem;
+  border-left: 2px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-muted);
+  transition: background var(--transition-fast);
+  line-height: 1.4;
 }
 
 .log-entry:hover {
-  background: rgba(0,0,0,0.04);
-  transform: translateX(2px);
+  background: rgba(0, 0, 0, 0.07);
 }
 
-.log-entry.combat { border-left-color: var(--danger); }
-.log-entry.move { border-left-color: var(--info); }
-.log-entry.build { border-left-color: var(--success); }
-.log-entry.income { border-left-color: var(--warning); }
-.log-entry.capture { border-left-color: #a78bfa; }
+.log-entry.log-type-combat  { border-left-color: #ef4444; }
+.log-entry.log-type-capture { border-left-color: #a78bfa; }
+.log-entry.log-type-build   { border-left-color: #22c55e; }
+.log-entry.log-type-income  { border-left-color: #f59e0b; }
+.log-entry.log-type-move    { border-left-color: #60a5fa; }
+.log-entry.log-type-general { border-left-color: #64748b; }
 
-.log-entry .log-turn {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-bottom: 0.2rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.log-entry .log-message {
-  color: var(--text-light);
-  line-height: 1.4;
-}
+.log-icon    { font-size: 0.68rem; margin-right: 0.2rem; }
+.log-faction { font-weight: 700; font-size: 0.68rem; margin-right: 0.25rem; }
+.log-message { color: #94a3b8; }
+.log-turn    { float: right; color: #334155; font-size: 0.63rem; margin-left: 0.4rem; }
 
 /* ==================== New Game Modal ==================== */
 
@@ -2301,7 +2400,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0;
-  margin-top: 0;
+  margin: 0 auto;
+  width: fit-content;
   padding: 0.3rem 0.75rem;
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
@@ -2393,7 +2493,8 @@ body {
   display: flex;
   justify-content: center;
   gap: 0.3rem;
-  margin-top: 0.25rem;
+  margin: 0.25rem auto 0;
+  width: fit-content;
   animation: fadeIn 0.4s ease-out 0.4s both;
 }
 
@@ -2717,9 +2818,13 @@ body {
     font-size: 0.8rem;
   }
   
-  #faction-panel,
-  #battle-log-panel {
+  #faction-panel {
     display: none;
+  }
+
+  #battle-log-panel {
+    width: 100%;
+    border-radius: 8px 8px 0 0;
   }
   
   #minimap-container {
@@ -2777,6 +2882,7 @@ body {
   .modal-content {
     min-width: 90vw;
     padding: 1.25rem;
+    padding-top: 2.5rem; /* preserve room for sticky × close button */
     margin: 1rem;
     max-height: calc(100vh - 2rem);
   }
@@ -2815,8 +2921,9 @@ body {
   
   .modal-content {
     padding: 1rem;
+    padding-top: 2.25rem; /* preserve room for sticky × close button */
   }
-  
+
   #build-options {
     grid-template-columns: 1fr 1fr;
   }
@@ -3666,6 +3773,8 @@ kbd.kbd-hint {
 .fb-ipc .fb-val {
   margin-left: 0.2rem;
   color: #8b6914;
+  width: auto;
+  white-space: nowrap;
 }
 
 /* Minimap threat toggle button */
@@ -3757,6 +3866,7 @@ kbd.kbd-hint {
   top: 50%;
   right: 1rem;
   transform: translateY(-50%);
+  pointer-events: auto;
   min-width: 220px;
   background: rgba(8, 14, 30, 0.96);
   border: 1px solid var(--result-color, #ffd700);
@@ -3896,3 +4006,341 @@ kbd.kbd-hint {
   accent-color: #b8860b;
   cursor: pointer;
 }
+
+/* ==================== Dark War-Room Theme (body.theme-dark) ==================== */
+
+body.theme-dark .turn-banner {
+  background: rgba(10,17,34,0.94);
+  border-color: rgba(200,144,48,0.55);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(200,144,48,0.15);
+}
+body.theme-dark .turn-banner:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6), 0 0 20px rgba(200,144,48,0.18), inset 0 1px 0 rgba(200,144,48,0.2);
+}
+body.theme-dark .turn-banner span,
+body.theme-dark #current-faction {
+  color: #e8d8a8;
+}
+body.theme-dark #current-phase {
+  color: #b0a080;
+}
+body.theme-dark #turn-number {
+  color: #c89030;
+  border-left-color: rgba(200,144,48,0.3);
+}
+body.theme-dark #current-faction {
+  border-right-color: rgba(200,144,48,0.3);
+}
+
+body.theme-dark #resources {
+  background: linear-gradient(135deg, rgba(10,17,34,0.92) 0%, rgba(18,28,52,0.96) 100%);
+  border-color: rgba(200,144,48,0.5);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(200,144,48,0.12);
+}
+body.theme-dark #resources:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55), 0 0 18px rgba(200,144,48,0.2);
+}
+body.theme-dark #ipc-display {
+  color: #d4a020;
+  text-shadow: 0 0 8px rgba(200,144,48,0.4);
+}
+
+body.theme-dark #selection-info {
+  background: rgba(10,17,34,0.94);
+  border-color: rgba(200,144,48,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(200,144,48,0.12);
+  color: #e0cfa0;
+}
+body.theme-dark #selection-info:hover {
+  box-shadow: 0 10px 32px rgba(0,0,0,0.6), 0 0 20px rgba(200,144,48,0.15);
+}
+body.theme-dark #selection-info::before {
+  background: linear-gradient(90deg, #b8860b, #d4a017, #b8860b);
+}
+body.theme-dark #selection-info h3,
+body.theme-dark #selection-info .territory-name {
+  color: #d4a020;
+}
+body.theme-dark #selection-info p,
+body.theme-dark #selection-info span,
+body.theme-dark #selection-info td,
+body.theme-dark #selection-info th {
+  color: #b8a880;
+}
+
+body.theme-dark #action-buttons {
+  background: rgba(10,17,34,0.94);
+  border-color: rgba(200,144,48,0.45);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(200,144,48,0.12);
+}
+body.theme-dark #action-buttons button {
+  background: rgba(255,255,255,0.04);
+  color: #e0cfa0;
+  border-color: rgba(200,144,48,0.22);
+}
+body.theme-dark #action-buttons button:hover:not(:disabled) {
+  background: rgba(200,144,48,0.12);
+  border-color: rgba(200,144,48,0.6);
+  color: #f0e0a8;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 12px rgba(200,144,48,0.2);
+}
+body.theme-dark #action-buttons button:disabled {
+  color: #6a5a38;
+  border-color: rgba(200,144,48,0.1);
+  opacity: 0.45;
+}
+body.theme-dark .btn-separator {
+  background: rgba(200,144,48,0.2);
+}
+body.theme-dark #action-buttons .utility-btn {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(200,144,48,0.15);
+}
+body.theme-dark #btn-end-phase {
+  background: linear-gradient(135deg, rgba(37,99,168,0.2), rgba(37,99,168,0.28));
+  border-color: rgba(96,165,250,0.4);
+}
+body.theme-dark #btn-end-phase:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(37,99,168,0.3), rgba(37,99,168,0.42));
+}
+
+body.theme-dark .modal-overlay {
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(4px);
+}
+body.theme-dark .modal-content {
+  background: rgba(10,17,34,0.97);
+  border-color: rgba(200,144,48,0.45);
+  color: #e0cfa0;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 32px rgba(200,144,48,0.08);
+}
+body.theme-dark .modal-content h2 {
+  color: #d4a020;
+  text-shadow: 0 0 12px rgba(200,144,48,0.3);
+}
+body.theme-dark .modal-content h3 {
+  color: #c89030;
+  border-bottom-color: rgba(200,144,48,0.25);
+}
+body.theme-dark .modal-content p,
+body.theme-dark .modal-content label,
+body.theme-dark .modal-content td,
+body.theme-dark .modal-content th,
+body.theme-dark .modal-content li {
+  color: #b8a880;
+}
+body.theme-dark .modal-subtitle {
+  color: #907860;
+}
+body.theme-dark .modal-content button {
+  background: rgba(255,255,255,0.04);
+  color: #e0cfa0;
+  border-color: rgba(200,144,48,0.25);
+}
+body.theme-dark .modal-content button:hover:not(:disabled) {
+  background: rgba(200,144,48,0.12);
+  border-color: rgba(200,144,48,0.6);
+  color: #f0e0a8;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 12px rgba(200,144,48,0.2);
+}
+body.theme-dark .modal-content button.primary {
+  background: linear-gradient(135deg, #9a6e08, #c08818);
+  color: #fff8e8;
+  border-color: #b8860b;
+}
+body.theme-dark .modal-content button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b8860b, #d4a017);
+  box-shadow: 0 4px 20px rgba(200,144,48,0.45);
+}
+body.theme-dark .modal-content button.danger {
+  background: rgba(197,48,48,0.12);
+  border-color: rgba(220,60,60,0.5);
+  color: #f08080;
+}
+body.theme-dark .modal-content button.danger:hover:not(:disabled) {
+  background: rgba(197,48,48,0.22);
+  box-shadow: 0 4px 20px rgba(197,48,48,0.25);
+}
+body.theme-dark .modal-status-bar {
+  background: rgba(200,144,48,0.08);
+  border-color: rgba(200,144,48,0.2);
+}
+body.theme-dark .modal-content input[type="checkbox"] { accent-color: #c89030; }
+body.theme-dark .modal-content input[type="range"]    { accent-color: #c89030; }
+body.theme-dark .modal-content select,
+body.theme-dark .modal-content input[type="text"],
+body.theme-dark .modal-content input[type="number"] {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(200,144,48,0.3);
+  color: #e0cfa0;
+  border-radius: 6px;
+}
+body.theme-dark .modal-content select option {
+  background: #0a1122;
+  color: #e0cfa0;
+}
+body.theme-dark .modal-section-header,
+body.theme-dark .section-header {
+  color: #c89030;
+  border-bottom-color: rgba(200,144,48,0.25);
+}
+
+/* Battle log — dark theme */
+body.theme-dark #battle-log-panel {
+  background: rgba(10,17,34,0.94);
+  border-color: rgba(200,144,48,0.45);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+body.theme-dark #battle-log-header {
+  background: rgba(200,144,48,0.08);
+  border-bottom-color: rgba(200,144,48,0.25);
+  color: #c89030;
+}
+body.theme-dark #battle-log-header:hover {
+  background: rgba(200,144,48,0.13);
+}
+body.theme-dark #battle-log-header button { color: #7a6a48; }
+body.theme-dark #battle-log-header button:hover { background: rgba(255,255,255,0.06); color: #e0cfa0; }
+body.theme-dark #battle-log-search {
+  background: rgba(0,0,0,0.25);
+  border-bottom-color: rgba(200,144,48,0.2);
+}
+body.theme-dark #blog-filter-text,
+body.theme-dark #blog-filter-type {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(200,144,48,0.2);
+  color: #b8a880;
+}
+body.theme-dark #blog-filter-type option { background: #0a1122; color: #b8a880; }
+body.theme-dark .log-entry {
+  border-left-color: rgba(200,144,48,0.2);
+  background: rgba(255,255,255,0.02);
+  color: #a09070;
+}
+body.theme-dark .log-entry:hover { background: rgba(255,255,255,0.05); }
+body.theme-dark #battle-log-entries {
+  scrollbar-color: rgba(200,144,48,0.3) transparent;
+}
+
+/* HUD theme toggle button */
+#btn-theme-toggle {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* ==================== End Dark War-Room Theme ==================== */
+
+/* ==================== Draggable Panels ==================== */
+
+/* Panels converted to fixed positioning by DragManager */
+.draggable-panel {
+  position: fixed !important;
+}
+
+/* Any element used as a drag handle gets a grab cursor */
+.drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Body-level state while a panel is being dragged */
+body.dragging-active {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* Panel appearance while being dragged */
+.draggable-panel.is-dragging {
+  opacity: 0.88;
+  z-index: 9100 !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5),
+              0 0 0 2px var(--gold-bright) !important;
+  transition: none !important;
+}
+body.theme-dark .draggable-panel.is-dragging {
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7),
+              0 0 0 2px rgba(200,144,48,0.9) !important;
+}
+
+/* Subtle ⠿ dot shown on hover for element-as-handle panels */
+.panel-drag-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--gold-bright);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.draggable-panel:hover .panel-drag-dot {
+  opacity: 0.45;
+}
+.draggable-panel.is-dragging .panel-drag-dot {
+  opacity: 0;
+}
+
+/* Injected gripper strip for #action-buttons (whose children are all buttons) */
+.panel-grip {
+  display: flex;
+  align-items: center;
+  padding: 0 7px 0 5px;
+  cursor: grab;
+  color: var(--gold-bright);
+  opacity: 0.35;
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0,0,0,0.1);
+  transition: opacity 0.15s;
+}
+.panel-grip:hover { opacity: 0.75; }
+.panel-grip:active { cursor: grabbing; opacity: 1; }
+body.theme-dark .panel-grip {
+  border-right-color: rgba(200,144,48,0.15);
+}
+
+/* ==================== End Draggable Panels ==================== */
+
+/* ==================== Micro-animation Polish ==================== */
+
+/* IPC counter flash: green on gain, red on spend */
+@keyframes ipcGain {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.18); color: #4ade80; text-shadow: 0 0 10px rgba(74,222,128,0.55); }
+  100% { transform: scale(1); }
+}
+@keyframes ipcSpend {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(0.88); color: #f87171; }
+  100% { transform: scale(1); }
+}
+.ipc-treasury.flash-gain  { animation: ipcGain  0.55s ease-out; }
+.ipc-treasury.flash-spend { animation: ipcSpend 0.45s ease-out; }
+
+/* Phase step pop when newly activated */
+@keyframes phaseActivate {
+  0%   { box-shadow: 0 0 8px  rgba(184,134,11,0.1); }
+  40%  { box-shadow: 0 0 22px rgba(184,134,11,0.55); }
+  100% { box-shadow: 0 0 15px rgba(184,134,11,0.2); }
+}
+.phase-step.active-pop { animation: phaseActivate 0.5s ease-out; }
+
+/* Selection info content fade-in when territory changes */
+@keyframes contentRefresh {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.content-refresh { animation: contentRefresh 0.2s ease-out; }
+
+/* Context helper text fade-in when message changes */
+@keyframes textFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#context-helper-text.text-fade-in { animation: textFadeIn 0.22s ease-out; }

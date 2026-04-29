@@ -20,6 +20,8 @@ export class BattleLog {
   private nextId: number = 1;
   private isCollapsed: boolean = false;
   private maxEntries: number = 100;
+  private filterText: string = '';
+  private filterType: LogEntryType | 'all' = 'all';
 
   constructor() {
     this.setupEventListeners();
@@ -34,6 +36,18 @@ export class BattleLog {
     document.getElementById('btn-toggle-log')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggle();
+    });
+    document.getElementById('btn-clear-log')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.clear();
+    });
+    document.getElementById('blog-filter-text')?.addEventListener('input', (e) => {
+      this.filterText = (e.target as HTMLInputElement).value.toLowerCase();
+      this.render();
+    });
+    document.getElementById('blog-filter-type')?.addEventListener('change', (e) => {
+      this.filterType = (e.target as HTMLSelectElement).value as LogEntryType | 'all';
+      this.render();
     });
   }
 
@@ -137,7 +151,7 @@ export class BattleLog {
   }
 
   /**
-   * Render the log entries to the DOM
+   * Render the log entries to the DOM, applying search and type filters.
    */
   private render(): void {
     if (typeof document === 'undefined') return;
@@ -153,7 +167,21 @@ export class BattleLog {
       general: '📋',
     };
 
-    container.innerHTML = this.entries.map(entry => `
+    const visible = this.entries.filter(e => {
+      if (this.filterType !== 'all' && e.type !== this.filterType) return false;
+      if (this.filterText) {
+        const haystack = `${e.faction} ${e.message}`.toLowerCase();
+        if (!haystack.includes(this.filterText)) return false;
+      }
+      return true;
+    });
+
+    if (visible.length === 0) {
+      container.innerHTML = '<div style="color:#4b5563;font-size:0.8rem;padding:8px;text-align:center;">No entries match filter</div>';
+      return;
+    }
+
+    container.innerHTML = visible.map(entry => `
       <div class="log-entry log-type-${entry.type}">
         <span class="log-icon">${icons[entry.type]}</span>
         <span class="log-faction" style="color:${entry.factionColor}">${entry.faction}</span>
