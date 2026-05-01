@@ -90,7 +90,15 @@ describe('MoraleSystem — tickAll skips defeated factions', () => {
 });
 
 describe('MoraleSystem — getCombatModifier', () => {
-  it('returns 0 when morale >= 50', () => {
+  it('returns 1 when morale is 80 or higher', () => {
+    const state = buildState();
+    const morale = new MoraleSystem(state);
+    const alpha = state.factionRegistry.get('alpha')!;
+    alpha.morale = 85;
+    expect(morale.getCombatModifier('alpha')).toBe(1);
+  });
+
+  it('returns 0 when morale is 50..79', () => {
     const state = buildState();
     const morale = new MoraleSystem(state);
     const alpha = state.factionRegistry.get('alpha')!;
@@ -98,20 +106,28 @@ describe('MoraleSystem — getCombatModifier', () => {
     expect(morale.getCombatModifier('alpha')).toBe(0);
   });
 
-  it('returns -1 when morale is 25..49', () => {
+  it('returns -1 when morale is 35..49', () => {
+    const state = buildState();
+    const morale = new MoraleSystem(state);
+    const alpha = state.factionRegistry.get('alpha')!;
+    alpha.morale = 40;
+    expect(morale.getCombatModifier('alpha')).toBe(-1);
+  });
+
+  it('returns -2 when morale is 20..34', () => {
     const state = buildState();
     const morale = new MoraleSystem(state);
     const alpha = state.factionRegistry.get('alpha')!;
     alpha.morale = 30;
-    expect(morale.getCombatModifier('alpha')).toBe(-1);
+    expect(morale.getCombatModifier('alpha')).toBe(-2);
   });
 
-  it('returns -2 when morale < 25', () => {
+  it('returns -3 when morale is below 20', () => {
     const state = buildState();
     const morale = new MoraleSystem(state);
     const alpha = state.factionRegistry.get('alpha')!;
     alpha.morale = 10;
-    expect(morale.getCombatModifier('alpha')).toBe(-2);
+    expect(morale.getCombatModifier('alpha')).toBe(-3);
   });
 
   it('returns 0 for unknown faction', () => {

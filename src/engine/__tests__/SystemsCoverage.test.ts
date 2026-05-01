@@ -47,28 +47,36 @@ describe('MoraleSystem', () => {
     expect(faction.warWeariness).toBeLessThan(20);
   });
 
-  it('getCombatModifier returns 0 for high morale', () => {
+  it('getCombatModifier returns 1 for high morale', () => {
     const { state, attackerFactionId } = buildCombatState();
     const morale = new MoraleSystem(state);
 
     state.factionRegistry.get(attackerFactionId)!.morale = 100;
-    expect(morale.getCombatModifier(attackerFactionId)).toBe(0);
+    expect(morale.getCombatModifier(attackerFactionId)).toBe(1);
   });
 
-  it('getCombatModifier returns -1 for mid morale (25-49)', () => {
+  it('getCombatModifier returns -1 for low morale (35-49)', () => {
+    const { state, attackerFactionId } = buildCombatState();
+    const morale = new MoraleSystem(state);
+
+    state.factionRegistry.get(attackerFactionId)!.morale = 40;
+    expect(morale.getCombatModifier(attackerFactionId)).toBe(-1);
+  });
+
+  it('getCombatModifier returns -2 for very low morale (20-34)', () => {
     const { state, attackerFactionId } = buildCombatState();
     const morale = new MoraleSystem(state);
 
     state.factionRegistry.get(attackerFactionId)!.morale = 30;
-    expect(morale.getCombatModifier(attackerFactionId)).toBe(-1);
+    expect(morale.getCombatModifier(attackerFactionId)).toBe(-2);
   });
 
-  it('getCombatModifier returns -2 for very low morale', () => {
+  it('getCombatModifier returns -3 for collapse morale', () => {
     const { state, attackerFactionId } = buildCombatState();
     const morale = new MoraleSystem(state);
 
     state.factionRegistry.get(attackerFactionId)!.morale = 10;
-    expect(morale.getCombatModifier(attackerFactionId)).toBe(-2);
+    expect(morale.getCombatModifier(attackerFactionId)).toBe(-3);
   });
 
   it('getIncomeModifier scales between 0.7 and 1.0', () => {

@@ -32,27 +32,11 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes('/src/engine/AIController') || id.includes('/src/engine/AIPersonalities')) {
-            return 'ai';
-          }
-          if (id.includes('/src/engine/')) {
-            return 'engine';
-          }
-          if (id.includes('/src/ui/')) {
-            return 'ui';
-          }
-          if (id.includes('/src/renderer/')) {
-            return 'renderer';
-          }
+          const normalizedId = id.replace(/\\/g, '/');
+          if (normalizedId.includes('/assets/maps/')) return 'maps';
+          if (normalizedId.includes('/assets/units/')) return 'units';
         },
       },
     },
   },
 });
-
-
-
-
-
-
-
