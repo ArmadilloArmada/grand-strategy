@@ -115,6 +115,32 @@ export class DragManager {
     location.reload();
   }
 
+  /**
+   * Snap all panels back to their designed defaults immediately, without a page reload.
+   * Clears saved positions so they won't drift back on next setup().
+   */
+  resetLayoutInPlace(): void {
+    this.saved = {};
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    for (const id of Object.keys(DEFAULTS)) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const def = DEFAULTS[id](vw, vh, rect);
+      const left = Math.max(0, Math.min(def.left, vw - el.offsetWidth));
+      const top  = Math.max(0, Math.min(def.top,  vh - el.offsetHeight));
+      el.style.transition = 'left 0.35s cubic-bezier(0.22,1,0.36,1), top 0.35s cubic-bezier(0.22,1,0.36,1)';
+      el.style.left = `${left}px`;
+      el.style.top  = `${top}px`;
+      // Remove transition after animation so dragging stays instant
+      setTimeout(() => { el.style.transition = ''; }, 380);
+    }
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
 
   private initPanel(el: HTMLElement, rect: DOMRect): void {

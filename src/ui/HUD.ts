@@ -39,6 +39,7 @@ import { FactionAbilityManager, factionAbilityManager, FACTION_ABILITIES, applyF
 import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
+import { dragManager } from './DragManager';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -358,7 +359,10 @@ export class HUD {
     // Zoom controls
     document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.renderer.zoom(1.2));
     document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.renderer.zoom(0.8));
-    document.getElementById('btn-zoom-fit')?.addEventListener('click', () => this.renderer.fitToScreen());
+    document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
+      this.renderer.fitToScreen();
+      dragManager.resetLayoutInPlace();
+    });
     document.getElementById('btn-overlay')?.addEventListener('click', () => this.cycleOverlay());
 
     // Faction panel toggle
