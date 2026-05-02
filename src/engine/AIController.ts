@@ -827,8 +827,10 @@ export class AIController {
           if (!ut || ut.attack === 0 || !ut.canEnter(target.type)) continue;
           // Naval AI skips inland targets for naval units
           if (this.personality.naval > 0.8 && ut.domain === 'sea' && target.type === 'land') continue;
-          attackers.push({ fromId: t.id, unitTypeId: pu.unitTypeId, count: pu.count });
-          totalAttackPower += pu.count * ut.attack;
+          const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
+          if (availableCount <= 0) continue;
+          attackers.push({ fromId: t.id, unitTypeId: pu.unitTypeId, count: availableCount });
+          totalAttackPower += availableCount * ut.attack;
         }
       }
 
@@ -874,10 +876,12 @@ export class AIController {
             if (potentialTargets.has(vm.territoryId)) continue; // normal plan already covers it
             const eval_ = evaluations.get(vm.territoryId);
             if (!eval_) continue;
+            const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
+            if (availableCount <= 0) continue;
             plans.push({
               targetId: vm.territoryId,
-              attackers: [{ fromId: t.id, unitTypeId: pu.unitTypeId, count: pu.count }],
-              expectedSuccess: this.estimateSuccessRate(pu.count * ut.attack, eval_.defenseStrength),
+              attackers: [{ fromId: t.id, unitTypeId: pu.unitTypeId, count: availableCount }],
+              expectedSuccess: this.estimateSuccessRate(availableCount * ut.attack, eval_.defenseStrength),
               strategicValue: eval_.strategicValue + 30,
             });
           }
@@ -908,8 +912,10 @@ export class AIController {
             if (!adjLand || adjLand.owner !== faction.id || !adjLand.isLand()) continue;
             const inf = adjLand.units.find(u => u.unitTypeId === 'infantry');
             if (inf && inf.count > 0) {
-              landAttackers.push({ fromId: adjLandId, unitTypeId: 'infantry', count: inf.count });
-              seaPower += inf.count * (this.state.unitRegistry.get('infantry')?.attack ?? 1);
+              const availableCount = this.getAttackAvailableCount(adjLand, 'infantry', inf.count, evaluations, faction);
+              if (availableCount <= 0) continue;
+              landAttackers.push({ fromId: adjLandId, unitTypeId: 'infantry', count: availableCount });
+              seaPower += availableCount * (this.state.unitRegistry.get('infantry')?.attack ?? 1);
             }
           }
           if (landAttackers.length === 0) continue;
@@ -924,6 +930,44 @@ export class AIController {
     }
 
     return plans;
+  }
+
+  private getAttackAvailableCount(
+    source: Territory,
+    unitTypeId: string,
+    count: number,
+    evaluations: Map<string, TerritoryEvaluation>,
+    faction: Faction
+  ): number {
+    const unit = this.state.unitRegistry.get(unitTypeId);
+    if (!unit || unit.domain !== 'land') return count;
+
+    const reserve = this.getAttackReserveCount(source, evaluations, faction);
+    return Math.max(0, count - reserve);
+  }
+
+  private getAttackReserveCount(
+    source: Territory,
+    evaluations: Map<string, TerritoryEvaluation>,
+    faction: Faction
+  ): number {
+    let reserve = source.isCapital || source.id === faction.capital ? 3 : source.hasFactory ? 2 : 1;
+    const evaluation = evaluations.get(source.id);
+
+    if (evaluation) {
+      if (evaluation.threatLevel > evaluation.defenseStrength) reserve += 2;
+      else if (evaluation.threatLevel > 0) reserve += 1;
+    }
+
+    if (this.personality.defense > 0.7 || this.hasBehavior('fortify_borders') || this.hasBehavior('maximum_defense')) {
+      reserve += 1;
+    }
+
+    if (this.personality.aggression > 0.8 && !source.isCapital && source.id !== faction.capital && !source.hasFactory) {
+      reserve = Math.max(0, reserve - 1);
+    }
+
+    return reserve;
   }
 
   private estimateSuccessRate(attackPower: number, defensePower: number): number {
@@ -1155,8 +1199,10 @@ export class AIController {
         if (!ut || ut.attack === 0 || ut.movement < 2) continue;
         const validMoves = this.movementValidator.getValidMoves(pu.unitTypeId, ownedT.id, true);
         if (validMoves.some(m => m.territoryId === randomTarget.id)) {
-          attackers.push({ fromId: ownedT.id, unitTypeId: pu.unitTypeId, count: pu.count });
-          totalAttackPower += pu.count * ut.attack;
+          const availableCount = this.getAttackAvailableCount(ownedT, pu.unitTypeId, pu.count, evaluations, faction);
+          if (availableCount <= 0) continue;
+          attackers.push({ fromId: ownedT.id, unitTypeId: pu.unitTypeId, count: availableCount });
+          totalAttackPower += availableCount * ut.attack;
         }
       }
     }

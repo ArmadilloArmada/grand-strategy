@@ -3,6 +3,7 @@ import { AIController } from '../AIController';
 import { GameState } from '../GameState';
 import { TurnManager } from '../TurnManager';
 import { getPersonality, AI_PERSONALITIES } from '../AIPersonalities';
+import { makeTerritory, makeUnitData } from './testHelpers';
 
 // ── Minimal game-state helpers ─────────────────────────────────────────────
 
@@ -188,5 +189,39 @@ describe('AIController grudge system', () => {
 
     // Capital attacks record a larger grievance (30 vs 20), so total should grow
     expect(ai.getGrudgeSeverity('axis', 'allies')).toBeGreaterThan(normalGrudge);
+  });
+});
+
+describe('AIController attack planning', () => {
+  it('keeps an extra capital garrison when planning attacks from threatened territory', () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2 }));
+
+    const berlin = makeTerritory('berlin', 'axis', {
+      adjacentTo: ['poland'],
+      isCapital: true,
+      hasFactory: true,
+    });
+    berlin.addUnits('infantry', 5);
+
+    const poland = makeTerritory('poland', 'allies', {
+      adjacentTo: ['berlin'],
+      production: 4,
+    });
+    poland.addUnits('infantry', 1);
+
+    state.territories.set('berlin', berlin);
+    state.territories.set('poland', poland);
+
+    const { ai } = makeAI(state);
+    const axis = state.factionRegistry.get('axis')!;
+    const evaluations = (ai as any).evaluateAllTerritories();
+    const plans = (ai as any).generateAttackPlans(evaluations, axis);
+
+    const polandPlan = plans.find((plan: any) => plan.targetId === 'poland');
+    expect(polandPlan).toBeDefined();
+    expect(polandPlan.attackers).toEqual([
+      { fromId: 'berlin', unitTypeId: 'infantry', count: 1 },
+    ]);
   });
 });
