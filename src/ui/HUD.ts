@@ -1172,7 +1172,29 @@ export class HUD {
       this.checkAutoSkipPhase(phase, faction);
       // One-time hint about the Enter shortcut to end phases
       this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
+      this.showFirstTurnPhaseTip(phase);
     }
+  }
+
+  private showFirstTurnPhaseTip(phase: string): void {
+    if (this.state.turnNumber > 1) return;
+
+    const tips: Record<string, string> = {
+      purchase: 'First turn: mobilize your capital or factory first. Those territories usually produce the strongest opening forces.',
+      build: 'First turn: click a highlighted territory to mobilize defenders. Start with your capital or factory if you can afford it.',
+      combat_move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
+      move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
+      orders: 'First turn: select a territory with units, then click a highlighted destination to issue orders.',
+      action: 'First turn: make one strong move or attack, then end the phase.',
+      combat: 'Combat only happens after you move into enemy territory. If no battles are queued, continue to the next phase.',
+      resolve: 'Resolve queued battles, then continue once the map is quiet.',
+      noncombat_move: 'Use non-combat movement to reinforce fronts. You cannot attack in this phase.',
+      production: 'Production places your reserved units. If nothing is waiting, continue to income.',
+      collect_income: 'Income pays for the next round. End the turn after reviewing your IPCs.',
+      end: 'Income pays for the next round. End the turn after reviewing your IPCs.',
+    };
+
+    if (tips[phase]) this.showFirstTimeTip(`first-turn-${phase}`, tips[phase]);
   }
   
   /**
@@ -2463,34 +2485,52 @@ export class HUD {
       const canMobilize = mobilizeOptions.filter(o => o.canMobilize).length;
       const alreadyMobilized = this.mobilizationSystem.getMobilizationCount();
       if (canMobilize > 0) {
-        newText = `🖱️ Click your territories to mobilize forces (${canMobilize} available, ${faction?.ipcs || 0} IPCs)`;
-        tipKey = 'mobilize'; tipMsg = 'Click highlighted territories to spawn defenders! Factories produce more units.';
+        const preferred = mobilizeOptions.find(o => o.canMobilize);
+        const preferredText = preferred
+          ? ` Best first: ${preferred.territory.name} (${preferred.type}, ${preferred.cost} IPCs).`
+          : '';
+        newText = `🖱️ Click highlighted territories to mobilize forces (${canMobilize} available, ${faction?.ipcs || 0} IPCs).${preferredText}`;
+        tipKey = 'mobilize'; tipMsg = 'Click highlighted territories to spawn defenders. Factories and capitals usually give the strongest value.';
       } else if (alreadyMobilized > 0) {
         newText = `✓ Mobilized ${alreadyMobilized} territories. Click "Next Phase" to continue.`;
         newClass += ' success';
       } else {
-        newText = `💰 Not enough IPCs to mobilize. Click "Next Phase" to continue.`;
+        newText = `💰 No affordable mobilizations remain. Click "Next Phase" to continue.`;
         newClass += ' warning';
       }
     } else if (isMovementPhase) {
       if (territory && territory.owner === faction?.id) {
         const availableUnits = territory.units.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
         if (availableUnits > 0) {
-          newText = `🚶 Click an adjacent territory to move ${availableUnits} unit${availableUnits !== 1 ? 's' : ''}, or click enemy to attack`;
-          tipKey = 'movement'; tipMsg = 'Units can move once per turn. Click adjacent territories to move/attack.';
+          const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+          const targetIds = new Set<string>();
+          const attackIds = new Set<string>();
+          for (const pu of territory.units) {
+            for (const move of this.movementValidator.getValidMoves(pu.unitTypeId, territory.id, allowAttacks)) {
+              if (move.isAttack) attackIds.add(move.territoryId);
+              else targetIds.add(move.territoryId);
+            }
+          }
+          const moveCount = targetIds.size;
+          const attackCount = attackIds.size;
+          const targetText = attackCount > 0
+            ? `${moveCount} move target${moveCount !== 1 ? 's' : ''}, ${attackCount} attack target${attackCount !== 1 ? 's' : ''}`
+            : `${moveCount} move target${moveCount !== 1 ? 's' : ''}`;
+          newText = `🚶 ${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText})`;
+          tipKey = 'movement'; tipMsg = 'Units can act once per turn. Green highlights are moves; attack highlights start a battle preview.';
         } else {
           newText = `⏸️ All units in ${territory.name} have acted. Select another territory.`;
           newClass += ' hint';
         }
       } else {
-        newText = `🖱️ Select one of your territories to move or attack`;
+        newText = `🖱️ Select one of your territories with ready units, then click a highlighted neighbor to move or attack.`;
       }
     } else if (isCombatPhase) {
       if (this.state.pendingMoves.length > 0) {
         newText = `⚔️ ${this.state.pendingMoves.length} battle${this.state.pendingMoves.length !== 1 ? 's' : ''} to resolve. Click "Resolve Combat".`;
         tipKey = 'combat'; tipMsg = 'Battles are resolved by dice rolls. Higher attack/defense = better odds!';
       } else {
-        newText = `✓ All battles resolved! Click "Next Phase" to continue.`;
+        newText = `✓ No battles waiting. Click "Next Phase" to continue.`;
         newClass += ' success';
       }
     } else if (isEndPhase) {
