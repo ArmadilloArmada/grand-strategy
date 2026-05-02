@@ -390,6 +390,7 @@ export class HUD {
       const vsAiOptions = document.getElementById('vs-ai-options');
       if (hotseatOptions) hotseatOptions.classList.toggle('hidden', mode !== 'hotseat');
       if (vsAiOptions) vsAiOptions.classList.toggle('hidden', mode !== 'vs-ai');
+      this.updateSetupSummary();
     });
 
     // Turn style description updater
@@ -399,6 +400,7 @@ export class HUD {
       if (descEl && TURN_STYLE_INFO[style]) {
         descEl.textContent = TURN_STYLE_INFO[style].description;
       }
+      this.updateSetupSummary();
     });
 
     // Unit era description update
@@ -408,6 +410,7 @@ export class HUD {
       if (descEl && UNIT_ERA_INFO[era]) {
         descEl.textContent = UNIT_ERA_INFO[era].description;
       }
+      this.updateSetupSummary();
     });
 
     // Victory type: show/hide custom fields
@@ -417,13 +420,34 @@ export class HUD {
       document.getElementById('victory-domination-row')?.classList.toggle('hidden', v !== 'domination');
       document.getElementById('victory-economic-row')?.classList.toggle('hidden', v !== 'economic');
     };
-    document.getElementById('victory-type')?.addEventListener('change', updateVictoryRows);
+    document.getElementById('victory-type')?.addEventListener('change', () => {
+      updateVictoryRows();
+      this.updateSetupSummary();
+    });
 
     const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
     if (factionSelect) {
-      const updateFactionCard = () => this.updateFactionInfoCard(factionSelect.value);
+      const updateFactionCard = () => {
+        this.updateFactionInfoCard(factionSelect.value);
+        this.updateSetupSummary();
+      };
       factionSelect.addEventListener('change', updateFactionCard);
       updateFactionCard();
+    }
+
+    for (const id of [
+      'map-select',
+      'preset-hold10',
+      'human-factions',
+      'victory-capitals',
+      'victory-domination',
+      'victory-economic',
+      'turn-limit',
+      'fog-of-war',
+      'auto-save',
+    ]) {
+      document.getElementById(id)?.addEventListener('change', () => this.updateSetupSummary());
+      document.getElementById(id)?.addEventListener('input', () => this.updateSetupSummary());
     }
 
     document.getElementById('btn-start-game')?.addEventListener('click', () => this.onStartNewGame());
@@ -2974,7 +2998,11 @@ export class HUD {
     if (mapSelect) {
       const list = getMapList();
       mapSelect.innerHTML = list.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
+      mapSelect.value = this.gameConfig.mapId && list.some(m => m.id === this.gameConfig.mapId)
+        ? this.gameConfig.mapId
+        : 'grid';
     }
+    this.syncSetupHelpers();
     if (modal) modal.classList.remove('hidden');
   }
 
@@ -3014,6 +3042,11 @@ export class HUD {
         for (const option of Array.from(select.selectedOptions)) {
           humanFactions.push(option.value);
         }
+      }
+      if (humanFactions.length === 0) {
+        this.showToast('Choose at least one human faction for Hot Seat', 'info');
+        this.updateSetupSummary();
+        return;
       }
     } else {
       const playerFactionSelect = document.getElementById('player-faction') as HTMLSelectElement;
@@ -3121,6 +3154,79 @@ export class HUD {
         ${uniqueUnit.canBlitz ? ' · can blitz' : ''}
         ${!uniqueUnit.requiredTransport && uniqueUnit.domain === 'land' ? ' · no transport needed' : ''}
       </div>` : ''}
+    `;
+  }
+
+  private syncSetupHelpers(): void {
+    const mode = (document.getElementById('game-mode') as HTMLSelectElement | null)?.value ?? 'vs-ai';
+    document.getElementById('hotseat-options')?.classList.toggle('hidden', mode !== 'hotseat');
+    document.getElementById('vs-ai-options')?.classList.toggle('hidden', mode !== 'vs-ai');
+
+    const turnStyle = ((document.getElementById('turn-style') as HTMLSelectElement | null)?.value ?? 'quick') as TurnStyle;
+    const turnDesc = document.getElementById('turn-style-description');
+    if (turnDesc && TURN_STYLE_INFO[turnStyle]) turnDesc.textContent = TURN_STYLE_INFO[turnStyle].description;
+
+    const unitEra = ((document.getElementById('unit-era') as HTMLSelectElement | null)?.value ?? 'wwii') as UnitEra;
+    const eraDesc = document.getElementById('unit-era-description');
+    if (eraDesc && UNIT_ERA_INFO[unitEra]) eraDesc.textContent = UNIT_ERA_INFO[unitEra].description;
+
+    const victoryType = (document.getElementById('victory-type') as HTMLSelectElement | null)?.value ?? 'capitals';
+    document.getElementById('victory-capitals-row')?.classList.toggle('hidden', victoryType !== 'capitals');
+    document.getElementById('victory-domination-row')?.classList.toggle('hidden', victoryType !== 'domination');
+    document.getElementById('victory-economic-row')?.classList.toggle('hidden', victoryType !== 'economic');
+
+    const factionId = (document.getElementById('player-faction') as HTMLSelectElement | null)?.value ?? 'atlantic_alliance';
+    this.updateFactionInfoCard(factionId);
+    this.updateSetupSummary();
+  }
+
+  private updateSetupSummary(): void {
+    const summary = document.getElementById('setup-summary');
+    if (!summary) return;
+
+    const mapSelect = document.getElementById('map-select') as HTMLSelectElement | null;
+    const mapName = mapSelect?.selectedOptions[0]?.textContent?.trim() || 'Selected map';
+    const mapId = mapSelect?.value ?? 'grid';
+    const unitEra = ((document.getElementById('unit-era') as HTMLSelectElement | null)?.value ?? 'wwii') as UnitEra;
+    const mode = (document.getElementById('game-mode') as HTMLSelectElement | null)?.value ?? 'vs-ai';
+    const turnStyle = ((document.getElementById('turn-style') as HTMLSelectElement | null)?.value ?? 'quick') as TurnStyle;
+    const victoryType = ((document.getElementById('victory-type') as HTMLSelectElement | null)?.value ?? 'capitals') as VictoryType;
+    const presetHold10 = (document.getElementById('preset-hold10') as HTMLInputElement | null)?.checked ?? false;
+    const turnLimitValue = (document.getElementById('turn-limit') as HTMLSelectElement | null)?.value ?? '50';
+    const fogOfWar = (document.getElementById('fog-of-war') as HTMLInputElement | null)?.checked ?? true;
+    const autoSave = (document.getElementById('auto-save') as HTMLInputElement | null)?.checked ?? true;
+
+    let playerText = 'Single player vs AI';
+    if (mode === 'hotseat') {
+      const selected = Array.from((document.getElementById('human-factions') as HTMLSelectElement | null)?.selectedOptions ?? []);
+      playerText = selected.length > 0 ? `${selected.length} local players` : 'Choose at least 1 local player';
+    } else {
+      const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
+      playerText = factionSelect?.selectedOptions[0]?.textContent?.trim() || 'Single player vs AI';
+    }
+
+    const victoryText = {
+      capitals: `Capture ${(document.getElementById('victory-capitals') as HTMLInputElement | null)?.value || '3'} capitals`,
+      domination: `Control ${(document.getElementById('victory-domination') as HTMLInputElement | null)?.value || '75'}% of territories`,
+      economic: `Earn ${(document.getElementById('victory-economic') as HTMLInputElement | null)?.value || '500'} IPCs`,
+      elimination: 'Eliminate every rival',
+    }[victoryType];
+    const turnLimitText = presetHold10 || mapId === 'tutorial'
+      ? 'short match'
+      : turnLimitValue === '0'
+        ? 'unlimited turns'
+        : `${turnLimitValue} turns`;
+    const recommended = mapId === 'grid' && unitEra === 'wwii' && mode === 'vs-ai' && turnStyle === 'quick'
+      ? 'Recommended first game'
+      : 'Custom setup';
+
+    summary.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.35rem;">
+        <strong style="color:#86efac;">${recommended}</strong>
+        <span style="color:#94a3b8;font-size:0.78rem;">${fogOfWar ? 'Fog on' : 'Fog off'} · ${autoSave ? 'Autosave on' : 'Autosave off'}</span>
+      </div>
+      <div>${mapName} · ${UNIT_ERA_INFO[unitEra]?.name ?? unitEra} · ${TURN_STYLE_INFO[turnStyle]?.name ?? turnStyle}</div>
+      <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText}</div>
     `;
   }
 
