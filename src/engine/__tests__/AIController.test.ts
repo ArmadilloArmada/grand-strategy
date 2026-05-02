@@ -258,3 +258,45 @@ describe('AIController attack planning', () => {
     expect(frontierPlan.expectedSuccess).toBe(0.95);
   });
 });
+
+describe('AIController mobilization planning', () => {
+  it('prioritizes a threatened border over a safe factory when IPCs are tight', () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+    state.unitRegistry.register(makeUnitData({ id: 'artillery', attack: 2, defense: 2, cost: 4 }));
+    state.unitRegistry.register(makeUnitData({ id: 'tank', attack: 3, defense: 3, cost: 6, canBlitz: true }));
+
+    const axis = state.factionRegistry.get('axis')!;
+    axis.ipcs = 12;
+
+    const safeFactory = makeTerritory('safe_factory', 'axis', {
+      adjacentTo: ['berlin'],
+      hasFactory: true,
+      production: 5,
+    });
+    const threatenedFront = makeTerritory('threatened_front', 'axis', {
+      adjacentTo: ['enemy_front'],
+      production: 2,
+    });
+    threatenedFront.addUnits('infantry', 1);
+
+    const enemyFront = makeTerritory('enemy_front', 'allies', {
+      adjacentTo: ['threatened_front'],
+      production: 2,
+    });
+    enemyFront.addUnits('tank', 3);
+
+    state.territories.set('safe_factory', safeFactory);
+    state.territories.set('threatened_front', threatenedFront);
+    state.territories.set('enemy_front', enemyFront);
+
+    const { ai } = makeAI(state);
+    const evaluations = (ai as any).evaluateAllTerritories();
+    (ai as any).handleMobilizationPhase(evaluations);
+    const mobilizationSystem = (ai as any).mobilizationSystem;
+
+    expect(mobilizationSystem.wasMobilized('threatened_front')).toBe(true);
+    expect(mobilizationSystem.wasMobilized('safe_factory')).toBe(false);
+    expect(axis.ipcs).toBe(7);
+  });
+});

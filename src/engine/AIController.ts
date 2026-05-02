@@ -6,7 +6,7 @@
 import { GameState } from "./GameState";
 import { TurnManager } from "./TurnManager";
 import { MovementValidator } from "./MovementValidator";
-import { MobilizationSystem } from "./MobilizationSystem";
+import { MobilizationOption, MobilizationSystem } from "./MobilizationSystem";
 import { CombatResolver } from "./CombatResolver";
 import { Territory } from "../data/Territory";
 import { Faction } from "../data/Faction";
@@ -609,48 +609,9 @@ export class AIController {
       else return;
     }
 
-    const factoryScoreBonus = this.hasBehavior('factory_priority') ? 150 : 30;
-    const frontlineScoreBonus = this.hasBehavior('fortify_borders') ? 60
-      : this.aggressiveness > 0.6 ? 30 : 10;
-
     options.sort((a, b) => {
-      const evalA = evaluations.get(a.territory.id);
-      const evalB = evaluations.get(b.territory.id);
-      let scoreA = 0, scoreB = 0;
-
-      if (evalA?.threatLevel ?? 0 > 0) scoreA += (evalA!.threatLevel) * 2;
-      if (evalB?.threatLevel ?? 0 > 0) scoreB += (evalB!.threatLevel) * 2;
-
-      if (a.type === 'factory') scoreA += factoryScoreBonus;
-      if (b.type === 'factory') scoreB += factoryScoreBonus;
-      if (a.type === 'capital') scoreA += 25;
-      if (b.type === 'capital') scoreB += 25;
-
-      const aFrontline = a.territory.adjacentTo.some(id => {
-        const t = this.state.territories.get(id);
-        return t?.owner && faction.isEnemyOf(t.owner);
-      });
-      const bFrontline = b.territory.adjacentTo.some(id => {
-        const t = this.state.territories.get(id);
-        return t?.owner && faction.isEnemyOf(t.owner);
-      });
-      if (aFrontline) scoreA += frontlineScoreBonus;
-      if (bFrontline) scoreB += frontlineScoreBonus;
-
-      // Unit composition preference via personality
-      const upA = a.units.reduce((sum, u) =>
-        sum + calculateUnitPriority(this.personality, u.unitTypeId, currentComposition) * u.count, 0);
-      const upB = b.units.reduce((sum, u) =>
-        sum + calculateUnitPriority(this.personality, u.unitTypeId, currentComposition) * u.count, 0);
-      scoreA += upA * 10;
-      scoreB += upB * 10;
-
-      // Economic AI is frugal when low on IPCs — only mobilize threatened or key sites
-      if (this.personality.economy > 0.7 && faction.ipcs < 20) {
-        if ((evalA?.threatLevel ?? 0) < 5 && a.type === 'land') scoreA -= 20;
-        if ((evalB?.threatLevel ?? 0) < 5 && b.type === 'land') scoreB -= 20;
-      }
-
+      const scoreA = this.getMobilizationPriority(a, evaluations, currentComposition, faction);
+      const scoreB = this.getMobilizationPriority(b, evaluations, currentComposition, faction);
       return scoreB - scoreA;
     });
 
@@ -671,6 +632,49 @@ export class AIController {
         });
       }
     }
+  }
+
+  private getMobilizationPriority(
+    option: MobilizationOption,
+    evaluations: Map<string, TerritoryEvaluation>,
+    currentComposition: Map<string, number>,
+    faction: Faction
+  ): number {
+    const evaluation = evaluations.get(option.territory.id);
+    const threatLevel = evaluation?.threatLevel ?? 0;
+    const defenseStrength = evaluation?.defenseStrength ?? 0;
+    const defenseGap = Math.max(0, threatLevel - defenseStrength);
+    const isFrontline = option.territory.adjacentTo.some(id => {
+      const territory = this.state.territories.get(id);
+      return territory?.owner && faction.isEnemyOf(territory.owner);
+    });
+
+    let score = 0;
+
+    score += threatLevel * 3;
+    score += defenseGap * 6;
+
+    if (threatLevel > 0 && option.territory.isCapital) score += 90;
+    else if (option.territory.isCapital) score += 25;
+
+    if (threatLevel > 0 && option.territory.hasFactory) score += 70;
+    else if (option.type === 'factory') score += this.hasBehavior('factory_priority') ? 150 : 30;
+
+    const frontlineScoreBonus = this.hasBehavior('fortify_borders') ? 70
+      : this.personality.defense > 0.7 ? 50
+      : this.aggressiveness > 0.6 ? 25 : 20;
+    if (isFrontline) score += frontlineScoreBonus;
+
+    const unitPriority = option.units.reduce((sum, unit) =>
+      sum + calculateUnitPriority(this.personality, unit.unitTypeId, currentComposition) * unit.count, 0);
+    score += unitPriority * 10;
+
+    // Economic AI is frugal when low on IPCs — only mobilize threatened or key sites
+    if (this.personality.economy > 0.7 && faction.ipcs < 20 && threatLevel < 5 && option.type === 'land') {
+      score -= 20;
+    }
+
+    return score;
   }
 
   private handlePurchasePhase(evaluations: Map<string, TerritoryEvaluation>): void {
