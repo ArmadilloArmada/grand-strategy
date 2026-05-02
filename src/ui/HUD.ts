@@ -42,6 +42,17 @@ import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgress
 import { calculateTerritoryThreat } from '../engine/ThreatAnalyzer';
 import { dragManager } from './DragManager';
 
+interface TurnRecapStats {
+  factionId: string;
+  battles: number;
+  captures: number;
+  mobilizations: number;
+  unitsMobilized: number;
+  income: number;
+  unitsLost: number;
+  enemyUnitsDestroyed: number;
+}
+
 export class HUD {
   private movementValidator: MovementValidator;
   private productionManager: ProductionManager;
@@ -94,6 +105,7 @@ export class HUD {
   // Phase recap: counts for current phase (battles, territories captured)
   private battlesThisPhase: number = 0;
   private territoriesCapturedThisPhase: number = 0;
+  private turnRecap: TurnRecapStats | null = null;
 
   // Event announcement dismiss timer
   private eventDismissTimer: ReturnType<typeof setTimeout> | null = null;
@@ -666,6 +678,7 @@ export class HUD {
       // Tick dynamic features for human factions
       const evData = e.data as { factionId?: string } | undefined;
       const fid = evData?.factionId ?? this.state.currentFactionId;
+      this.resetTurnRecap(fid);
       const f = this.state.factionRegistry.get(fid);
       if (f?.controlledBy === 'human') this.tickDynamicFeatures(fid);
     });
@@ -722,9 +735,19 @@ export class HUD {
       }
     });
 
+    this.state.on('territory_mobilized', (e) => {
+      const data = e.data as { territoryId: string; units: Array<{ unitTypeId: string; count: number }>; cost: number };
+      const faction = this.state.getCurrentFaction();
+      if (!faction) return;
+      const recap = this.ensureTurnRecap(faction.id);
+      recap.mobilizations++;
+      recap.unitsMobilized += data.units.reduce((sum, unit) => sum + unit.count, 0);
+    });
+
     this.state.on('income_collected', (e) => {
       const data = e.data as { factionId: string; amount: number };
       statisticsManager.trackIncome(data.factionId, data.amount);
+      this.ensureTurnRecap(data.factionId).income += data.amount;
       this.showIncomeNotification(data);
 
       if (data.amount > 0) {
@@ -798,6 +821,13 @@ export class HUD {
     // Calculate casualties for achievements
     const attackerLosses = combat.attackers.reduce((sum, u) => sum + u.casualties, 0);
     const defenderLosses = combat.defenders.reduce((sum, u) => sum + u.casualties, 0);
+    const recapFactionId = faction?.id ?? this.state.currentFactionId;
+    const recap = this.ensureTurnRecap(recapFactionId);
+    if (combat.attackingFactionId === recapFactionId || combat.defendingFactionId === recapFactionId) {
+      recap.battles++;
+      recap.unitsLost += combat.attackingFactionId === recapFactionId ? attackerLosses : defenderLosses;
+      recap.enemyUnitsDestroyed += combat.attackingFactionId === recapFactionId ? defenderLosses : attackerLosses;
+    }
 
     // Track casualties in StatisticsManager for all factions
     statisticsManager.trackUnitKilled(combat.attackingFactionId, defenderLosses);
@@ -807,6 +837,7 @@ export class HUD {
 
     if (combat.winner === 'attacker' && !data.retreated) {
       this.territoriesCapturedThisPhase++;
+      if (combat.attackingFactionId === recapFactionId) recap.captures++;
       statisticsManager.trackBattleWon(combat.attackingFactionId);
       statisticsManager.trackBattleLost(combat.defendingFactionId);
       statisticsManager.trackTerritoryCaptured(combat.attackingFactionId);
@@ -1051,6 +1082,7 @@ export class HUD {
     const data = e.data as { phase: string; factionId: string };
     const phaseName = getPhaseDisplayNameFromStyle(data.phase, this.gameConfig.turnStyle);
     const faction = this.state.getCurrentFaction();
+    const isTurnClosingPhase = ['collect_income', 'end'].includes(data.phase);
     let summary = `${phaseName} complete`;
     if (this.battlesThisPhase > 0 || this.territoriesCapturedThisPhase > 0) {
       const parts: string[] = [];
@@ -1061,6 +1093,10 @@ export class HUD {
     turnLog.log(this.state.turnNumber, data.phase, data.factionId, summary);
     if (faction?.controlledBy === 'human') {
       soundManager.play('phase_end');
+      if (isTurnClosingPhase) {
+        this.showTurnRecap();
+        return;
+      }
       // Show rich recap if anything happened; otherwise just toast
       if (this.battlesThisPhase > 0 || this.territoriesCapturedThisPhase > 0) {
         this.showPhaseRecap(phaseName);
@@ -1158,6 +1194,64 @@ export class HUD {
     card.addEventListener('click', () => card.remove());
     document.body.appendChild(card);
     setTimeout(() => card?.remove(), 5000);
+  }
+
+  private resetTurnRecap(factionId: string): void {
+    this.turnRecap = {
+      factionId,
+      battles: 0,
+      captures: 0,
+      mobilizations: 0,
+      unitsMobilized: 0,
+      income: 0,
+      unitsLost: 0,
+      enemyUnitsDestroyed: 0,
+    };
+  }
+
+  private ensureTurnRecap(factionId: string): TurnRecapStats {
+    if (!this.turnRecap || this.turnRecap.factionId !== factionId) {
+      this.resetTurnRecap(factionId);
+    }
+    return this.turnRecap!;
+  }
+
+  private showTurnRecap(): void {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const recap = this.ensureTurnRecap(faction.id);
+    document.getElementById('turn-recap-card')?.remove();
+
+    const netLossText = recap.enemyUnitsDestroyed - recap.unitsLost;
+    const rows = [
+      `<div class="recap-row"><span>Battles fought</span><span class="recap-val">${recap.battles}</span></div>`,
+      `<div class="recap-row"><span>Territories captured</span><span class="recap-val">${recap.captures}</span></div>`,
+      `<div class="recap-row"><span>Mobilized territories</span><span class="recap-val">${recap.mobilizations}</span></div>`,
+      `<div class="recap-row"><span>Units mobilized</span><span class="recap-val">${recap.unitsMobilized}</span></div>`,
+      `<div class="recap-row"><span>Income collected</span><span class="recap-val">+${recap.income} IPC</span></div>`,
+      `<div class="recap-row"><span>Combat exchange</span><span class="recap-val">${netLossText >= 0 ? '+' : ''}${netLossText}</span></div>`,
+    ];
+
+    const card = document.createElement('div');
+    card.id = 'turn-recap-card';
+    card.className = 'turn-recap-card';
+    card.innerHTML = `
+      <div class="recap-header">
+        <span>Turn ${this.state.turnNumber} Recap</span>
+        <button class="recap-close" title="Dismiss">×</button>
+      </div>
+      <div class="turn-recap-faction" style="color:${faction.colorLight || faction.color};">${faction.name}</div>
+      ${rows.join('')}
+      <div class="recap-dismiss">Click to dismiss</div>`;
+
+    card.querySelector('.recap-close')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      card.remove();
+    });
+    card.addEventListener('click', () => card.remove());
+    document.body.appendChild(card);
+    setTimeout(() => card?.remove(), 9000);
   }
 
   /**

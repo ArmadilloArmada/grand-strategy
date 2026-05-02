@@ -3870,6 +3870,21 @@ kbd.kbd-hint {
   animation: recapSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
+.turn-recap-card {
+  position: fixed;
+  bottom: 86px;
+  right: 1rem;
+  width: min(340px, calc(100vw - 2rem));
+  background: rgba(8, 14, 30, 0.97);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-left: 4px solid #60a5fa;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  z-index: 8600;
+  cursor: pointer;
+  animation: recapSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+}
 .recap-header {
   font-family: 'Cinzel', serif;
   font-size: 0.8rem;
@@ -3877,15 +3892,35 @@ kbd.kbd-hint {
   color: #ffd700;
   margin-bottom: 0.5rem;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.recap-close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: #cbd5e1;
+  cursor: pointer;
+  line-height: 1;
+}
+.turn-recap-faction {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 .recap-row {
   display: flex;
   justify-content: space-between;
+  gap: 1rem;
   font-size: 0.85rem;
   padding: 0.2rem 0;
   color: var(--text-secondary, #ccc);
 }
 .recap-val {
+  flex-shrink: 0;
   font-weight: 700;
   color: #fff;
 }
