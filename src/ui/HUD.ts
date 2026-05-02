@@ -362,6 +362,7 @@ export class HUD {
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
       this.renderer.fitToScreen();
       dragManager.resetLayoutInPlace();
+      this.showToast('View and panels reset', 'info');
     });
     document.getElementById('btn-overlay')?.addEventListener('click', () => this.cycleOverlay());
 
@@ -3898,4 +3899,3 @@ export class HUD {
   }
 
 }
-

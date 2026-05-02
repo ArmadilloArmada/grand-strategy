@@ -1442,9 +1442,15 @@ class Game {
 
     document.getElementById('btn-reset-layout')?.addEventListener('click', () => {
       this.showConfirm('Reset Panel Layout?', 'All panels will return to their default positions.', () => {
-        dragManager.resetLayout();
+        dragManager.resetLayoutInPlace();
+        this.hud.showToast('Panel layout reset', 'success');
       });
     });
+  }
+
+  private resetViewAndPanels(): void {
+    this.renderer.fitToScreen();
+    dragManager.resetLayoutInPlace();
   }
 
   /**
@@ -1534,8 +1540,8 @@ class Game {
 
       // F - Fit map to screen
       if (e.key === 'f' && this.isGameStarted) {
-        this.renderer.fitToScreen();
-        this.hud.showToast('Map centered', 'info');
+        this.resetViewAndPanels();
+        this.hud.showToast('View and panels reset', 'info');
       }
 
       // C - Center on capital
@@ -1908,7 +1914,10 @@ class Game {
 
     api.onMenuZoomIn?.(() => this.renderer.zoom(1.2));
     api.onMenuZoomOut?.(() => this.renderer.zoom(0.8));
-    api.onMenuZoomReset?.(() => this.renderer.fitToScreen());
+    api.onMenuZoomReset?.(() => {
+      this.resetViewAndPanels();
+      this.hud.showToast('View and panels reset', 'info');
+    });
   }
 
   /**
