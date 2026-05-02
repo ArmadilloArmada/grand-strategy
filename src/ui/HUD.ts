@@ -39,7 +39,7 @@ import { FactionAbilityManager, factionAbilityManager, FACTION_ABILITIES, applyF
 import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
-import { calculateTerritoryThreat } from '../engine/ThreatAnalyzer';
+import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
 import { dragManager } from './DragManager';
 
 interface TurnRecapStats {
@@ -121,6 +121,7 @@ export class HUD {
 
   // First-time tips system
   private shownTips: Set<string> = new Set(JSON.parse(localStorage.getItem('shownTips') || '[]'));
+  private firstWarRoomShown: boolean = false;
 
   // Event emitter for main game (gameStarted, autoSave, gameOver)
   public events: { on: (name: string, cb: (data?: unknown) => void) => void; emit: (name: string, data?: unknown) => void } = (() => {
@@ -253,6 +254,7 @@ export class HUD {
    */
   private setupEventListeners(): void {
     // Action buttons
+    this.enhanceCommandBar();
     document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
     document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
@@ -498,6 +500,28 @@ export class HUD {
         }
       }
     });
+  }
+
+  private enhanceCommandBar(): void {
+    const bar = document.getElementById('action-buttons');
+    if (!bar || bar.dataset.enhanced === 'true') return;
+    bar.dataset.enhanced = 'true';
+    bar.classList.add('command-bar-enhanced');
+
+    const labels = [
+      { beforeId: 'btn-undo', text: 'Orders' },
+      { beforeId: 'btn-research', text: 'War Room' },
+      { beforeId: 'btn-end-phase', text: 'Turn' },
+    ];
+
+    for (const label of labels) {
+      const before = document.getElementById(label.beforeId);
+      if (!before || before.previousElementSibling?.classList.contains('command-group-label')) continue;
+      const el = document.createElement('span');
+      el.className = 'command-group-label';
+      el.textContent = label.text;
+      bar.insertBefore(el, before);
+    }
   }
 
   /**
@@ -1224,6 +1248,8 @@ export class HUD {
     document.getElementById('turn-recap-card')?.remove();
 
     const netLossText = recap.enemyUnitsDestroyed - recap.unitsLost;
+    const topThreat = this.getTopThreats(faction.id)[0];
+    const nextObjective = this.objectiveSystem.getActive(faction.id)[0];
     const rows = [
       `<div class="recap-row"><span>Battles fought</span><span class="recap-val">${recap.battles}</span></div>`,
       `<div class="recap-row"><span>Territories captured</span><span class="recap-val">${recap.captures}</span></div>`,
@@ -1231,6 +1257,8 @@ export class HUD {
       `<div class="recap-row"><span>Units mobilized</span><span class="recap-val">${recap.unitsMobilized}</span></div>`,
       `<div class="recap-row"><span>Income collected</span><span class="recap-val">+${recap.income} IPC</span></div>`,
       `<div class="recap-row"><span>Combat exchange</span><span class="recap-val">${netLossText >= 0 ? '+' : ''}${netLossText}</span></div>`,
+      topThreat ? `<div class="recap-row recap-next"><span>Next danger</span><span class="recap-val">${this.escapeHtml(this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId)}</span></div>` : '',
+      nextObjective ? `<div class="recap-row recap-next"><span>Next objective</span><span class="recap-val">${this.escapeHtml(nextObjective.title)}</span></div>` : '',
     ];
 
     const card = document.createElement('div');
@@ -1242,7 +1270,7 @@ export class HUD {
         <button class="recap-close" title="Dismiss">×</button>
       </div>
       <div class="turn-recap-faction" style="color:${faction.colorLight || faction.color};">${faction.name}</div>
-      ${rows.join('')}
+      ${rows.filter(Boolean).join('')}
       <div class="recap-dismiss">Click to dismiss</div>`;
 
     card.querySelector('.recap-close')?.addEventListener('click', (event) => {
@@ -1855,6 +1883,7 @@ export class HUD {
     this.updateTurnOrder();
     this.updateFactionPanel();
     this.updateVictoryProgress();
+    this.updateStrategicAdvisor();
     this.renderMinimap();
     this.undoController.clearMoveHistory();
     this.undoController.clearPhaseSnapshots();
@@ -1871,6 +1900,7 @@ export class HUD {
         // First-time tips
         if (this.state.turnNumber === 1) {
           this.showFirstTimeTip('turn_start', 'Click territories to select them, then use the action bar at the bottom');
+          this.showFirstWarRoom(faction.id);
         }
       } else {
         this.stopTurnTimer();
@@ -4001,6 +4031,174 @@ export class HUD {
     this.gameConfig.totalIPCsEarned.set(factionId, current + amount);
   }
 
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  private getTopThreats(factionId: string): TerritoryThreat[] {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return [];
+
+    return Array.from(this.state.territories.values())
+      .filter(t => t.owner === factionId && t.isLand())
+      .map(t => calculateTerritoryThreat(this.state, t, faction))
+      .filter(t => t.threatLevel > 0)
+      .sort((a, b) => b.defenseGap - a.defenseGap || b.threatLevel - a.threatLevel)
+      .slice(0, 3);
+  }
+
+  private getOpportunityTargets(factionId: string): Array<{ territoryId: string; score: number; reason: string }> {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return [];
+
+    const opportunities = new Map<string, { territoryId: string; score: number; reason: string }>();
+    for (const owned of this.state.territories.values()) {
+      if (owned.owner !== factionId || !owned.isLand()) continue;
+      const availableAttack = owned.units.reduce((sum, unit) => {
+        const type = this.state.unitRegistry.get(unit.unitTypeId);
+        return sum + (type?.attack ?? 0) * owned.getAvailableUnitCount(unit.unitTypeId);
+      }, 0);
+      if (availableAttack <= 0) continue;
+
+      for (const adjacentId of owned.adjacentTo) {
+        const target = this.state.territories.get(adjacentId);
+        if (!target?.owner || !faction.isEnemyOf(target.owner) || target.isSea()) continue;
+        const defense = target.units.reduce((sum, unit) => {
+          const type = this.state.unitRegistry.get(unit.unitTypeId);
+          return sum + (type?.defense ?? 0) * unit.count;
+        }, 0);
+        const strategicValue = target.production + (target.isCapital ? 8 : 0) + (target.hasFactory ? 5 : 0);
+        const score = availableAttack - defense + strategicValue;
+        const existing = opportunities.get(target.id);
+        if (!existing || score > existing.score) {
+          const reason = target.isCapital ? 'enemy capital' : target.hasFactory ? 'factory target' : `+${target.production} IPC`;
+          opportunities.set(target.id, { territoryId: target.id, score, reason });
+        }
+      }
+    }
+
+    return Array.from(opportunities.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }
+
+  private getMobilizationAdvice(): string {
+    const options = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize);
+    const best = options.sort((a, b) => {
+      const aValue = (a.territory.isCapital ? 8 : 0) + (a.territory.hasFactory ? 6 : 0) + a.units.reduce((s, u) => s + u.count, 0);
+      const bValue = (b.territory.isCapital ? 8 : 0) + (b.territory.hasFactory ? 6 : 0) + b.units.reduce((s, u) => s + u.count, 0);
+      return bValue - aValue || a.cost - b.cost;
+    })[0];
+    if (!best) return 'No affordable mobilization is available. Preserve IPCs or advance the phase.';
+    return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
+  }
+
+  private updateStrategicAdvisor(): void {
+    let panel = document.getElementById('strategic-advisor-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'strategic-advisor-panel';
+      document.body.appendChild(panel);
+    }
+
+    const faction = this.state.getCurrentFaction();
+    if (!faction || faction.controlledBy !== 'human') {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    const topThreat = this.getTopThreats(faction.id)[0];
+    const topOpportunity = this.getOpportunityTargets(faction.id)[0];
+    const activeObjective = this.objectiveSystem.getActive(faction.id)[0];
+    const income = this.state.calculateIncome(faction.id);
+    const threatLine = topThreat
+      ? `${this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId}: gap ${Math.ceil(topThreat.defenseGap)}`
+      : 'No immediate front-line pressure.';
+    const opportunityLine = topOpportunity
+      ? `${this.state.territories.get(topOpportunity.territoryId)?.name ?? topOpportunity.territoryId} (${topOpportunity.reason})`
+      : 'Build strength before attacking.';
+    const objectiveLine = activeObjective
+      ? `${activeObjective.title}: ${activeObjective.description}`
+      : 'Secure income and create a new attack lane.';
+
+    panel.classList.remove('hidden');
+    panel.innerHTML = `
+      <div class="strategic-advisor-header">
+        <span>Strategic Intent</span>
+        <button id="btn-advisor-collapse" title="Collapse advisor">-</button>
+      </div>
+      <div class="strategic-advisor-body">
+        <div class="advisor-row"><span>Objective</span><strong>${this.escapeHtml(objectiveLine)}</strong></div>
+        <div class="advisor-row"><span>Danger</span><strong>${this.escapeHtml(threatLine)}</strong></div>
+        <div class="advisor-row"><span>Opportunity</span><strong>${this.escapeHtml(opportunityLine)}</strong></div>
+        <div class="advisor-row"><span>Economy</span><strong>${faction.ipcs} IPC, +${income}/turn</strong></div>
+        <div class="advisor-advice">${this.escapeHtml(this.getMobilizationAdvice())}</div>
+      </div>
+    `;
+
+    panel.querySelector('#btn-advisor-collapse')?.addEventListener('click', () => {
+      panel?.classList.toggle('collapsed');
+    });
+  }
+
+  private showFirstWarRoom(factionId: string): void {
+    if (this.firstWarRoomShown) return;
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction || faction.controlledBy !== 'human') return;
+    this.firstWarRoomShown = true;
+
+    const threats = this.getTopThreats(factionId);
+    const opportunities = this.getOpportunityTargets(factionId);
+    const capital = this.state.territories.get(faction.capital);
+    const firstThreat = threats[0] ? this.state.territories.get(threats[0].territoryId)?.name : null;
+    const firstTarget = opportunities[0] ? this.state.territories.get(opportunities[0].territoryId)?.name : null;
+
+    document.getElementById('first-war-room')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'first-war-room';
+    overlay.innerHTML = `
+      <div class="first-war-room-card">
+        <div class="fwr-kicker">First War Room</div>
+        <h2>${this.escapeHtml(faction.name)}</h2>
+        <p>Your opening job is simple: protect your capital, turn IPCs into board presence, and take one profitable fight instead of three messy ones.</p>
+        <div class="fwr-grid">
+          <div><span>Anchor</span><strong>${this.escapeHtml(capital?.name ?? 'Your capital')}</strong></div>
+          <div><span>Watch</span><strong>${this.escapeHtml(firstThreat ?? 'No urgent threat')}</strong></div>
+          <div><span>Pressure</span><strong>${this.escapeHtml(firstTarget ?? 'Nearest enemy border')}</strong></div>
+        </div>
+        <div class="fwr-plan">
+          <strong>Suggested opening:</strong>
+          <ol>
+            <li>${this.escapeHtml(this.getMobilizationAdvice())}</li>
+            <li>Select a border territory with ready units and inspect the highlighted attack targets.</li>
+            <li>Use the battle preview. Favor attacks marked favorable or overwhelming.</li>
+          </ol>
+        </div>
+        <div class="fwr-actions">
+          <button id="btn-fwr-objectives">Show Objectives</button>
+          <button id="btn-fwr-threats">Threat Overlay</button>
+          <button id="btn-fwr-close" class="primary">Start Command</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btn-fwr-close')?.addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#btn-fwr-objectives')?.addEventListener('click', () => {
+      this.updateObjectivesPanel();
+      document.getElementById('objectives-panel')?.classList.remove('hidden');
+    });
+    overlay.querySelector('#btn-fwr-threats')?.addEventListener('click', () => {
+      this.overlayController.setMode('threat');
+      overlay.remove();
+    });
+  }
+
   // ── Dynamic Feature Methods ───────────────────────────────────────────────
 
   /** Call at turn start for a human faction to tick objectives and supply display. */
@@ -4018,6 +4216,7 @@ export class HUD {
       this.updateSupplyIndicator(factionId);
     }
     this.updateFactionAbilityButton(factionId);
+    this.updateStrategicAdvisor();
   }
 
   /** Render the war-tension level as an inline badge in the turn-banner. */

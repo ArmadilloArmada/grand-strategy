@@ -49,6 +49,7 @@ export class ObjectiveSystem {
   private objectives: Objective[] = [];
   private idCounter = 0;
   private listeners: Array<(obj: Objective, event: 'new' | 'complete' | 'fail') => void> = [];
+  private openingIssued: Set<string> = new Set();
 
   constructor(private state: GameState) {}
 
@@ -60,6 +61,7 @@ export class ObjectiveSystem {
    */
   tick(factionId: string): void {
     this.checkFailures(factionId);
+    this.ensureOpeningObjectives(factionId);
 
     const active = this.objectives.filter(o => o.factionId === factionId && !o.completed && !o.failed);
     if (active.length < MAX_ACTIVE && Math.random() < CHANCE_PER_TURN) {
@@ -144,9 +146,67 @@ export class ObjectiveSystem {
     return this.objectives.filter(o => o.factionId === factionId);
   }
 
+  reset(): void {
+    this.objectives = [];
+    this.idCounter = 0;
+    this.openingIssued.clear();
+  }
+
   onChange(cb: (obj: Objective, event: 'new' | 'complete' | 'fail') => void): () => void {
     this.listeners.push(cb);
     return () => { this.listeners = this.listeners.filter(l => l !== cb); };
+  }
+
+  ensureOpeningObjectives(factionId: string): void {
+    if (this.openingIssued.has(factionId) || this.state.turnNumber > 1) return;
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return;
+    this.openingIssued.add(factionId);
+
+    const capital = this.state.territories.get(faction.capital);
+    if (capital?.owner === factionId) {
+      const obj: Objective = {
+        id: `obj_${++this.idCounter}`,
+        title: 'Secure the Capital',
+        description: `Hold ${capital.name} for the first 3 turns.`,
+        reward: { type: 'ipc', amount: 20 },
+        deadline: this.state.turnNumber + 4,
+        factionId,
+        condition: { type: 'survive_turns', count: 3 },
+        progress: 0,
+        completed: false,
+        failed: false,
+      };
+      this.objectives.push(obj);
+      this.emit(obj, 'new');
+    }
+
+    const enemyBorder = Array.from(this.state.territories.values())
+      .filter(t => t.owner && faction.isEnemyOf(t.owner) && t.isLand())
+      .map(t => {
+        const friendlyAdjacency = t.adjacentTo.some(id => this.state.territories.get(id)?.owner === factionId);
+        const value = t.production + (t.hasFactory ? 4 : 0) + (t.isCapital ? 8 : 0);
+        return { territory: t, friendlyAdjacency, value };
+      })
+      .filter(t => t.friendlyAdjacency)
+      .sort((a, b) => b.value - a.value)[0]?.territory;
+
+    if (enemyBorder) {
+      const obj: Objective = {
+        id: `obj_${++this.idCounter}`,
+        title: 'Opening Offensive',
+        description: `Capture ${enemyBorder.name} before turn ${this.state.turnNumber + 5}.`,
+        reward: { type: 'ipc', amount: 25 },
+        deadline: this.state.turnNumber + 5,
+        factionId,
+        condition: { type: 'capture_territory', territoryId: enemyBorder.id, territoryName: enemyBorder.name, count: 1 },
+        progress: 0,
+        completed: false,
+        failed: false,
+      };
+      this.objectives.push(obj);
+      this.emit(obj, 'new');
+    }
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

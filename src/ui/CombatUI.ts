@@ -652,6 +652,47 @@ export class CombatUI {
         <span>${previewStats.riskDetail}</span>
       `;
     }
+
+    let consequenceEl = document.getElementById('preview-consequence-summary');
+    if (!consequenceEl) {
+      consequenceEl = document.createElement('div');
+      consequenceEl.id = 'preview-consequence-summary';
+      summaryEl?.after(consequenceEl);
+    }
+    consequenceEl.className = `preview-consequence-summary ${previewStats.riskClass}`;
+    consequenceEl.innerHTML = this.buildBattleConsequenceSummary(fromId, toId, previewStats);
+  }
+
+  private buildBattleConsequenceSummary(fromId: string, toId: string, stats: BattlePreviewStats): string {
+    const from = this.state.territories.get(fromId);
+    const target = this.state.territories.get(toId);
+    if (!from || !target) return '';
+
+    const targetValue = target.production + (target.isCapital ? 10 : 0) + (target.hasFactory ? 6 : 0);
+    const likelyAttackerLosses = Math.min(stats.attackerUnitCount, Math.max(0, Math.round(stats.expectedDefenderHits)));
+    const likelyDefenderLosses = Math.min(stats.defenderUnitCount, Math.max(0, Math.round(stats.expectedAttackerHits)));
+    const enemyCounterSources = target.adjacentTo
+      .map(id => this.state.territories.get(id))
+      .filter(t => t?.owner && t.owner !== this.state.currentFactionId && t.getTotalUnitCount() > 0)
+      .length;
+
+    const stakes: string[] = [];
+    if (target.isCapital) stakes.push('capital swing');
+    if (target.hasFactory) stakes.push('factory control');
+    if (target.production > 0) stakes.push(`+${target.production} IPC income`);
+    if (enemyCounterSources > 0) stakes.push(`${enemyCounterSources} counterattack lane${enemyCounterSources === 1 ? '' : 's'}`);
+
+    const tempo = stats.odds >= 0.65
+      ? 'Likely creates momentum if you can hold it next turn.'
+      : stats.odds < 0.5
+        ? 'A failed attack may leave your border thin.'
+        : 'Expect a trade unless reinforced.';
+
+    return `
+      <strong>Strategic consequence</strong>
+      <span>Stake: ${stakes.join(', ') || `+${targetValue} strategic value`}.</span>
+      <span>Likely first round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}. ${tempo}</span>
+    `;
   }
 
   calculateBattlePreviewStats(

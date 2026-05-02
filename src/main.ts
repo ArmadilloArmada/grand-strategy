@@ -398,12 +398,13 @@ class Game {
     // Fit map to screen
     this.renderer.fitToScreen();
 
-    // Start the game
-    this.turnManager.startGame();
-
     // Reset dynamic feature systems for fresh game
     this.hud.tensionSystem.reset();
+    this.hud.objectiveSystem.reset();
     factionAbilityManager.reset();
+
+    // Start the game
+    this.turnManager.startGame();
 
     // Wire optional systems based on settings
     if (settings.getSetting('dynamicWeather')) {
