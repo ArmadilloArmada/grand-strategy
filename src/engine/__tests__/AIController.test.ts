@@ -224,4 +224,37 @@ describe('AIController attack planning', () => {
       { fromId: 'berlin', unitTypeId: 'infantry', count: 1 },
     ]);
   });
+
+  it('uses cheap units for easy low-value captures instead of overcommitting armor', () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+    state.unitRegistry.register(makeUnitData({ id: 'tank', attack: 3, defense: 3, cost: 6, canBlitz: true }));
+
+    const border = makeTerritory('border', 'axis', {
+      adjacentTo: ['empty_frontier'],
+      production: 2,
+    });
+    border.addUnits('infantry', 5);
+    border.addUnits('tank', 2);
+
+    const emptyFrontier = makeTerritory('empty_frontier', 'allies', {
+      adjacentTo: ['border'],
+      production: 1,
+    });
+
+    state.territories.set('border', border);
+    state.territories.set('empty_frontier', emptyFrontier);
+
+    const { ai } = makeAI(state);
+    const axis = state.factionRegistry.get('axis')!;
+    const evaluations = (ai as any).evaluateAllTerritories();
+    const plans = (ai as any).generateAttackPlans(evaluations, axis);
+
+    const frontierPlan = plans.find((plan: any) => plan.targetId === 'empty_frontier');
+    expect(frontierPlan).toBeDefined();
+    expect(frontierPlan.attackers).toEqual([
+      { fromId: 'border', unitTypeId: 'infantry', count: 1 },
+    ]);
+    expect(frontierPlan.expectedSuccess).toBe(0.95);
+  });
 });

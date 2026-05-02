@@ -33,6 +33,15 @@ export interface AttackPlan {
   strategicValue: number;
 }
 
+interface AttackCandidate {
+  fromId: string;
+  unitTypeId: string;
+  count: number;
+  attack: number;
+  cost: number;
+  domain: string;
+}
+
 export class AIController {
   private movementValidator: MovementValidator;
   private mobilizationSystem: MobilizationSystem;
@@ -817,25 +826,6 @@ export class AIController {
       const eval_ = evaluations.get(targetId);
       if (!eval_) continue;
 
-      const attackers: { fromId: string; unitTypeId: string; count: number }[] = [];
-      let totalAttackPower = 0;
-
-      for (const t of owned) {
-        if (!t.adjacentTo.includes(targetId)) continue;
-        for (const pu of t.units) {
-          const ut = this.state.unitRegistry.get(pu.unitTypeId);
-          if (!ut || ut.attack === 0 || !ut.canEnter(target.type)) continue;
-          // Naval AI skips inland targets for naval units
-          if (this.personality.naval > 0.8 && ut.domain === 'sea' && target.type === 'land') continue;
-          const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
-          if (availableCount <= 0) continue;
-          attackers.push({ fromId: t.id, unitTypeId: pu.unitTypeId, count: availableCount });
-          totalAttackPower += availableCount * ut.attack;
-        }
-      }
-
-      if (attackers.length === 0) continue;
-
       let planValue = eval_.strategicValue;
 
       // Behavior: control_seas — prioritize sea zone captures heavily
@@ -855,6 +845,31 @@ export class AIController {
           planValue += 60;
         }
       }
+
+      const candidates: AttackCandidate[] = [];
+
+      for (const t of owned) {
+        if (!t.adjacentTo.includes(targetId)) continue;
+        for (const pu of t.units) {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          if (!ut || ut.attack === 0 || !ut.canEnter(target.type)) continue;
+          // Naval AI skips inland targets for naval units
+          if (this.personality.naval > 0.8 && ut.domain === 'sea' && target.type === 'land') continue;
+          const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
+          if (availableCount <= 0) continue;
+          candidates.push({
+            fromId: t.id,
+            unitTypeId: pu.unitTypeId,
+            count: availableCount,
+            attack: ut.attack,
+            cost: ut.cost,
+            domain: ut.domain,
+          });
+        }
+      }
+
+      const { attackers, totalAttackPower } = this.selectAttackersForTarget(candidates, target, eval_, planValue);
+      if (attackers.length === 0) continue;
 
       plans.push({
         targetId,
@@ -930,6 +945,67 @@ export class AIController {
     }
 
     return plans;
+  }
+
+  private selectAttackersForTarget(
+    candidates: AttackCandidate[],
+    target: Territory,
+    evaluation: TerritoryEvaluation,
+    planValue: number
+  ): { attackers: AttackPlan['attackers']; totalAttackPower: number } {
+    const sorted = [...candidates].sort((a, b) => {
+      const cheapTarget = evaluation.defenseStrength <= 2 || planValue < 35;
+      if (cheapTarget) {
+        const costDiff = a.cost - b.cost;
+        if (costDiff !== 0) return costDiff;
+        return a.attack - b.attack;
+      }
+
+      const aEfficiency = a.attack / Math.max(1, a.cost);
+      const bEfficiency = b.attack / Math.max(1, b.cost);
+      if (bEfficiency !== aEfficiency) return bEfficiency - aEfficiency;
+      return b.attack - a.attack;
+    });
+
+    const desiredSuccess = this.getDesiredAttackSuccess(target, evaluation, planValue);
+    const attackers: AttackPlan['attackers'] = [];
+    let totalAttackPower = 0;
+
+    for (const candidate of sorted) {
+      let remaining = candidate.count;
+      while (remaining > 0) {
+        const existing = attackers.find(a =>
+          a.fromId === candidate.fromId && a.unitTypeId === candidate.unitTypeId
+        );
+        if (existing) existing.count += 1;
+        else attackers.push({ fromId: candidate.fromId, unitTypeId: candidate.unitTypeId, count: 1 });
+
+        totalAttackPower += candidate.attack;
+        remaining -= 1;
+
+        if (this.estimateSuccessRate(totalAttackPower, evaluation.defenseStrength) >= desiredSuccess) {
+          return { attackers, totalAttackPower };
+        }
+      }
+    }
+
+    return { attackers, totalAttackPower };
+  }
+
+  private getDesiredAttackSuccess(
+    target: Territory,
+    evaluation: TerritoryEvaluation,
+    planValue: number
+  ): number {
+    if (this.hasBehavior('ignore_losses')) return 0.3;
+    if (this.hasBehavior('only_sure_attacks') || this.hasBehavior('maximum_defense')) return 0.9;
+
+    const valuePressure = Math.min(0.2, planValue / 500);
+    const defensePressure = target.isCapital || target.hasFactory || evaluation.defenseStrength >= 15 ? 0.15 : 0;
+    const caution = this.personality.defense * 0.15 + this.personality.patience * 0.1;
+    const aggression = this.personality.aggression * 0.1;
+
+    return Math.max(0.45, Math.min(0.9, 0.6 + valuePressure + defensePressure + caution - aggression));
   }
 
   private getAttackAvailableCount(
