@@ -2538,9 +2538,42 @@ body.theme-dark #help-button {
 
 /* ==================== Battle Preview ==================== */
 
+.direct-open-warning {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  width: min(680px, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border: 2px solid #fbbf24;
+  border-radius: 8px;
+  background: #111827;
+  color: #f8fafc;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  font-family: system-ui, sans-serif;
+}
+
+.direct-open-warning strong,
+.direct-open-warning span {
+  display: block;
+}
+
+.direct-open-warning span {
+  margin-top: 0.25rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
 #preview-attacker-units, #preview-defender-units {
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+.preview-combat-note {
+  color: #059669;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
 }
 
 #odds-display {

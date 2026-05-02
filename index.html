@@ -6,6 +6,17 @@
   <title>Grand Strategy - Board Game</title>
   <link rel="stylesheet" href="/src/styles/main.css">
   <link rel="icon" href="assets/icon.png">
+  <script>
+    if (window.location.protocol === 'file:') {
+      window.addEventListener('DOMContentLoaded', function () {
+        var warning = document.createElement('div');
+        warning.className = 'direct-open-warning';
+        warning.style.cssText = 'position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:100000;width:min(680px,calc(100vw - 2rem));padding:0.85rem 1rem;border:2px solid #fbbf24;border-radius:8px;background:#111827;color:#f8fafc;box-shadow:0 12px 32px rgba(0,0,0,0.45);font-family:system-ui,sans-serif;';
+        warning.innerHTML = '<strong>Grand Strategy needs the dev server.</strong><span>Open <code>http://127.0.0.1:19123</code> after running <code>npm.cmd run dev -- --host 127.0.0.1 --port 19123</code>. Double-clicking index.html cannot load the game files correctly.</span>';
+        document.body.prepend(warning);
+      });
+    }
+  </script>
 </head>
 <body>
   <!-- Crash screen — shown by the error handler below if the app throws before recovering -->

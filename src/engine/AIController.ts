@@ -219,18 +219,23 @@ export class AIController {
   private considerDiplomacy(faction: Faction): void {
     const diplo = this.state.diplomacyManager;
     const isLosing = this.isLosingBadly(faction);
+    const borderThreat = this.getFactionBorderThreat(faction);
 
     // Respond to incoming proposals
     for (const proposal of diplo.getPendingProposals(faction.id)) {
       let acceptChance = 0.2;
+      const grudge = this.getGrudgeSeverity(faction.id, proposal.fromId);
 
       if (proposal.type === 'pact') {
-        acceptChance = isLosing ? 0.75 : (this.personality.defense * 0.5 + 0.15);
+        acceptChance = isLosing || borderThreat > 30 ? 0.78 : (this.personality.defense * 0.5 + 0.15);
       } else if (proposal.type === 'alliance') {
-        acceptChance = isLosing ? 0.3 : (this.personality.defense * 0.4 + this.personality.economy * 0.2);
+        acceptChance = isLosing ? 0.45 : (this.personality.defense * 0.4 + this.personality.economy * 0.2);
       } else if (proposal.type === 'trade_deal') {
         acceptChance = this.personality.economy * 0.8 + 0.1;
       }
+
+      acceptChance -= Math.min(0.65, grudge / 140);
+      acceptChance = Math.max(0.05, Math.min(0.9, acceptChance));
 
       if (Math.random() < acceptChance) {
         diplo.acceptProposal(proposal.fromId, proposal.toId, proposal.type);
@@ -242,9 +247,10 @@ export class AIController {
     const others = this.state.factionRegistry.getAll().filter(f => f.id !== faction.id && !f.isDefeated);
 
     // When losing badly, seek a non-aggression pact with the strongest enemy
-    if (isLosing && Math.random() < 0.25) {
+    if ((isLosing || borderThreat > 35) && Math.random() < 0.25 + Math.min(0.25, borderThreat / 200)) {
       const strongest = others
         .filter(f => diplo.getRelation(faction.id, f.id) === 'war')
+        .filter(f => this.getGrudgeSeverity(faction.id, f.id) < 70)
         .sort((a, b) =>
           this.state.getTerritoriesOwnedBy(b.id).length - this.state.getTerritoriesOwnedBy(a.id).length
         )[0];
@@ -450,6 +456,15 @@ export class AIController {
     const ratio = myTerritories / Math.max(1, landTerritories);
     const capitalHeld = this.state.territories.get(faction.capital)?.owner === faction.id;
     return ratio < 0.2 || !capitalHeld;
+  }
+
+  private getFactionBorderThreat(faction: Faction): number {
+    let threat = 0;
+    for (const territory of this.state.getTerritoriesOwnedBy(faction.id)) {
+      if (territory.isSea()) continue;
+      threat += this.calculateThreatLevel(territory, faction);
+    }
+    return threat;
   }
 
   // ── Territory evaluation ────────────────────────────────────────────────

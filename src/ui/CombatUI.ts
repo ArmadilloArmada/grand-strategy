@@ -583,17 +583,14 @@ export class CombatUI {
 
     let artilleryCount = 0;
     let infantryCount = 0;
-    for (const pu of fromTerritory.units) {
-      if (pu.unitTypeId === 'artillery') artilleryCount += pu.count;
-      if (pu.unitTypeId === 'infantry') infantryCount += pu.count;
-    }
-
     const attackerUnitsEl = document.getElementById('preview-attacker-units');
     let attackPower = 0;
     let attackerHtml = '';
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
+        if (pu.unitTypeId === 'artillery') artilleryCount += pu.count;
+        if (pu.unitTypeId === 'infantry') infantryCount += pu.count;
         const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
         attackerHtml += `<div>${icon} ${pu.count}× ${unitType.name} <small style="color:#666">(Atk:${unitType.attack} Move:${unitType.movement})</small></div>`;
         attackPower += pu.count * unitType.attack;
@@ -746,7 +743,18 @@ export class CombatUI {
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
-        attackingUnits.push({ unitTypeId: pu.unitTypeId, count: pu.count, veteranCount: pu.veteranCount ?? 0 });
+        const answer = prompt(`How many ${unitType.name} should attack?`, String(pu.count));
+        if (answer === null) {
+          this.callbacks.showToast('Attack cancelled', 'info');
+          return;
+        }
+        const parsed = Number(answer);
+        const count = Number.isFinite(parsed)
+          ? Math.max(0, Math.min(pu.count, Math.floor(parsed)))
+          : 0;
+        if (count > 0) {
+          attackingUnits.push({ unitTypeId: pu.unitTypeId, count, veteranCount: pu.veteranCount ?? 0 });
+        }
       }
     }
 
