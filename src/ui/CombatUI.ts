@@ -19,6 +19,20 @@ export interface CombatCallbacks {
   updateActionButtons(): void;
 }
 
+export interface BattlePreviewStats {
+  attackPower: number;
+  defensePower: number;
+  effectiveDefense: number;
+  attackerUnitCount: number;
+  defenderUnitCount: number;
+  odds: number;
+  expectedAttackerHits: number;
+  expectedDefenderHits: number;
+  riskLabel: string;
+  riskClass: 'good' | 'even' | 'bad';
+  riskDetail: string;
+}
+
 export class CombatUI {
   private activeCombat: CombatState | null = null;
   private pendingCombats: string[] = [];
@@ -592,9 +606,6 @@ export class CombatUI {
     }
     if (attackerUnitsEl) attackerUnitsEl.innerHTML = attackerHtml || '<em>No units</em>';
 
-    const attackPowerEl = document.getElementById('preview-attacker-power');
-    if (attackPowerEl) attackPowerEl.textContent = `Attack Power: ${attackPower}`;
-
     const defenderUnitsEl = document.getElementById('preview-defender-units');
     let defensePower = 0;
     let defenderHtml = '';
@@ -611,20 +622,98 @@ export class CombatUI {
     }
     if (defenderUnitsEl) defenderUnitsEl.innerHTML = defenderHtml || '<em>Undefended!</em>';
 
-    const defensePowerEl = document.getElementById('preview-defender-power');
-    if (defensePowerEl) defensePowerEl.textContent = `Defense Power: ${defensePower}`;
-
     let effectiveDefense = defensePower;
     if (toTerritory.isCapital || toTerritory.hasFactory) {
       const defenderUnitCount = toTerritory.units.reduce((sum, u) => sum + u.count, 0);
       effectiveDefense += defenderUnitCount;
     }
-    const odds = this.calculateBattleOdds(attackPower, effectiveDefense);
+
+    const previewStats = this.calculateBattlePreviewStats(fromTerritory.units, toTerritory.units, attackPower, defensePower, effectiveDefense);
+    const attackPowerEl = document.getElementById('preview-attacker-power');
+    if (attackPowerEl) {
+      attackPowerEl.innerHTML = `Attack Power: ${previewStats.attackPower}<br><small>Expected hits: ${previewStats.expectedAttackerHits.toFixed(1)}</small>`;
+    }
+
+    const defensePowerEl = document.getElementById('preview-defender-power');
+    if (defensePowerEl) {
+      const bonusText = previewStats.effectiveDefense > previewStats.defensePower
+        ? ` <small>(effective ${previewStats.effectiveDefense})</small>` : '';
+      defensePowerEl.innerHTML = `Defense Power: ${previewStats.defensePower}${bonusText}<br><small>Expected hits: ${previewStats.expectedDefenderHits.toFixed(1)}</small>`;
+    }
+
     const oddsEl = document.getElementById('odds-display');
     if (oddsEl) {
-      oddsEl.textContent = `~${Math.round(odds * 100)}%`;
-      oddsEl.className = odds >= 0.65 ? 'good' : odds >= 0.4 ? 'even' : 'bad';
+      oddsEl.textContent = `~${Math.round(previewStats.odds * 100)}%`;
+      oddsEl.className = previewStats.riskClass;
     }
+
+    const summaryEl = document.getElementById('preview-risk-summary');
+    if (summaryEl) {
+      summaryEl.className = `preview-risk-summary ${previewStats.riskClass}`;
+      summaryEl.innerHTML = `
+        <strong>${previewStats.riskLabel}</strong>
+        <span>${previewStats.riskDetail}</span>
+      `;
+    }
+  }
+
+  calculateBattlePreviewStats(
+    attackerUnits: { unitTypeId: string; count: number }[],
+    defenderUnits: { unitTypeId: string; count: number }[],
+    attackPower: number,
+    defensePower: number,
+    effectiveDefense: number
+  ): BattlePreviewStats {
+    const attackerUnitCount = attackerUnits.reduce((sum, unit) => sum + unit.count, 0);
+    const defenderUnitCount = defenderUnits.reduce((sum, unit) => sum + unit.count, 0);
+    const odds = this.calculateBattleOdds(attackPower, effectiveDefense);
+    const expectedAttackerHits = attackPower / 6;
+    const expectedDefenderHits = effectiveDefense / 6;
+
+    let riskLabel = 'Balanced fight';
+    let riskClass: BattlePreviewStats['riskClass'] = 'even';
+    let riskDetail = 'Expect a contested battle. Reinforcements or flanking can make this safer.';
+
+    if (defenderUnitCount === 0) {
+      riskLabel = 'Unopposed capture';
+      riskClass = 'good';
+      riskDetail = 'No defenders are present. This should resolve as an immediate capture.';
+    } else if (odds >= 0.85) {
+      riskLabel = 'Overwhelming attack';
+      riskClass = 'good';
+      riskDetail = 'Your force has a large power advantage and should win reliably.';
+    } else if (odds >= 0.65) {
+      riskLabel = 'Favorable attack';
+      riskClass = 'good';
+      riskDetail = 'You have the edge, though losses are still possible.';
+    } else if (odds < 0.35) {
+      riskLabel = 'High-risk attack';
+      riskClass = 'bad';
+      riskDetail = 'Defenders are favored. Add units or choose another target.';
+    } else if (odds < 0.5) {
+      riskLabel = 'Risky attack';
+      riskClass = 'bad';
+      riskDetail = 'You are attacking at a disadvantage and should expect casualties.';
+    }
+
+    if (expectedDefenderHits > expectedAttackerHits + 0.75 && defenderUnitCount > 0) {
+      riskDetail += ' The first round is likely to hurt.';
+      if (riskClass === 'even') riskClass = 'bad';
+    }
+
+    return {
+      attackPower,
+      defensePower,
+      effectiveDefense,
+      attackerUnitCount,
+      defenderUnitCount,
+      odds,
+      expectedAttackerHits,
+      expectedDefenderHits,
+      riskLabel,
+      riskClass,
+      riskDetail,
+    };
   }
 
   calculateBattleOdds(attackPower: number, defensePower: number): number {

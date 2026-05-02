@@ -2547,6 +2547,42 @@ body.theme-dark #help-button {
 #odds-display.even { color: #d97706; }
 #odds-display.bad { color: #dc2626; }
 
+.preview-risk-summary {
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.preview-risk-summary strong,
+.preview-risk-summary span {
+  display: block;
+}
+
+.preview-risk-summary span {
+  margin-top: 0.2rem;
+  color: rgba(245, 235, 205, 0.78);
+}
+
+.preview-risk-summary.good {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.preview-risk-summary.even {
+  border-color: rgba(217, 119, 6, 0.45);
+  background: rgba(217, 119, 6, 0.12);
+}
+
+.preview-risk-summary.bad {
+  border-color: rgba(220, 38, 38, 0.45);
+  background: rgba(220, 38, 38, 0.13);
+}
+
 /* ==================== Tooltip ==================== */
 
 .tooltip {
