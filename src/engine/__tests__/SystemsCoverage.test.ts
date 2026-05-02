@@ -639,6 +639,34 @@ describe('SaveManager', () => {
     expect(state.turnNumber).toBe(11);
   });
 
+  it('hasAutoSave ignores corrupt auto-save data', () => {
+    const { state } = buildCombatState();
+    const manager = new SaveManager(state);
+
+    store['grand-strategy-autosave'] = 'not-json';
+
+    expect(manager.hasAutoSave()).toBe(false);
+    expect(manager.loadAutoSave()).toBe(false);
+  });
+
+  it('loadFromSlot rejects invalid snapshots without changing state', () => {
+    const { state } = buildCombatState();
+    state.turnNumber = 4;
+    const manager = new SaveManager(state);
+
+    store['grand-strategy-save-1'] = JSON.stringify({
+      version: '1.0.0',
+      slot: 1,
+      name: 'Broken',
+      timestamp: Date.now(),
+      snapshot: { turnNumber: 99 },
+    });
+
+    expect(manager.loadFromSlot(1)).toBe(false);
+    expect(state.turnNumber).toBe(4);
+    expect(manager.getSlots()[0].isEmpty).toBe(true);
+  });
+
   it('formatTimestamp returns "Empty" for a zero timestamp', () => {
     const { state } = buildCombatState();
     const manager = new SaveManager(state);

@@ -43,7 +43,8 @@ export class SaveManager {
       
       if (data) {
         try {
-          const parsed = JSON.parse(data) as SaveData;
+          const parsed = this.parseSaveData(data);
+          if (!parsed) throw new Error('Invalid save data');
           slots.push({
             id: i,
             name: parsed.name || `Save ${i}`,
@@ -117,7 +118,8 @@ export class SaveManager {
         return false;
       }
 
-      const saveData = JSON.parse(data) as SaveData;
+      const saveData = this.parseSaveData(data);
+      if (!saveData) return false;
       
       // Version check (for future compatibility)
       if (saveData.version !== SAVE_VERSION) {
@@ -193,7 +195,8 @@ export class SaveManager {
       const data = localStorage.getItem('grand-strategy-autosave');
       if (!data) return false;
 
-      const saveData = JSON.parse(data) as SaveData;
+      const saveData = this.parseSaveData(data);
+      if (!saveData) return false;
       this.state.restoreFromSnapshot(saveData.snapshot);
       return true;
     } catch (e) {
@@ -206,7 +209,8 @@ export class SaveManager {
    * Check if auto save exists
    */
   hasAutoSave(): boolean {
-    return localStorage.getItem('grand-strategy-autosave') !== null;
+    const data = localStorage.getItem('grand-strategy-autosave');
+    return data !== null && this.parseSaveData(data) !== null;
   }
 
   /**
@@ -244,8 +248,8 @@ export class SaveManager {
         if (!file) { resolve(false); return; }
         try {
           const text = await file.text();
-          const parsed = JSON.parse(text) as Partial<SaveData>;
-          if (!parsed.snapshot) { resolve(false); return; }
+          const parsed = this.parseSaveData(text);
+          if (!parsed) { resolve(false); return; }
           const saveData: SaveData = {
             version: parsed.version ?? SAVE_VERSION,
             slot: slotId,
@@ -274,5 +278,35 @@ export class SaveManager {
       hour: '2-digit', 
       minute: '2-digit' 
     });
+  }
+
+  private parseSaveData(raw: string): SaveData | null {
+    try {
+      const parsed = JSON.parse(raw) as Partial<SaveData>;
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!this.isValidSnapshot(parsed.snapshot)) return null;
+
+      return {
+        version: typeof parsed.version === 'string' ? parsed.version : SAVE_VERSION,
+        slot: typeof parsed.slot === 'number' ? parsed.slot : 0,
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : 'Imported Save',
+        timestamp: typeof parsed.timestamp === 'number' ? parsed.timestamp : Date.now(),
+        snapshot: parsed.snapshot,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private isValidSnapshot(snapshot: unknown): snapshot is GameStateSnapshot {
+    if (!snapshot || typeof snapshot !== 'object') return false;
+    const s = snapshot as Partial<GameStateSnapshot>;
+    return typeof s.turnNumber === 'number' &&
+      typeof s.currentFactionId === 'string' &&
+      typeof s.currentPhase === 'string' &&
+      Array.isArray(s.territories) &&
+      Array.isArray(s.factions) &&
+      Array.isArray(s.pendingMoves) &&
+      Array.isArray(s.purchaseOrders);
   }
 }

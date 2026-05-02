@@ -533,7 +533,34 @@ class Game {
       return true;
     }
 
+    this.hud.showToast('Could not load autosave', 'error');
     return false;
+  }
+
+  private quickSaveWithFeedback(): void {
+    if (!this.isGameStarted) {
+      this.hud.showToast('Start a game before saving', 'info');
+      return;
+    }
+
+    if (this.saveManager.quickSave()) {
+      this.hud.showToast('Quick saved!', 'success');
+      this.flashSaveIndicator();
+    } else {
+      this.hud.showToast('Quick save failed', 'error');
+    }
+  }
+
+  private quickLoadWithFeedback(): void {
+    if (this.saveManager.quickLoad()) {
+      this.renderer.render();
+      this.hud.updateTurnInfo();
+      this.isGameStarted = true;
+      this.hideMainMenu();
+      this.hud.showToast('Quick loaded!', 'success');
+    } else {
+      this.hud.showToast('No valid quick save found', 'info');
+    }
   }
 
   /**
@@ -1037,8 +1064,12 @@ class Game {
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
         const slot = this.saveManager.getSlots().find(s => s.id === slotId);
         if (!slot?.isEmpty && !confirm('Overwrite existing save?')) return;
-        this.saveManager.saveToSlot(slotId);
-        this.hud.showToast('Game saved!', 'success');
+        if (this.saveManager.saveToSlot(slotId)) {
+          this.hud.showToast('Game saved!', 'success');
+          this.flashSaveIndicator();
+        } else {
+          this.hud.showToast('Save failed', 'error');
+        }
         this.renderSaveSlots();
       });
     });
@@ -1056,6 +1087,8 @@ class Game {
           this.hideGameMenu();
           this.hideMainMenu();
           this.hud.showToast('Game loaded!', 'success');
+        } else {
+          this.hud.showToast('Could not load save slot', 'error');
         }
       });
     });
@@ -1226,18 +1259,17 @@ class Game {
 
     // Listen for auto-save event
     this.hud.events.on('autoSave', () => {
-      this.saveManager.quickSave();
+      if (!this.saveManager.quickSave()) {
+        this.hud.showToast('Quick save failed', 'error');
+      }
     });
 
     // HUD keyboard shortcut events
     this.hud.events.on('quickSave', () => {
-      if (this.isGameStarted) this.saveManager.quickSave();
+      this.quickSaveWithFeedback();
     });
     this.hud.events.on('quickLoad', () => {
-      if (this.saveManager.quickLoad()) {
-        this.renderer.render();
-        this.hud.updateTurnInfo();
-      }
+      this.quickLoadWithFeedback();
     });
 
     document.getElementById('btn-continue-game')?.addEventListener('click', () => {
@@ -1383,7 +1415,9 @@ class Game {
       // Export the first non-empty slot, or slot 1 if all empty
       const slots = this.saveManager.getSlots();
       const target = slots.find(s => !s.isEmpty) ?? slots[0];
-      if (!this.saveManager.exportToFile(target.id)) {
+      if (this.saveManager.exportToFile(target.id)) {
+        this.hud.showToast('Save export started', 'success');
+      } else {
         this.hud.showToast('No save to export', 'info');
       }
     });
@@ -1485,20 +1519,13 @@ class Game {
       // Ctrl+S - Quick save
       if (e.key === 's' && e.ctrlKey) {
         e.preventDefault();
-        if (this.isGameStarted) {
-          this.saveManager.quickSave();
-          this.hud.showToast('Quick saved!', 'success');
-        }
+        this.quickSaveWithFeedback();
       }
 
       // Ctrl+L - Quick load
       if (e.key === 'l' && e.ctrlKey) {
         e.preventDefault();
-        if (this.saveManager.quickLoad()) {
-          this.renderer.render();
-          this.hud.updateTurnInfo();
-          this.hud.showToast('Quick loaded!', 'success');
-        }
+        this.quickLoadWithFeedback();
       }
 
       // Enter or Space - End phase
@@ -1770,8 +1797,11 @@ class Game {
 
   private autoSave(): void {
     if (this.isGameStarted && this.hud.gameConfig.autoSave) {
-      this.saveManager.autoSave();
-      this.flashSaveIndicator();
+      if (this.saveManager.autoSave()) {
+        this.flashSaveIndicator();
+      } else {
+        this.hud.showToast('Autosave failed', 'error');
+      }
     }
   }
 
@@ -1894,18 +1924,11 @@ class Game {
     });
 
     api.onMenuSaveGame?.(() => {
-      if (this.isGameStarted) {
-        this.saveManager.quickSave();
-        this.hud.showToast('Quick saved!', 'success');
-      }
+      this.quickSaveWithFeedback();
     });
 
     api.onMenuLoadGame?.(() => {
-      if (this.saveManager.quickLoad()) {
-        this.renderer.render();
-        this.hud.updateTurnInfo();
-        this.hud.showToast('Quick loaded!', 'success');
-      }
+      this.quickLoadWithFeedback();
     });
 
     api.onMenuSettings?.(() => this.showSettings());
