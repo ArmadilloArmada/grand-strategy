@@ -614,6 +614,30 @@ describe('SaveManager', () => {
     expect(manager.getSlots().find(s => s.id === 4)!.isEmpty).toBe(true);
   });
 
+  it('renameSlot updates a save name without changing the saved turn', () => {
+    const { state } = buildCombatState();
+    state.turnNumber = 8;
+    const manager = new SaveManager(state);
+
+    manager.saveToSlot(2, 'Old Name');
+    state.turnNumber = 99;
+
+    expect(manager.renameSlot(2, 'New Campaign Name')).toBe(true);
+    const slot = manager.getSlots().find(s => s.id === 2)!;
+    expect(slot.name).toBe('New Campaign Name');
+    expect(slot.turnNumber).toBe(8);
+  });
+
+  it('renameSlot rejects empty and missing slots', () => {
+    const { state } = buildCombatState();
+    const manager = new SaveManager(state);
+
+    expect(manager.renameSlot(2, 'Name')).toBe(false);
+    manager.saveToSlot(2, 'Existing');
+    expect(manager.renameSlot(2, '   ')).toBe(false);
+    expect(manager.getSlots().find(s => s.id === 2)!.name).toBe('Existing');
+  });
+
   it('quickSave and quickLoad use slot 1', () => {
     const { state } = buildCombatState();
     state.turnNumber = 3;

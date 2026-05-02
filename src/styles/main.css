@@ -1824,6 +1824,8 @@ body.theme-dark #help-button {
 
 .save-slot-info {
   text-align: left;
+  min-width: 0;
+  flex: 1;
 }
 
 .save-slot-name {
@@ -1842,6 +1844,8 @@ body.theme-dark #help-button {
 .save-slot-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .save-slot-actions button {

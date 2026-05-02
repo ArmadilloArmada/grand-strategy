@@ -85,11 +85,12 @@ export class SaveManager {
     if (slotId < 1 || slotId > MAX_SLOTS) return false;
 
     try {
+      const existing = this.getSaveData(slotId);
       const snapshot = this.state.createSnapshot();
       const saveData: SaveData = {
         version: SAVE_VERSION,
         slot: slotId,
-        name: name || `Save ${slotId}`,
+        name: name?.trim() || existing?.name || `Save ${slotId}`,
         timestamp: Date.now(),
         snapshot,
       };
@@ -100,6 +101,28 @@ export class SaveManager {
       return true;
     } catch (e) {
       console.error('Failed to save:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Rename a save slot without changing its snapshot or timestamp
+   */
+  renameSlot(slotId: number, name: string): boolean {
+    if (slotId < 1 || slotId > MAX_SLOTS) return false;
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+
+    try {
+      const saveData = this.getSaveData(slotId);
+      if (!saveData) return false;
+
+      saveData.name = trimmed.slice(0, 48);
+      const key = `grand-strategy-save-${slotId}`;
+      localStorage.setItem(key, JSON.stringify(saveData));
+      return true;
+    } catch (e) {
+      console.error('Failed to rename save:', e);
       return false;
     }
   }
@@ -274,10 +297,25 @@ export class SaveManager {
   formatTimestamp(timestamp: number): string {
     if (!timestamp) return 'Empty';
     const date = new Date(timestamp);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const dayLabel = isToday
+      ? 'Today'
+      : date.toDateString() === yesterday.toDateString()
+        ? 'Yesterday'
+        : date.toLocaleDateString();
+    return dayLabel + ' ' + date.toLocaleTimeString([], {
       hour: '2-digit', 
       minute: '2-digit' 
     });
+  }
+
+  private getSaveData(slotId: number): SaveData | null {
+    const key = `grand-strategy-save-${slotId}`;
+    const data = localStorage.getItem(key);
+    return data ? this.parseSaveData(data) : null;
   }
 
   private parseSaveData(raw: string): SaveData | null {

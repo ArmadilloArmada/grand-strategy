@@ -1034,7 +1034,7 @@ class Game {
       html += `
         <div class="save-slot ${isEmpty ? 'empty' : ''}" data-slot="${slot.id}">
           <div class="save-slot-info">
-            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : slot.name}</div>
+            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : this.escapeHTML(slot.name)}</div>
             <div class="save-slot-details">
               ${isEmpty 
                 ? 'No save data' 
@@ -1049,6 +1049,7 @@ class Game {
                 ? '' 
                 : `<button class="btn-slot-load primary" data-slot="${slot.id}">Load</button>`
             }
+            ${!isEmpty ? `<button class="btn-slot-rename" data-slot="${slot.id}">Rename</button>` : ''}
             ${!isEmpty ? `<button class="btn-slot-delete danger" data-slot="${slot.id}">🗑️</button>` : ''}
           </div>
         </div>
@@ -1064,7 +1065,10 @@ class Game {
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
         const slot = this.saveManager.getSlots().find(s => s.id === slotId);
         if (!slot?.isEmpty && !confirm('Overwrite existing save?')) return;
-        if (this.saveManager.saveToSlot(slotId)) {
+        const defaultName = slot?.isEmpty ? `Save ${slotId}` : slot?.name ?? `Save ${slotId}`;
+        const saveName = prompt('Save name:', defaultName);
+        if (saveName === null) return;
+        if (this.saveManager.saveToSlot(slotId, saveName)) {
           this.hud.showToast('Game saved!', 'success');
           this.flashSaveIndicator();
         } else {
@@ -1093,6 +1097,23 @@ class Game {
       });
     });
 
+    container.querySelectorAll('.btn-slot-rename').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
+        const slot = this.saveManager.getSlots().find(s => s.id === slotId);
+        if (!slot || slot.isEmpty) return;
+        const newName = prompt('Rename save slot:', slot.name);
+        if (newName === null) return;
+        if (this.saveManager.renameSlot(slotId, newName)) {
+          this.renderSaveSlots();
+          this.hud.showToast('Save renamed', 'success');
+        } else {
+          this.hud.showToast('Rename failed', 'error');
+        }
+      });
+    });
+
     container.querySelectorAll('.btn-slot-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1104,6 +1125,16 @@ class Game {
         });
       });
     });
+  }
+
+  private escapeHTML(value: string): string {
+    return value.replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char] ?? char));
   }
 
   /**
