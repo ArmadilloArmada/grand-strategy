@@ -39,6 +39,7 @@ import { FactionAbilityManager, factionAbilityManager, FACTION_ABILITIES, applyF
 import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
+import { calculateTerritoryThreat } from '../engine/ThreatAnalyzer';
 import { dragManager } from './DragManager';
 
 export class HUD {
@@ -594,6 +595,20 @@ export class HUD {
       }
       
       // Respect fog of war — hide enemy unit details in hidden territories
+      let threatInfo = '';
+      if (isOwnTerritory && faction) {
+        const threat = calculateTerritoryThreat(this.state, territory, faction);
+        if (threat.threatLevel > 0) {
+          const status = threat.defenseGap > 0 ? 'Under-defended front' : 'Covered front';
+          const bgColor = threat.defenseGap > 0 ? 'rgba(239,68,68,0.14)' : 'rgba(245,158,11,0.12)';
+          const textColor = threat.defenseGap > 0 ? '#b91c1c' : '#92400e';
+          threatInfo = `<div style="margin-top: 0.5rem; padding: 0.4rem; background: ${bgColor}; border-radius: 4px; color: ${textColor};">
+            <strong>${status}</strong><br>
+            Enemy pressure: ${Math.round(threat.threatLevel)} | Defense: ${Math.round(threat.defenseStrength)}
+          </div>`;
+        }
+      }
+
       const isVisible = this.isTerritoryVisible(territoryId);
       const showUnits = isVisible || territory.owner === faction?.id;
 
@@ -632,6 +647,7 @@ export class HUD {
         ${badges.length ? '<br>' + badges.join(' • ') : ''}
         ${commanderLine}
         ${historyLine}
+        ${threatInfo}
         ${mobilizationInfo}
       `;
       el.style.left = `${clientX + 15}px`;

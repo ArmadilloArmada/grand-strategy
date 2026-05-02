@@ -5,6 +5,7 @@
 import { GameState } from '../engine/GameState';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { CombatState } from '../engine/CombatResolver';
+import { getThreatenedTerritoryIds } from '../engine/ThreatAnalyzer';
 import { settings } from './Settings';
 import { soundManager } from '../audio/SoundManager';
 
@@ -109,6 +110,10 @@ export class MinimapController {
     const activeCombat = this.getActiveCombat();
     const combatId = activeCombat?.territoryId;
     const pendingAttackTargets = this.state.pendingMoves.map(m => m.toTerritoryId);
+    const threatFaction = this.getThreatFaction();
+    const threatenedIds = this.threatMode && threatFaction
+      ? getThreatenedTerritoryIds(this.state, threatFaction)
+      : new Set<string>();
 
     for (const territory of this.state.territories.values()) {
       ctx.beginPath();
@@ -126,15 +131,10 @@ export class MinimapController {
       } else if (!territory.owner) {
         ctx.fillStyle = '#5c5c5c';
       } else if (this.threatMode) {
-        const humanFaction = this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human');
-        if (humanFaction) {
-          if (territory.owner === humanFaction.id) {
-            const isThreatened = territory.adjacentTo.some(adjId => {
-              const adj = this.state.territories.get(adjId);
-              return adj?.owner && humanFaction.isEnemyOf(adj.owner) && adj.getTotalUnitCount() > 0;
-            });
-            ctx.fillStyle = isThreatened ? '#ef4444' : '#22c55e';
-          } else if (humanFaction.isEnemyOf(territory.owner)) {
+        if (threatFaction) {
+          if (territory.owner === threatFaction.id) {
+            ctx.fillStyle = threatenedIds.has(territory.id) ? '#ef4444' : '#22c55e';
+          } else if (threatFaction.isEnemyOf(territory.owner)) {
             ctx.fillStyle = '#f97316';
           } else {
             ctx.fillStyle = '#94a3b8';
@@ -185,5 +185,11 @@ export class MinimapController {
         ctx.fillText('★', centerX, centerY);
       }
     }
+  }
+
+  private getThreatFaction() {
+    const current = this.state.getCurrentFaction();
+    if (current?.controlledBy === 'human') return current;
+    return this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human') ?? current ?? null;
   }
 }

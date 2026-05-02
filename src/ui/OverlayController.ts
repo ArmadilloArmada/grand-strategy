@@ -5,6 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { MapRenderer } from '../renderer/MapRenderer';
+import { getThreatenedTerritoryIds } from '../engine/ThreatAnalyzer';
 
 export interface OverlayCallbacks {
   showToast: (message: string, type: 'info' | 'success' | 'error') => void;
@@ -43,7 +44,7 @@ export class OverlayController {
     const labels: Record<OverlayMode, string> = {
       off: 'Overlays off',
       range: 'Movement/attack range',
-      threat: 'Threat (enemy reach)',
+      threat: 'Threatened territories',
       economic: 'Economic heat map (IPC values)',
     };
     this.callbacks.showToast(labels[this.mode], 'info');
@@ -63,19 +64,8 @@ export class OverlayController {
   }
 
   private getThreatTerritoryIds(): Set<string> {
-    const sel = this.state.selectedTerritoryId;
     const faction = this.state.getCurrentFaction();
-    if (!sel || !faction) return new Set();
-
-    const territory = this.state.territories.get(sel);
-    if (!territory) return new Set();
-
-    const threat = new Set<string>();
-    for (const adjId of territory.adjacentTo) {
-      const adj = this.state.territories.get(adjId);
-      if (!adj || !adj.owner || !faction.isEnemyOf(adj.owner)) continue;
-      if (adj.getTotalUnitCount() > 0) threat.add(adjId);
-    }
-    return threat;
+    if (!faction) return new Set();
+    return getThreatenedTerritoryIds(this.state, faction);
   }
 }
