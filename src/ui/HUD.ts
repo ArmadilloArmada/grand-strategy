@@ -2287,6 +2287,7 @@ export class HUD {
     const isBuildPhase = ['purchase', 'build', 'production'].includes(phaseStr);
     const isCombatPhase = ['combat', 'attack', 'resolve'].includes(phaseStr);
     const isEndPhase = ['collect_income', 'end'].includes(phaseStr);
+    const hasAttackTargets = isMovementPhase && this.validMoves.some(m => m.isAttack);
 
     // Move button - enabled during movement phases with owned territory selected that has available units
     if (moveBtn) {
@@ -2297,31 +2298,46 @@ export class HUD {
       moveBtn.disabled = !canMove;
       
       if (canMove) {
-        moveBtn.textContent = '🚶 Move Units';
+        moveBtn.innerHTML = '🚶 Move Units <kbd class="kbd-hint">M</kbd>';
+        moveBtn.title = 'Click a highlighted friendly/empty territory to move units';
       } else {
-        moveBtn.textContent = '🚶 Move';
+        moveBtn.innerHTML = '🚶 Move <kbd class="kbd-hint">M</kbd>';
+        moveBtn.title = isMovementPhase
+          ? 'Select one of your territories with ready units'
+          : 'Only available in movement phases';
       }
     }
 
-    // Attack button - now just shows info since combat is immediate
+    // Attack button - opens battle preview when selected territory has attack targets
     if (attackBtn) {
       if (isMovementPhase && isHumanTurn) {
-        attackBtn.textContent = '⚔️ Attack';
-        attackBtn.disabled = true; // Info only - attacks via map clicks
-        attackBtn.title = 'Select your territory, then click an enemy territory to attack';
+        attackBtn.innerHTML = hasAttackTargets
+          ? '⚔️ Attack Target <kbd class="kbd-hint">A</kbd>'
+          : '⚔️ Attack <kbd class="kbd-hint">A</kbd>';
+        attackBtn.disabled = !hasAttackTargets;
+        attackBtn.title = hasAttackTargets
+          ? 'Open battle preview for available attack target'
+          : 'Select your territory, then click an enemy territory to attack';
       } else if (isCombatPhase) {
         attackBtn.textContent = '⚔️ Resolve Combat';
         attackBtn.disabled = this.state.pendingMoves.length === 0 || !isHumanTurn;
+        attackBtn.title = this.state.pendingMoves.length > 0
+          ? 'Resolve queued battles'
+          : 'No battles waiting';
       } else {
-        attackBtn.textContent = '⚔️ Attack';
+        attackBtn.innerHTML = '⚔️ Attack <kbd class="kbd-hint">A</kbd>';
         attackBtn.disabled = true;
+        attackBtn.title = 'Only available in movement/combat phases';
       }
     }
 
     // Phase-active class: highlight buttons relevant to the current phase
     const allActionBtns = [moveBtn, attackBtn, buildBtn];
     for (const b of allActionBtns) b?.classList.remove('phase-active');
-    if (isMovementPhase) { moveBtn?.classList.add('phase-active'); attackBtn?.classList.add('phase-active'); }
+    if (isMovementPhase) {
+      moveBtn?.classList.add('phase-active');
+      if (hasAttackTargets) attackBtn?.classList.add('phase-active');
+    }
     if (isBuildPhase) buildBtn?.classList.add('phase-active');
     if (isCombatPhase) attackBtn?.classList.add('phase-active');
 
@@ -2609,6 +2625,7 @@ export class HUD {
     this.validMoves = allMoves;
     this.renderer.setValidMoveTargets(moveTargets, attackTargets);
     this.applyOverlay();
+    this.updateActionButtons();
   }
 
   private applyOverlay(): void { this.overlayController.apply(); }
@@ -2625,6 +2642,10 @@ export class HUD {
    * Handle attack button click - START COMBAT RESOLUTION
    */
   private onAttackClick(): void {
+    if (['combat_move', 'move', 'orders', 'action'].includes(this.state.currentPhase)) {
+      this.onAttackShortcut();
+      return;
+    }
     this.combatUI.onAttackClick();
   }
 
