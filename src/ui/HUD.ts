@@ -630,6 +630,8 @@ export class HUD {
   }
 
   private setupHQLayout(): void {
+    // Skip on narrow viewports — elements stay as free-floating panels managed by DragManager
+    if (window.innerWidth <= 1080) return;
     if (document.getElementById('hq-panel')) return;
 
     const panel = document.createElement('aside');
@@ -4646,12 +4648,26 @@ export class HUD {
     const activeObjective = this.objectiveSystem.getActive(faction.id)[0];
     const income = this.state.calculateIncome(faction.id);
     const coach = this.getTurnCoach(faction);
-    const threatLine = topThreat
-      ? `${this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId}: gap ${Math.ceil(topThreat.defenseGap)}`
-      : 'No immediate front-line pressure.';
-    const opportunityLine = topOpportunity
-      ? `${this.state.territories.get(topOpportunity.territoryId)?.name ?? topOpportunity.territoryId} (${topOpportunity.reason})`
-      : 'Build strength before attacking.';
+    const threatLine = (() => {
+      if (!topThreat) return 'No immediate front-line pressure.';
+      const name = this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId;
+      const gap = Math.ceil(topThreat.defenseGap);
+      if (gap >= 8) return `🚨 ${name} is collapsing — reinforce now`;
+      if (gap >= 4) return `⚠ ${name} at risk — defense is thin`;
+      return `${name} is exposed, watch the flank`;
+    })();
+    const opportunityLine = (() => {
+      if (!topOpportunity) return 'Build strength before attacking.';
+      const name = this.state.territories.get(topOpportunity.territoryId)?.name ?? topOpportunity.territoryId;
+      const reasonMap: Record<string, string> = {
+        weak_defense: 'lightly defended — strike now',
+        isolated:     'cut off from support',
+        high_value:   'high-value — worth taking',
+        undefended:   'undefended — easy capture',
+      };
+      const detail = reasonMap[topOpportunity.reason] ?? topOpportunity.reason;
+      return `${name} — ${detail}`;
+    })();
     const objectiveLine = activeObjective
       ? `${activeObjective.title}: ${activeObjective.description}`
       : 'Secure income and create a new attack lane.';

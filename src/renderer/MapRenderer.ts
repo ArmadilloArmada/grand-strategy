@@ -203,8 +203,9 @@ export class MapRenderer {
       if (now - startTime > 1800) this.aiPulseTerritories.delete(id);
       else anyActive = true;
     }
-    // Keep loop alive while a territory is selected (animated glow needs continuous frames)
+    // Keep loop alive while a territory is selected or mobilizable targets are pulsing
     if (this.state.selectedTerritoryId !== null) anyActive = true;
+    if (this.mobilizableTargets.size > 0) anyActive = true;
     // Use drawFrame() directly — the animation loop already owns the RAF cadence
     this.renderPending = false;
     this.drawFrame();
@@ -1027,7 +1028,9 @@ export class MapRenderer {
         if (this.mobilizedTargets.has(territory.id)) {
           overlayColor = 'rgba(34,197,94,0.35)';
         } else if (this.mobilizableTargets.has(territory.id)) {
-          overlayColor = 'rgba(255,215,0,0.25)';
+          // Pulse between 0.15 and 0.38 opacity at ~0.5 Hz to draw attention
+          const pulse = 0.15 + 0.23 * Math.abs(Math.sin(Date.now() * 0.0025));
+          overlayColor = `rgba(255,215,0,${pulse.toFixed(2)})`;
         }
       }
 
@@ -1222,7 +1225,9 @@ export class MapRenderer {
   setMobilizationTargets(canMobilize: string[], alreadyMobilized: string[]): void {
     this.mobilizableTargets = new Set(canMobilize);
     this.mobilizedTargets = new Set(alreadyMobilized);
-    this.render();
+    // Keep the render loop alive so the pulse animation runs continuously
+    if (canMobilize.length > 0) this.startContinuousRender();
+    else this.render();
   }
 
   /**
