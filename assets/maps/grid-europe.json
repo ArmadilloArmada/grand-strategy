@@ -550,7 +550,8 @@
         "ireland",
         "north_sea",
         "scotland",
-        "france_n"
+        "france_n",
+        "english_ch"
       ],
       "polygon": [
         [
@@ -920,7 +921,8 @@
         "celtic_sea",
         "france_n",
         "ireland",
-        "spain_n"
+        "spain_n",
+        "english_ch"
       ],
       "polygon": [
         [
@@ -1069,7 +1071,8 @@
         "france_n",
         "germany_n",
         "north_sea",
-        "france_c"
+        "france_c",
+        "english_ch"
       ],
       "polygon": [
         [
@@ -1371,7 +1374,8 @@
         "switzerland",
         "albania",
         "czechoslovakia",
-        "italy_n"
+        "italy_n",
+        "yugoslavia"
       ],
       "polygon": [
         [
@@ -1560,7 +1564,8 @@
         "czechoslovakia",
         "ukraine_s",
         "brest_litovsk",
-        "albania"
+        "albania",
+        "yugoslavia"
       ],
       "polygon": [
         [
@@ -1712,7 +1717,8 @@
         "albania",
         "bulgaria",
         "ukraine_s",
-        "aegean_sea"
+        "aegean_sea",
+        "yugoslavia"
       ],
       "polygon": [
         [
@@ -2195,7 +2201,8 @@
         "med_c2",
         "greece",
         "austria",
-        "egypt"
+        "egypt",
+        "italy_s"
       ],
       "polygon": [
         [
@@ -2308,7 +2315,8 @@
         "italy_n",
         "aegean_sea",
         "albania",
-        "med_e1"
+        "med_e1",
+        "yugoslavia"
       ],
       "polygon": [
         [
@@ -3156,7 +3164,8 @@
         "libya_s",
         "sinai",
         "egypt",
-        "med_c2"
+        "med_c2",
+        "italy_s"
       ],
       "polygon": [
         [
@@ -3193,7 +3202,8 @@
         "med_e2",
         "greece",
         "sinai",
-        "med_c2"
+        "med_c2",
+        "italy_s"
       ],
       "polygon": [
         [

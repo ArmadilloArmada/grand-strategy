@@ -2,11 +2,13 @@
   "name": "grand-strategy",
   "version": "0.1.0",
   "description": "A turn-based grand strategy wargame of global conquest",
+  "author": "ArmadilloArmada",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:19123 && node electron/launch.cjs\"",
     "generate-icons": "node scripts/generate-icons.cjs",
+    "validate:maps": "node scripts/validate-maps.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",

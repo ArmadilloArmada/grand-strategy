@@ -1,0 +1,94 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { afterEach, describe, expect, it } from 'vitest';
+import { GameState } from '../../engine/GameState';
+import { MovementValidator } from '../../engine/MovementValidator';
+import { MobilizationSystem } from '../../engine/MobilizationSystem';
+import { PhaseGuidance } from '../PhaseGuidance';
+import { makeFactionData, makeTerritory } from '../../engine/__tests__/testHelpers';
+
+function makeGuidance(): { state: GameState; guidance: PhaseGuidance } {
+  const state = new GameState();
+  state.factionRegistry.register(makeFactionData('atlantic_alliance', {
+    name: 'Atlantic Alliance',
+    capital: 'washington',
+  }));
+  state.currentFactionId = 'atlantic_alliance';
+  state.territories.set('washington', makeTerritory('washington', 'atlantic_alliance', { name: 'Washington' }));
+  const guidance = new PhaseGuidance(
+    state,
+    new MovementValidator(state),
+    new MobilizationSystem(state),
+  );
+  return { state, guidance };
+}
+
+afterEach(() => {
+  document.body.innerHTML = '';
+});
+
+describe('PhaseGuidance', () => {
+  it('returns stable phase toast copy', () => {
+    const { guidance } = makeGuidance();
+
+    expect(guidance.getPhaseToast('purchase')).toBe('Click Build to buy units');
+    expect(guidance.getPhaseToast('unknown')).toBeNull();
+  });
+
+  it('returns first-turn tips only on turn one', () => {
+    const { guidance } = makeGuidance();
+
+    expect(guidance.getFirstTurnTip(1, 'combat_move')?.tipId).toBe('first-turn-combat_move');
+    expect(guidance.getFirstTurnTip(2, 'combat_move')).toBeNull();
+  });
+
+  it('updates context helper for AI turns', () => {
+    const { state, guidance } = makeGuidance();
+    document.body.innerHTML = `
+      <div id="context-helper" class="context-helper">
+        <span id="context-helper-text"></span>
+      </div>
+    `;
+    const faction = state.factionRegistry.get('atlantic_alliance');
+
+    const tip = guidance.updateContextHelper({
+      phase: 'move',
+      faction,
+      territory: undefined,
+      isHumanTurn: false,
+      isBuildPhase: false,
+      isMovementPhase: false,
+      isCombatPhase: false,
+      isEndPhase: false,
+    });
+
+    expect(tip).toBeNull();
+    expect(document.getElementById('context-helper')?.className).toContain('hint');
+    expect(document.getElementById('context-helper-text')?.textContent).toBe('Atlantic Alliance is taking their turn...');
+  });
+
+  it('surfaces combat guidance when battles are pending', () => {
+    const { state, guidance } = makeGuidance();
+    document.body.innerHTML = `
+      <div id="context-helper" class="context-helper">
+        <span id="context-helper-text"></span>
+      </div>
+    `;
+    state.pendingMoves.push({} as any);
+
+    const tip = guidance.updateContextHelper({
+      phase: 'combat',
+      faction: state.factionRegistry.get('atlantic_alliance'),
+      territory: undefined,
+      isHumanTurn: true,
+      isBuildPhase: false,
+      isMovementPhase: false,
+      isCombatPhase: true,
+      isEndPhase: false,
+    });
+
+    expect(tip?.tipId).toBe('combat');
+    expect(document.getElementById('context-helper-text')?.textContent).toContain('1 battle to resolve');
+  });
+});

@@ -1756,13 +1756,38 @@ body.theme-dark #help-button {
   transform: translateY(0);
 }
 
+/* Objectives panels: default position below the resources bar */
+#objectives-panel,
+#campaign-objectives-panel {
+  top: 8rem;
+  transition: top 0.2s ease;
+}
+
+/* Shift down below the AI feed when it's visible */
+body.ai-feed-active #objectives-panel,
+body.ai-feed-active #campaign-objectives-panel {
+  top: calc(3.25rem + 40vh + 0.5rem);
+}
+
 .ai-feed-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 0.45rem;
   color: var(--gold-bright);
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.ai-feed-title small {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .ai-feed-row {
@@ -1793,6 +1818,16 @@ body.theme-dark #help-button {
   display: block;
   color: var(--text-primary);
   font-size: 0.76rem;
+}
+
+.ai-feed-copy small {
+  display: block;
+  margin-top: 0.12rem;
+  color: rgba(251, 191, 36, 0.76);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* ==================== Turn Style Description ==================== */
@@ -4564,6 +4599,40 @@ kbd.kbd-hint {
   padding-left: 1.2rem;
 }
 
+.fwr-next {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(200, 150, 32, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  border-radius: 7px;
+}
+
+.fwr-next span,
+.fwr-next strong,
+.fwr-next small {
+  display: block;
+}
+
+.fwr-next span {
+  color: #fbbf24;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fwr-next strong {
+  margin-top: 0.2rem;
+  color: #f8fafc;
+  font-size: 0.94rem;
+}
+
+.fwr-next small {
+  margin-top: 0.12rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
 .fwr-actions {
   display: flex;
   justify-content: flex-end;
@@ -4579,6 +4648,11 @@ kbd.kbd-hint {
   background: rgba(255,255,255,0.08);
   color: #e5e7eb;
   cursor: pointer;
+}
+
+.fwr-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .fwr-actions button.primary {

@@ -5,9 +5,9 @@ const fs = require('fs');
 // Keep a global reference of the window object
 let mainWindow = null;
 
-// Steam integration (optional - will work without Steam)
-// Replace 480 with your real Steam App ID once you have one from Steamworks
-const STEAM_APP_ID = 480;
+// Steam integration is optional; App ID 480 is Spacewar, useful only for dev smoke tests.
+// Set STEAM_APP_ID to the real Steamworks App ID for release builds.
+const STEAM_APP_ID = Number(process.env.STEAM_APP_ID ?? 480);
 let steamworks = null;
 try {
   const steamworksJs = require('steamworks.js');
@@ -53,13 +53,12 @@ function createWindow() {
     mainWindow.show();
     mainWindow.focus();
   });
-
-  // Handle renderer crash — offer reload before quitting
+  // Handle renderer crash - offer reload before quitting
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[Renderer] Process gone:', details.reason);
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: 'error',
-      title: 'Grand Strategy — Renderer Crashed',
+      title: 'Grand Strategy - Renderer Crashed',
       message: 'The game renderer stopped unexpectedly.',
       detail: `Reason: ${details.reason}`,
       buttons: ['Reload Game', 'Quit'],
@@ -73,7 +72,7 @@ function createWindow() {
   mainWindow.webContents.on('unresponsive', () => {
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: 'warning',
-      title: 'Grand Strategy — Not Responding',
+      title: 'Grand Strategy - Not Responding',
       message: 'The game is not responding.',
       buttons: ['Wait', 'Reload', 'Quit'],
       defaultId: 0,
@@ -182,8 +181,8 @@ function createMenu() {
                 'Inspired by TripleA and Axis & Allies.',
                 '',
                 'Third-party libraries:',
-                '  Electron · Vite · TypeScript',
-                '  steamworks.js · Vitest',
+                '  Electron - Vite - TypeScript',
+                '  steamworks.js - Vitest',
               ].join('\n'),
             });
           },
@@ -326,7 +325,7 @@ ipcMain.handle('show-open-dialog', async () => {
   return result;
 });
 
-// ── Mod filesystem integration ─────────────────────────────────────────────
+// Mod filesystem integration
 
 /** Scan the userData/mods/ folder and return all valid mod JSON files */
 ipcMain.handle('scan-mods-folder', async () => {
@@ -408,7 +407,7 @@ ipcMain.handle('delete-mod-file', async (event, filename) => {
   }
 });
 
-// ── Steam Workshop ────────────────────────────────────────────────────────────
+// Steam Workshop
 
 ipcMain.handle('get-workshop-items', (_event, query, tags) => {
   if (!steamworks) return [];
@@ -453,8 +452,7 @@ ipcMain.handle('workshop-publish', async (_event, { title, description, tags, co
   try {
     const ugc = steamworks.ugc ?? steamworks.workshop;
     if (!ugc) return { success: false, error: 'UGC API not available in this build' };
-
-    // createItem is async in steamworks.js — returns { publishedFileId, userNeedsToAcceptWorkshopLegalAgreement }
+    // createItem is async in steamworks.js and returns published file metadata.
     const createResult = await ugc.createItem?.(STEAM_APP_ID, 0 /* k_EWorkshopFileTypeCommunity */);
     if (!createResult) return { success: false, error: 'createItem not supported' };
 
@@ -503,14 +501,14 @@ ipcMain.handle('workshop-update', async (_event, { itemId, title, description, t
   }
 });
 
-// ── Crash & error handling ────────────────────────────────────────────────────
+// Crash and error handling
 
 process.on('uncaughtException', (err) => {
   console.error('[Main] Uncaught exception:', err);
   try {
     dialog.showMessageBoxSync({
       type: 'error',
-      title: 'Grand Strategy — Fatal Error',
+      title: 'Grand Strategy - Fatal Error',
       message: 'An unexpected error caused the game to crash.',
       detail: err.stack ?? err.message,
       buttons: ['OK'],

@@ -46,18 +46,11 @@ import { getMaxCapturableCapitals, normalizeCapitalsToWin } from '../engine/Setu
 import { dragManager } from './DragManager';
 import { toastManager } from './ToastManager';
 import { aiActivityFeed } from './AIActivityFeed';
-
-interface TurnRecapStats {
-  factionId: string;
-  battles: number;
-  captures: number;
-  mobilizations: number;
-  unitsMobilized: number;
-  income: number;
-  unitsLost: number;
-  enemyUnitsDestroyed: number;
-}
-
+import { FirstWarRoom } from './FirstWarRoom';
+import { StrategicAdvisor } from './StrategicAdvisor';
+import { PhaseGuidance } from './PhaseGuidance';
+import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
+import { AbilityPanel } from './AbilityPanel';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -74,6 +67,11 @@ export class HUD {
   private techUI!: TechUI;
   private statsUI!: StatsUI;
   private diplomacyUI!: DiplomacyUI;
+  private firstWarRoom!: FirstWarRoom;
+  private strategicAdvisor!: StrategicAdvisor;
+  private phaseGuidance!: PhaseGuidance;
+  private turnRecapPanel!: TurnRecapPanel;
+  private abilityPanel!: AbilityPanel;
 
   // Current UI state
   private selectedUnitType: string | null = null;
@@ -97,7 +95,7 @@ export class HUD {
   // Injected by main.ts so HUD can control AI turn speed
   private aiSpeedCallback: ((multiplier: number) => void) | null = null;
 
-  // Multiplayer turn timer
+  // Optional timed-turn display
   private turnTimerInterval: ReturnType<typeof setInterval> | null = null;
   private turnTimerSeconds: number = 0;
 
@@ -120,15 +118,11 @@ export class HUD {
   // IPC flash tracking
   private prevIPCs: number = -1;
 
-  // Context helper last text (for change-detection fade)
-  private prevContextText: string = '';
-
   // Commander move mode
   private commanderMoveSource: string | null = null;
 
   // First-time tips system
   private shownTips: Set<string> = new Set(JSON.parse(localStorage.getItem('shownTips') || '[]'));
-  private firstWarRoomShown: boolean = false;
 
   // Event emitter for main game (gameStarted, autoSave, gameOver)
   public events: { on: (name: string, cb: (data?: unknown) => void) => void; emit: (name: string, data?: unknown) => void } = (() => {
@@ -155,6 +149,9 @@ export class HUD {
     this.mobilizationSystem = new MobilizationSystem(state);
     this.combatResolver = new CombatResolver(state);
     this.technologyManager = new TechnologyManager(state);
+    this.phaseGuidance = new PhaseGuidance(state, this.movementValidator, this.mobilizationSystem);
+    this.turnRecapPanel = new TurnRecapPanel();
+    this.abilityPanel = new AbilityPanel();
 
     const combatCallbacks = {
       showToast: (msg: string, type: 'success' | 'info' | 'error') => this.showToast(msg, type),
@@ -225,6 +222,17 @@ export class HUD {
     });
     this.overlayController = new OverlayController(state, renderer, {
       showToast: (msg, type) => this.showToast(msg, type),
+    });
+    this.firstWarRoom = new FirstWarRoom({
+      focusTerritory: (territoryId) => this.runAdvisorAction('focus-territory', territoryId),
+      showObjectives: () => {
+        this.updateObjectivesPanel();
+        document.getElementById('objectives-panel')?.classList.remove('hidden');
+      },
+      showThreatOverlay: () => this.overlayController.setMode('threat'),
+    });
+    this.strategicAdvisor = new StrategicAdvisor((action, territoryId) => {
+      this.runAdvisorAction(action, territoryId);
     });
 
     renderer.setContextMenuCallback((territoryId, clientX, clientY) =>
@@ -346,9 +354,13 @@ export class HUD {
     this.state.on('alliance_betrayed', (e: any) => {
       const d = e.data as { betrayerName: string; betrayedName: string };
       soundManager.play('hit');
-      this.showToast(`⚠️ BETRAYAL! ${d.betrayerName} has stabbed ${d.betrayedName} in the back!`, 'info');
-      battleLog.logCombat(this.state.turnNumber, d.betrayerName, '#ff0000',
-        `🗡️ ${d.betrayerName} BETRAYED their alliance with ${d.betrayedName}! War declared!`);
+      this.showToast(`BETRAYAL! ${d.betrayerName} has stabbed ${d.betrayedName} in the back!`, 'info');
+      battleLog.logCombat(
+        this.state.turnNumber,
+        d.betrayerName,
+        '#ff0000',
+        `BETRAYAL: ${d.betrayerName} ended their alliance with ${d.betrayedName}. War declared!`
+      );
     });
 
     // Diplomacy event sounds
@@ -375,7 +387,7 @@ export class HUD {
           const toast = document.createElement('div');
           toast.className = 'toast error';
           toast.style.cssText = 'font-size:1.15rem;font-weight:bold;border:2px solid #ef4444;padding:1rem 1.5rem;';
-          toast.innerHTML = `☢️ NUCLEAR STRIKE!<br><span style="font-size:0.9rem;font-weight:normal;">${launcherFaction?.name ?? 'Unknown'} annihilated ${d.targetTerritoryName} — ${d.unitsDestroyed} units destroyed!</span>`;
+          toast.innerHTML = `NUCLEAR STRIKE!<br><span style="font-size:0.9rem;font-weight:normal;">${launcherFaction?.name ?? 'Unknown'} annihilated ${d.targetTerritoryName} - ${d.unitsDestroyed} units destroyed!</span>`;
           container.appendChild(toast);
           setTimeout(() => toast.remove(), 6000);
         }
@@ -1335,33 +1347,15 @@ export class HUD {
     setTimeout(() => flash.remove(), 950);
   }
 
-  /**
-   * Show a brief, auto-dismissing phase recap card
-   */
   private showPhaseRecap(phaseName: string): void {
-    document.getElementById('phase-recap-card')?.remove();
-
     const faction = this.state.getCurrentFaction();
     const factionStats = faction ? statisticsManager.getFactionStats(faction.id) : null;
-
-    const rows: string[] = [];
-    if (this.battlesThisPhase > 0)
-      rows.push(`<div class="recap-row"><span>⚔️ Battles fought</span><span class="recap-val">${this.battlesThisPhase}</span></div>`);
-    if (this.territoriesCapturedThisPhase > 0)
-      rows.push(`<div class="recap-row"><span>🏴 Territories captured</span><span class="recap-val">${this.territoriesCapturedThisPhase}</span></div>`);
-    if (factionStats && factionStats.unitsLost > 0)
-      rows.push(`<div class="recap-row"><span>💀 Units lost this game</span><span class="recap-val">${factionStats.unitsLost}</span></div>`);
-
-    const card = document.createElement('div');
-    card.id = 'phase-recap-card';
-    card.className = 'phase-recap-card';
-    card.innerHTML = `
-      <div class="recap-header">${phaseName} · Complete</div>
-      ${rows.join('')}
-      <div class="recap-dismiss">Click to dismiss</div>`;
-    card.addEventListener('click', () => card.remove());
-    document.body.appendChild(card);
-    setTimeout(() => card?.remove(), 5000);
+    this.turnRecapPanel.showPhase({
+      phaseName,
+      battles: this.battlesThisPhase,
+      captures: this.territoriesCapturedThisPhase,
+      unitsLostThisGame: factionStats?.unitsLost ?? 0,
+    });
   }
 
   private resetTurnRecap(factionId: string): void {
@@ -1389,41 +1383,18 @@ export class HUD {
     if (!faction) return;
 
     const recap = this.ensureTurnRecap(faction.id);
-    document.getElementById('turn-recap-card')?.remove();
-
-    const netLossText = recap.enemyUnitsDestroyed - recap.unitsLost;
     const topThreat = this.getTopThreats(faction.id)[0];
     const nextObjective = this.objectiveSystem.getActive(faction.id)[0];
-    const rows = [
-      `<div class="recap-row"><span>Battles fought</span><span class="recap-val">${recap.battles}</span></div>`,
-      `<div class="recap-row"><span>Territories captured</span><span class="recap-val">${recap.captures}</span></div>`,
-      `<div class="recap-row"><span>Mobilized territories</span><span class="recap-val">${recap.mobilizations}</span></div>`,
-      `<div class="recap-row"><span>Units mobilized</span><span class="recap-val">${recap.unitsMobilized}</span></div>`,
-      `<div class="recap-row"><span>Income collected</span><span class="recap-val">+${recap.income} IPC</span></div>`,
-      `<div class="recap-row"><span>Combat exchange</span><span class="recap-val">${netLossText >= 0 ? '+' : ''}${netLossText}</span></div>`,
-      topThreat ? `<div class="recap-row recap-next"><span>Next danger</span><span class="recap-val">${this.escapeHtml(this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId)}</span></div>` : '',
-      nextObjective ? `<div class="recap-row recap-next"><span>Next objective</span><span class="recap-val">${this.escapeHtml(nextObjective.title)}</span></div>` : '',
-    ];
 
-    const card = document.createElement('div');
-    card.id = 'turn-recap-card';
-    card.className = 'turn-recap-card';
-    card.innerHTML = `
-      <div class="recap-header">
-        <span>Turn ${this.state.turnNumber} Recap</span>
-        <button class="recap-close" title="Dismiss">×</button>
-      </div>
-      <div class="turn-recap-faction" style="color:${faction.colorLight || faction.color};">${faction.name}</div>
-      ${rows.filter(Boolean).join('')}
-      <div class="recap-dismiss">Click to dismiss</div>`;
-
-    card.querySelector('.recap-close')?.addEventListener('click', (event) => {
-      event.stopPropagation();
-      card.remove();
+    this.turnRecapPanel.showTurn({
+      faction,
+      turnNumber: this.state.turnNumber,
+      recap,
+      nextDangerName: topThreat
+        ? this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId
+        : undefined,
+      nextObjectiveTitle: nextObjective?.title,
     });
-    card.addEventListener('click', () => card.remove());
-    document.body.appendChild(card);
-    setTimeout(() => card?.remove(), 9000);
   }
 
   /**
@@ -1454,29 +1425,9 @@ export class HUD {
       this.checkAutoSkipPhase(phase, faction);
       // One-time hint about the Enter shortcut to end phases
       this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
-      this.showFirstTurnPhaseTip(phase);
+      const firstTurnTip = this.phaseGuidance.getFirstTurnTip(this.state.turnNumber, phase);
+      if (firstTurnTip) this.showFirstTimeTip(firstTurnTip.tipId, firstTurnTip.message);
     }
-  }
-
-  private showFirstTurnPhaseTip(phase: string): void {
-    if (this.state.turnNumber > 1) return;
-
-    const tips: Record<string, string> = {
-      purchase: 'First turn: mobilize your capital or factory first. Those territories usually produce the strongest opening forces.',
-      build: 'First turn: click a highlighted territory to mobilize defenders. Start with your capital or factory if you can afford it.',
-      combat_move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
-      move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
-      orders: 'First turn: select a territory with units, then click a highlighted destination to issue orders.',
-      action: 'First turn: make one strong move or attack, then end the phase.',
-      combat: 'Combat only happens after you move into enemy territory. If no battles are queued, continue to the next phase.',
-      resolve: 'Resolve queued battles, then continue once the map is quiet.',
-      noncombat_move: 'Use non-combat movement to reinforce fronts. You cannot attack in this phase.',
-      production: 'Production places your reserved units. If nothing is waiting, continue to income.',
-      collect_income: 'Income pays for the next round. End the turn after reviewing your IPCs.',
-      end: 'Income pays for the next round. End the turn after reviewing your IPCs.',
-    };
-
-    if (tips[phase]) this.showFirstTimeTip(`first-turn-${phase}`, tips[phase]);
   }
   
   /**
@@ -2038,8 +1989,8 @@ export class HUD {
   }
   
   /**
-   * Start a countdown turn timer shown in the HUD when playing multiplayer.
-   * @param seconds Total seconds for the turn (default 300 = 5 min, matching server AFK timeout).
+   * Start a countdown turn timer shown in the HUD for timed local turns.
+   * @param seconds Total seconds for the turn.
    */
   startTurnTimer(seconds: number = 300): void {
     this.stopTurnTimer();
@@ -2236,25 +2187,9 @@ export class HUD {
       ipcEl.textContent = `${faction.ipcs} IPCs`;
     }
 
-    // Show phase-specific tips based on turn style
-    const tips: Record<string, string> = {
-      'purchase': '💰 Click Build to buy units',
-      'build': '🏭 Click Build to buy & place units',
-      'combat_move': '⚔️ Click your territory → click enemy to attack!',
-      'move': '⚔️ Click your territory → click to move or attack!',
-      'combat': '🎲 Resolving queued battles...',
-      'noncombat_move': '🚶 Move units (no attacking this phase)',
-      'production': '🏭 Placing your purchased units...',
-      'collect_income': '💵 Collecting income...',
-      'end': '💵 Collecting income...',
-      'orders': '📋 Click territory → click destination',
-      'resolve': '🎲 Resolving all actions...',
-      'action': '♟️ Make one move or attack',
-    };
-    
-    if (tips[phase]) {
-      this.showToast(tips[phase], 'info');
-    }
+    const phaseToast = this.phaseGuidance.getPhaseToast(phase);
+    if (phaseToast) this.showToast(phaseToast, 'info');
+    return;
   }
 
   /**
@@ -2775,7 +2710,17 @@ export class HUD {
     }
 
     // Update context helper with current action guidance
-    this.updateContextHelper(phase, faction, territory, isHumanTurn, isBuildPhase, isMovementPhase, isCombatPhase, isEndPhase);
+    const contextTip = this.phaseGuidance.updateContextHelper({
+      phase,
+      faction,
+      territory,
+      isHumanTurn,
+      isBuildPhase,
+      isMovementPhase,
+      isCombatPhase,
+      isEndPhase,
+    });
+    if (contextTip) this.showFirstTimeTip(contextTip.tipId, contextTip.message);
   }
 
   /**
@@ -2801,111 +2746,6 @@ export class HUD {
     const nextPhase = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
     return nextPhase ? (shortNames[nextPhase] ?? nextPhase) : 'Next';
   }
-  
-  /**
-   * Update the context helper banner with current action guidance
-   */
-  private updateContextHelper(
-    phase: string,
-    faction: ReturnType<typeof this.state.getCurrentFaction>,
-    territory: ReturnType<typeof this.state.getSelectedTerritory>,
-    isHumanTurn: boolean,
-    isBuildPhase: boolean,
-    isMovementPhase: boolean,
-    isCombatPhase: boolean,
-    isEndPhase: boolean
-  ): void {
-    const helper = document.getElementById('context-helper');
-    const text = document.getElementById('context-helper-text');
-    if (!helper || !text) return;
-
-    // Determine new text and class without touching the DOM yet
-    let newText = '';
-    let newClass = 'context-helper';
-    let tipKey = '';
-    let tipMsg = '';
-
-    if (!isHumanTurn) {
-      newText = `⏳ ${faction?.name || 'AI'} is taking their turn...`;
-      newClass += ' hint';
-    } else if (isBuildPhase) {
-      const mobilizeOptions = this.mobilizationSystem.getMobilizationOptions();
-      const canMobilize = mobilizeOptions.filter(o => o.canMobilize).length;
-      const alreadyMobilized = this.mobilizationSystem.getMobilizationCount();
-      if (canMobilize > 0) {
-        const preferred = mobilizeOptions.find(o => o.canMobilize);
-        const preferredText = preferred
-          ? ` Best first: ${preferred.territory.name} (${preferred.type}, ${preferred.cost} IPCs).`
-          : '';
-        newText = `🖱️ Click highlighted territories to mobilize forces (${canMobilize} available, ${faction?.ipcs || 0} IPCs).${preferredText}`;
-        tipKey = 'mobilize'; tipMsg = 'Click highlighted territories to spawn defenders. Factories and capitals usually give the strongest value.';
-      } else if (alreadyMobilized > 0) {
-        newText = `✓ Mobilized ${alreadyMobilized} territories. Click "Next Phase" to continue.`;
-        newClass += ' success';
-      } else {
-        newText = `💰 No affordable mobilizations remain. Click "Next Phase" to continue.`;
-        newClass += ' warning';
-      }
-    } else if (isMovementPhase) {
-      if (territory && territory.owner === faction?.id) {
-        const availableUnits = territory.units.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
-        if (availableUnits > 0) {
-          const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
-          const targetIds = new Set<string>();
-          const attackIds = new Set<string>();
-          const transportIds = new Set<string>();
-          for (const pu of territory.units) {
-            for (const move of this.movementValidator.getValidMoves(pu.unitTypeId, territory.id, allowAttacks)) {
-              if (move.isAttack) attackIds.add(move.territoryId);
-              else targetIds.add(move.territoryId);
-              if (move.viaTransport) transportIds.add(move.territoryId);
-            }
-          }
-          const moveCount = targetIds.size;
-          const attackCount = attackIds.size;
-          const transportCount = transportIds.size;
-          const targetText = attackCount > 0
-            ? `${moveCount} move target${moveCount !== 1 ? 's' : ''}, ${attackCount} attack target${attackCount !== 1 ? 's' : ''}`
-            : `${moveCount} move target${moveCount !== 1 ? 's' : ''}`;
-          const transportText = transportCount > 0 ? `, ${transportCount} via transport` : '';
-          newText = `🚶 ${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText})`;
-          tipKey = 'movement'; tipMsg = 'Units can act once per turn. Green highlights are moves; attack highlights start a battle preview.';
-        } else {
-          newText = `⏸️ All units in ${territory.name} have acted. Select another territory.`;
-          newClass += ' hint';
-        }
-      } else {
-        newText = `🖱️ Select one of your territories with ready units, then click a highlighted neighbor to move or attack.`;
-      }
-    } else if (isCombatPhase) {
-      if (this.state.pendingMoves.length > 0) {
-        newText = `⚔️ ${this.state.pendingMoves.length} battle${this.state.pendingMoves.length !== 1 ? 's' : ''} to resolve. Click "Resolve Combat".`;
-        tipKey = 'combat'; tipMsg = 'Battles are resolved by dice rolls. Higher attack/defense = better odds!';
-      } else {
-        newText = `✓ No battles waiting. Click "Next Phase" to continue.`;
-        newClass += ' success';
-      }
-    } else if (isEndPhase) {
-      const income = this.state.calculateIncome(faction?.id || '');
-      newText = `💰 Collecting ${income} IPCs. Click "End Turn" to finish.`;
-      newClass += ' success';
-      tipKey = 'income'; tipMsg = 'You earn IPCs each turn from the territories you control.';
-    } else {
-      newText = `📋 ${phase} phase - Click "Next Phase" when ready.`;
-    }
-
-    // Apply only if something changed (with a brief fade-in on text change)
-    helper.className = newClass;
-    if (newText !== this.prevContextText) {
-      text.classList.remove('text-fade-in');
-      void text.offsetWidth;
-      text.textContent = newText;
-      text.classList.add('text-fade-in');
-      this.prevContextText = newText;
-    }
-    if (tipKey) this.showFirstTimeTip(tipKey, tipMsg);
-  }
-
   /**
    * Update valid move highlights
    */
@@ -4642,16 +4482,9 @@ export class HUD {
   }
 
   private updateStrategicAdvisor(): void {
-    let panel = document.getElementById('strategic-advisor-panel');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'strategic-advisor-panel';
-      document.body.appendChild(panel);
-    }
-
     const faction = this.state.getCurrentFaction();
     if (!faction || faction.controlledBy !== 'human') {
-      panel.classList.add('hidden');
+      this.strategicAdvisor.update({ visible: false });
       return;
     }
 
@@ -4670,94 +4503,42 @@ export class HUD {
       ? `${activeObjective.title}: ${activeObjective.description}`
       : 'Secure income and create a new attack lane.';
 
-    panel.classList.remove('hidden');
-    panel.innerHTML = `
-      <div class="strategic-advisor-header">
-        <span>Strategic Intent</span>
-        <button id="btn-advisor-collapse" title="Collapse advisor">-</button>
-      </div>
-      <div class="strategic-advisor-body">
-        <div class="advisor-row"><span>Objective</span><strong>${this.escapeHtml(objectiveLine)}</strong></div>
-        <div class="advisor-row"><span>Danger</span><strong>${this.escapeHtml(threatLine)}</strong></div>
-        <div class="advisor-row"><span>Opportunity</span><strong>${this.escapeHtml(opportunityLine)}</strong></div>
-        <div class="advisor-row"><span>Economy</span><strong>${faction.ipcs} IPC, +${income}/turn</strong></div>
-        <div class="advisor-next-action">
-          <span>Next</span>
-          <strong>${this.escapeHtml(coach.headline)}</strong>
-          <small>${this.escapeHtml(coach.detail)}</small>
-          <div class="advisor-actions">
-            <button data-advisor-action="${this.escapeHtml(coach.primaryAction)}"${coach.territoryId ? ` data-territory-id="${this.escapeHtml(coach.territoryId)}"` : ''}>${this.escapeHtml(coach.primaryLabel)}</button>
-            ${coach.secondaryAction && coach.secondaryLabel ? `<button data-advisor-action="${this.escapeHtml(coach.secondaryAction)}"${coach.territoryId ? ` data-territory-id="${this.escapeHtml(coach.territoryId)}"` : ''}>${this.escapeHtml(coach.secondaryLabel)}</button>` : ''}
-          </div>
-        </div>
-        <div class="advisor-advice">${this.escapeHtml(this.getMobilizationAdvice())}</div>
-      </div>
-    `;
-
-    panel.querySelector('#btn-advisor-collapse')?.addEventListener('click', () => {
-      panel?.classList.toggle('collapsed');
-    });
-    panel.querySelectorAll<HTMLButtonElement>('[data-advisor-action]').forEach(button => {
-      button.addEventListener('click', () => {
-        this.runAdvisorAction(button.dataset.advisorAction ?? '', button.dataset.territoryId);
-      });
+    this.strategicAdvisor.update({
+      visible: true,
+      objectiveLine,
+      threatLine,
+      opportunityLine,
+      economyLine: `${faction.ipcs} IPC, +${income}/turn`,
+      coach,
+      mobilizationAdvice: this.getMobilizationAdvice(),
     });
   }
 
   private showFirstWarRoom(factionId: string): void {
-    if (this.firstWarRoomShown) return;
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction || faction.controlledBy !== 'human') return;
-    this.firstWarRoomShown = true;
 
     const threats = this.getTopThreats(factionId);
     const opportunities = this.getOpportunityTargets(factionId);
     const capital = this.state.territories.get(faction.capital);
     const firstThreat = threats[0] ? this.state.territories.get(threats[0].territoryId)?.name : null;
     const firstTarget = opportunities[0] ? this.state.territories.get(opportunities[0].territoryId)?.name : null;
+    const coach = this.getTurnCoach(faction);
+    const recommendedTerritoryId = coach.territoryId ?? capital?.id;
 
-    document.getElementById('first-war-room')?.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'first-war-room';
-    overlay.innerHTML = `
-      <div class="first-war-room-card">
-        <div class="fwr-kicker">First War Room</div>
-        <h2>${this.escapeHtml(faction.name)}</h2>
-        <p>Your opening job is simple: protect your capital, turn IPCs into board presence, and take one profitable fight instead of three messy ones.</p>
-        <div class="fwr-grid">
-          <div><span>Anchor</span><strong>${this.escapeHtml(capital?.name ?? 'Your capital')}</strong></div>
-          <div><span>Watch</span><strong>${this.escapeHtml(firstThreat ?? 'No urgent threat')}</strong></div>
-          <div><span>Pressure</span><strong>${this.escapeHtml(firstTarget ?? 'Nearest enemy border')}</strong></div>
-        </div>
-        <div class="fwr-plan">
-          <strong>Suggested opening:</strong>
-          <ol>
-            <li>${this.escapeHtml(this.getMobilizationAdvice())}</li>
-            <li>Select a border territory with ready units and inspect the highlighted attack targets.</li>
-            <li>Use the battle preview. Favor attacks marked favorable or overwhelming.</li>
-          </ol>
-        </div>
-        <div class="fwr-actions">
-          <button id="btn-fwr-objectives">Show Objectives</button>
-          <button id="btn-fwr-threats">Threat Overlay</button>
-          <button id="btn-fwr-close" class="primary">Start Command</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#btn-fwr-close')?.addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#btn-fwr-objectives')?.addEventListener('click', () => {
-      this.updateObjectivesPanel();
-      document.getElementById('objectives-panel')?.classList.remove('hidden');
-    });
-    overlay.querySelector('#btn-fwr-threats')?.addEventListener('click', () => {
-      this.overlayController.setMode('threat');
-      overlay.remove();
+    this.firstWarRoom.show({
+      factionName: faction.name,
+      capitalName: capital?.name ?? 'Your capital',
+      threatName: firstThreat ?? 'No urgent threat',
+      pressureName: firstTarget ?? 'Nearest enemy border',
+      mobilizationAdvice: this.getMobilizationAdvice(),
+      coachHeadline: coach.headline,
+      coachDetail: coach.detail,
+      recommendedTerritoryId,
     });
   }
 
-  // ── Dynamic Feature Methods ───────────────────────────────────────────────
+  // Dynamic Feature Methods
 
   /** Call at turn start for a human faction to tick objectives and supply display. */
   tickDynamicFeatures(factionId: string): void {
@@ -4784,7 +4565,7 @@ export class HUD {
     if (!settings.getSetting('warTension')) { badge.classList.add('hidden'); return; }
     const pct = Math.round(this.tensionSystem.getTension());
     const color = this.tensionSystem.getLevelColor();
-    badge.textContent = `⚡ ${this.tensionSystem.getLevelName()} · ${pct}%`;
+    badge.textContent = `${this.tensionSystem.getLevelName()} - ${pct}%`;
     badge.style.color = color;
     badge.classList.remove('hidden');
   }
@@ -4836,7 +4617,7 @@ export class HUD {
     );
     if (outOfSupply.length > 0) {
       indicator.classList.remove('hidden');
-      indicator.textContent = `⚠️ ${outOfSupply.length} territor${outOfSupply.length === 1 ? 'y' : 'ies'} out of supply (-1 combat)`;
+      indicator.textContent = `${outOfSupply.length} territor${outOfSupply.length === 1 ? 'y' : 'ies'} out of supply (-1 combat)`;
     } else {
       indicator.classList.add('hidden');
     }
@@ -4844,26 +4625,21 @@ export class HUD {
 
   /** Update the faction ability button state. */
   updateFactionAbilityButton(factionId: string): void {
-    const btn = document.getElementById('btn-faction-ability') as HTMLButtonElement | null;
-    const desc = document.getElementById('faction-ability-desc');
-    const container = document.getElementById('faction-ability-container');
-    if (!btn) return;
-    const hide = () => { btn.classList.add('hidden'); container?.classList.add('hidden'); };
+    const hide = () => this.abilityPanel.update({ visible: false });
     if (!settings.getSetting('factionAbilities')) { hide(); return; }
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction || faction.controlledBy !== 'human') { hide(); return; }
     const ability = this.abilityManager.getAbilityForFaction(factionId);
     if (!ability) { hide(); return; }
-    btn.classList.remove('hidden');
-    container?.classList.remove('hidden');
     const ready = this.abilityManager.isReady(factionId, this.state.turnNumber);
     const turnsLeft = this.abilityManager.turnsUntilReady(factionId, this.state.turnNumber);
-    btn.disabled = !ready || this.state.getCurrentFaction()?.id !== factionId;
-    btn.title = ability.description;
-    btn.innerHTML = ready
-      ? `⚡ ${ability.name}`
-      : `⚡ ${ability.name} (${turnsLeft}t)`;
-    if (desc) desc.textContent = ability.flavorText;
+    this.abilityPanel.update({
+      visible: true,
+      ability,
+      ready,
+      turnsLeft,
+      disabled: !ready || this.state.getCurrentFaction()?.id !== factionId,
+    });
   }
 
   /** Called when the player clicks the faction ability button. */
@@ -4905,24 +4681,24 @@ export class HUD {
     if (ability.cost > 0) faction.spendIPCs(ability.cost);
     const result = applyFactionAbility(abilityId, factionId, this.state, targetId);
     this.abilityManager.markUsed(factionId, this.state.turnNumber);
-    this.showToast(`⚡ ${ability.name}: ${result}`, 'success');
+    this.showToast(`${ability.name}: ${result}`, 'success');
     this.updateFactionAbilityButton(factionId);
     this.updateFactionPanel();
     this.renderer.render();
   }
 
-  /** Wire up the objectives callback — call once after initialization. */
+  /** Wire up the objectives callback - call once after initialization. */
   setupObjectiveCallbacks(): void {
     this.objectiveSystem.onChange((obj: Objective, event: 'new' | 'complete' | 'fail') => {
       if (event === 'new') {
-        this.showToast(`🎯 New objective: ${obj.title} — ${obj.description}`, 'info');
+        this.showToast(`New objective: ${obj.title} - ${obj.description}`, 'info');
       } else if (event === 'complete') {
         const rewardStr = obj.reward.type === 'ipc' ? `+${obj.reward.amount} IPC`
           : `+${obj.reward.amount} ${obj.reward.unitTypeId ?? 'research'}`;
-        this.showToast(`✅ Objective complete: ${obj.title}! Reward: ${rewardStr}`, 'success');
+        this.showToast(`Objective complete: ${obj.title}! Reward: ${rewardStr}`, 'success');
         visualEffects.confetti(window.innerWidth / 2, window.innerHeight * 0.4, 25);
       } else {
-        this.showToast(`❌ Objective failed: ${obj.title}`, 'error');
+        this.showToast(`Objective failed: ${obj.title}`, 'error');
       }
       this.updateObjectivesPanel();
     });
@@ -4933,3 +4709,4 @@ export class HUD {
   }
 
 }
+

@@ -1,8 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-for (const f of ['grid-europe', 'grid-pacific', 'grid-americas']) {
-  const map = JSON.parse(fs.readFileSync(path.join(__dirname, '../assets/maps/' + f + '.json'), 'utf8'));
+const mapsDir = path.join(__dirname, '../assets/maps');
+const mapFiles = fs.readdirSync(mapsDir)
+  .filter(file => file.endsWith('.json'))
+  .sort();
+
+let totalErrors = 0;
+
+for (const file of mapFiles) {
+  const f = path.basename(file, '.json');
+  const map = JSON.parse(fs.readFileSync(path.join(mapsDir, file), 'utf8'));
   const ids = new Set(map.territories.map(t => t.id));
   let errors = 0;
 
@@ -30,4 +38,10 @@ for (const f of ['grid-europe', 'grid-pacific', 'grid-americas']) {
     ' | ' + map.territories.length + ' territories' +
     ' | ' + factories + ' factories' +
     ' | capitals: ' + capitals);
+
+  totalErrors += errors;
+}
+
+if (totalErrors > 0) {
+  process.exitCode = 1;
 }

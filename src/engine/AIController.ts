@@ -612,6 +612,25 @@ export class AIController {
 
   private async processPhase(evaluations: Map<string, TerritoryEvaluation>): Promise<void> {
     const phase = this.state.currentPhase as string;
+    const phaseLabels: Record<string, string> = {
+      purchase: 'Mobilizing reserves',
+      build: 'Mobilizing reserves',
+      combat_move: 'Choosing attacks',
+      move: 'Moving and attacking',
+      orders: 'Issuing orders',
+      action: 'Taking action',
+      combat: 'Resolving battles',
+      resolve: 'Resolving battles',
+      noncombat_move: 'Reinforcing fronts',
+      production: 'Deploying production',
+      collect_income: 'Collecting income',
+      end: 'Ending turn',
+    };
+    this.state.emit("ai_thinking", {
+      message: phaseLabels[phase] ?? `Processing ${phase}`,
+      action: 'phase',
+    });
+
     switch (phase) {
       case "purchase":        this.handlePurchasePhase(evaluations); break;
       case "combat_move":     this.handleCombatMovePhase(evaluations); break;

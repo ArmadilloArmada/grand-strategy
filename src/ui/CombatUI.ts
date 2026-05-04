@@ -691,16 +691,26 @@ export class CombatUI {
     const targetValue = target.production + (target.isCapital ? 10 : 0) + (target.hasFactory ? 6 : 0);
     const likelyAttackerLosses = Math.min(stats.attackerUnitCount, Math.max(0, Math.round(stats.expectedDefenderHits)));
     const likelyDefenderLosses = Math.min(stats.defenderUnitCount, Math.max(0, Math.round(stats.expectedAttackerHits)));
+    const sourceUnitsBefore = from.getTotalUnitCount();
+    const sourceUnitsAfterCommit = Math.max(0, sourceUnitsBefore - stats.attackerUnitCount);
     const enemyCounterSources = target.adjacentTo
       .map(id => this.state.territories.get(id))
       .filter(t => t?.owner && t.owner !== this.state.currentFactionId && t.getTotalUnitCount() > 0)
       .length;
+    const sourceEnemyPressure = from.adjacentTo
+      .map(id => this.state.territories.get(id))
+      .filter(t => t?.owner && t.owner !== this.state.currentFactionId && t.getTotalUnitCount() > 0)
+      .reduce((sum, t) => sum + (t?.getTotalUnitCount() ?? 0), 0);
 
     const stakes: string[] = [];
     if (target.isCapital) stakes.push('capital swing');
     if (target.hasFactory) stakes.push('factory control');
     if (target.production > 0) stakes.push(`+${target.production} IPC income`);
     if (enemyCounterSources > 0) stakes.push(`${enemyCounterSources} counterattack lane${enemyCounterSources === 1 ? '' : 's'}`);
+
+    const commitment = sourceEnemyPressure > 0 && sourceUnitsAfterCommit <= 1
+      ? `Warning: this commits most of ${from.name} while ${sourceEnemyPressure} enemy unit${sourceEnemyPressure === 1 ? '' : 's'} can pressure it.`
+      : `Commitment: ${sourceUnitsAfterCommit} unit${sourceUnitsAfterCommit === 1 ? '' : 's'} remain in ${from.name}.`;
 
     const tempo = stats.odds >= 0.65
       ? 'Likely creates momentum if you can hold it next turn.'
@@ -712,6 +722,7 @@ export class CombatUI {
       <strong>Strategic consequence</strong>
       <span>Stake: ${stakes.join(', ') || `+${targetValue} strategic value`}.</span>
       <span>Likely first round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}. ${tempo}</span>
+      <span>${commitment}</span>
     `;
   }
 

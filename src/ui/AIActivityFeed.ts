@@ -20,7 +20,7 @@ class AIActivityFeed {
       ? message.slice(factionName.length).trim()
       : message;
     this.entries.unshift({ id: ++this.seq, factionName, factionColor, message: cleanMessage, action });
-    this.entries = this.entries.slice(0, 6);
+    this.entries = this.entries.slice(0, 8);
     this.render();
   }
 
@@ -39,33 +39,51 @@ class AIActivityFeed {
     }
 
     feed.innerHTML = `
-      <div class="ai-feed-title">AI Activity</div>
+      <div class="ai-feed-title">
+        <span>AI Activity</span>
+        <small>${this.entries.length} recent action${this.entries.length === 1 ? '' : 's'}</small>
+      </div>
       ${this.entries.map(e => `
         <div class="ai-feed-row" data-action="${this.escape(e.action ?? 'think')}">
           <span class="ai-feed-dot" style="background:${this.escape(e.factionColor)}"></span>
           <span class="ai-feed-copy">
             <strong>${this.escape(e.factionName)}</strong>
             ${this.escape(e.message)}
+            <small>${this.escape(this.getActionLabel(e.action))}</small>
           </span>
         </div>
       `).join('')}
     `;
     feed.classList.add('visible');
+    document.body.classList.add('ai-feed-active');
   }
 
   hideBanner(): void {
     document.getElementById('ai-activity-banner')?.classList.remove('visible');
     document.getElementById('ai-activity-feed')?.classList.remove('visible');
+    document.body.classList.remove('ai-feed-active');
   }
 
   clear(): void {
     this.entries = [];
     document.getElementById('ai-activity-feed')?.classList.remove('visible');
+    document.body.classList.remove('ai-feed-active');
   }
 
   private escape(str: string): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  private getActionLabel(action?: string): string {
+    switch (action) {
+      case 'attack': return 'planned attack';
+      case 'capture': return 'battle result';
+      case 'battle': return 'battle result';
+      case 'mobilize': return 'mobilization';
+      case 'phase': return 'phase';
+      default: return 'thinking';
+    }
   }
 }
 

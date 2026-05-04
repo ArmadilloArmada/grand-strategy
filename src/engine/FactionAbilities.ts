@@ -25,7 +25,7 @@ export interface AbilityCooldownState {
 
 const STORAGE_KEY = 'grand_strategy_faction_abilities';
 
-// ── Ability Definitions ───────────────────────────────────────────────────────
+// Ability Definitions
 
 export const FACTION_ABILITIES: FactionAbility[] = [
   {
@@ -42,7 +42,7 @@ export const FACTION_ABILITIES: FactionAbility[] = [
     id: 'scorched_earth',
     factionId: 'eastern_coalition',
     name: 'Scorched Earth',
-    description: 'Select a friendly territory. Destroy its infrastructure — it generates no income for 3 turns but enemy units there take -1 attack and cannot be reinforced.',
+    description: 'Select a friendly territory. Destroy its infrastructure - it generates no income for 3 turns but enemy units there take -1 attack and cannot be reinforced.',
     flavorText: 'Give them nothing. Take it all back.',
     cost: 0,
     cooldownTurns: 5,
@@ -63,8 +63,8 @@ export const FACTION_ABILITIES: FactionAbility[] = [
     id: 'guerrilla_surge',
     factionId: 'southern_federation',
     name: 'Guerrilla Surge',
-    description: 'Select an enemy territory. Spawn 2 partisan infantry there — they disrupt supply and cost the enemy 1 turn to clear.',
-    flavorText: 'Every jungle, every hill — a trap.',
+    description: 'Select an enemy territory. Spawn 2 partisan infantry there - they disrupt supply and cost the enemy 1 turn to clear.',
+    flavorText: 'Every jungle, every hill - a trap.',
     cost: 5,
     cooldownTurns: 4,
     needsTarget: true,
@@ -72,7 +72,7 @@ export const FACTION_ABILITIES: FactionAbility[] = [
   },
 ];
 
-// ── Runtime Effects ───────────────────────────────────────────────────────────
+// Runtime Effects
 
 /**
  * Applies the ability effect to the game state. Returns a human-readable result string.
@@ -128,7 +128,7 @@ export function applyFactionAbility(
   }
 }
 
-// ── Cooldown Manager ──────────────────────────────────────────────────────────
+// Cooldown Manager
 
 export class FactionAbilityManager {
   private cooldowns: Map<string, AbilityCooldownState> = new Map();
