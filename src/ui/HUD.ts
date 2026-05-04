@@ -2846,6 +2846,12 @@ export class HUD {
         const nextLabel = this.getNextPhaseLabel(phaseStr);
         endBtn.innerHTML = `➡️ ${nextLabel} <kbd class="kbd-hint">↵</kbd>`;
       }
+      // Pulse the End Phase button when player appears idle — nothing is in progress
+      const noPendingMoves = this.state.pendingMoves.length === 0;
+      const noActiveCombat = !this.combatUI.getActiveCombat();
+      const noSelection    = !this.state.selectedTerritoryId;
+      const shouldPulse    = isHumanTurn && noPendingMoves && noActiveCombat && noSelection;
+      endBtn.classList.toggle('btn-end-phase-pulse', shouldPulse);
     }
 
     // Shortcut badge on Build button

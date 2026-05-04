@@ -166,7 +166,7 @@ export class CombatUI {
     if (diceRow && atkGroup && defGroup && this.activeCombat) {
       const atkCount = Math.min(this.activeCombat.attackers.reduce((s, a) => s + a.count - a.casualties, 0), MAX_DICE);
       const defCount = Math.min(this.activeCombat.defenders.reduce((s, d) => s + d.count - d.casualties, 0), MAX_DICE);
-      const makePips = (count: number) => Array.from({ length: count }, () => `<span class="dice-pip rolling">?</span>`).join('');
+      const makePips = (count: number) => Array.from({ length: count }, () => `<span class="dice-pip rolling">1</span>`).join('');
       atkGroup.innerHTML = makePips(atkCount);
       defGroup.innerHTML = makePips(defCount);
       diceRow.classList.remove('hidden');
@@ -174,7 +174,15 @@ export class CombatUI {
 
     soundManager.play('dice_roll');
 
+    // Cycle random numbers on every pip while the dice are "rolling"
+    const cycleInterval = setInterval(() => {
+      document.querySelectorAll<HTMLElement>('.dice-pip.rolling').forEach(pip => {
+        pip.textContent = String(Math.ceil(Math.random() * 6));
+      });
+    }, 80);
+
     setTimeout(() => {
+      clearInterval(cycleInterval);
       if (!this.activeCombat) return;
       const result = this.combatResolver.resolveCombatRound(this.activeCombat);
 
@@ -191,10 +199,23 @@ export class CombatUI {
         const defActive = this.activeCombat.defenders.reduce((s, d) => s + (d.count - d.casualties), 0);
         renderPips(atkGroup, result.attackerRolls, atkActive);
         renderPips(defGroup, result.defenderRolls, defActive);
+
+        // Landing pop — stagger each pip slightly so they "settle" in sequence
+        const allPips = document.querySelectorAll<HTMLElement>('.dice-pip:not(.rolling)');
+        allPips.forEach((pip, i) => {
+          setTimeout(() => {
+            pip.classList.add('dice-land');
+            setTimeout(() => pip.classList.remove('dice-land'), 400);
+          }, i * 35);
+        });
       }
 
-      if (result.attackerHits > 0 || result.defenderHits > 0) {
+      const totalHits = result.attackerHits + result.defenderHits;
+      const totalCrits = result.attackerCriticals + result.defenderCriticals;
+      if (totalHits > 0) {
         soundManager.play('hit');
+        if (totalCrits > 0) this.flashCombatScreen('#ffd700', 0.35);
+        else if (totalHits >= 3)  this.flashCombatScreen('#ef4444', 0.22);
       } else {
         soundManager.play('miss');
       }
@@ -438,6 +459,23 @@ export class CombatUI {
         setTimeout(() => { overlay.remove(); resolve(); }, 250);
       }, 800);
     });
+  }
+
+  /** Brief color flash over the combat modal to accent heavy hits. */
+  private flashCombatScreen(color: string, opacity: number): void {
+    const modal = document.getElementById('combat-modal');
+    if (!modal) return;
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:9999;
+      background:${color};opacity:${opacity};transition:opacity 0.3s ease;
+    `;
+    modal.style.position = 'relative';
+    modal.appendChild(flash);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      flash.style.opacity = '0';
+      setTimeout(() => flash.remove(), 320);
+    }));
   }
 
   // ==================== ATTACK HANDLING ====================

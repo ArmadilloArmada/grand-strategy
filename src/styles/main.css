@@ -796,6 +796,15 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 15px rgba(37, 99, 168, 0.2);
 }
 
+#btn-end-phase.btn-end-phase-pulse {
+  animation: endPhasePulse 2s ease-in-out infinite;
+}
+
+@keyframes endPhasePulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(96, 165, 250, 0);    border-color: rgba(37,99,168,0.4); }
+  50%       { box-shadow: 0 0 12px 4px rgba(96, 165, 250, 0.45); border-color: #60a5fa; }
+}
+
 #btn-attack:not(:disabled) {
   background: linear-gradient(135deg, rgba(197, 48, 48, 0.1), rgba(197, 48, 48, 0.18));
   border-color: rgba(197, 48, 48, 0.4);
@@ -1459,7 +1468,12 @@ body.theme-dark #help-button {
 }
 
 .dice-pip.rolling {
-  animation: diceRoll 0.65s linear;
+  animation: diceRoll 0.12s ease-in-out infinite;
+  color: #7c6040;
+}
+
+.dice-pip.dice-land {
+  animation: diceLand 0.35s cubic-bezier(0.22, 1.8, 0.36, 1) forwards;
 }
 
 .dice-pip.hit {
@@ -1489,13 +1503,18 @@ body.theme-dark #help-button {
 }
 
 @keyframes diceRoll {
-  0%   { content: '1'; transform: rotateY(0deg);   }
-  16%  { transform: rotateY(60deg);  }
-  33%  { transform: rotateY(120deg); }
-  50%  { transform: rotateY(180deg); }
-  66%  { transform: rotateY(240deg); }
-  83%  { transform: rotateY(300deg); }
-  100% { transform: rotateY(360deg); }
+  0%   { transform: scale(1)    rotate(0deg);   box-shadow: 2px 2px 0 rgba(0,0,0,0.3); }
+  25%  { transform: scale(1.12) rotate(-8deg);  box-shadow: 4px 4px 6px rgba(0,0,0,0.4); }
+  50%  { transform: scale(0.92) rotate(6deg);   box-shadow: 1px 1px 0 rgba(0,0,0,0.2); }
+  75%  { transform: scale(1.08) rotate(-4deg);  box-shadow: 3px 3px 4px rgba(0,0,0,0.35); }
+  100% { transform: scale(1)    rotate(0deg);   box-shadow: 2px 2px 0 rgba(0,0,0,0.3); }
+}
+
+@keyframes diceLand {
+  0%   { transform: scale(1.35); opacity: 0.7; }
+  60%  { transform: scale(0.94); opacity: 1;   }
+  80%  { transform: scale(1.04); }
+  100% { transform: scale(1);    }
 }
 
 /* ==================== Build Modal ==================== */
