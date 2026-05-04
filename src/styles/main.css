@@ -2242,6 +2242,17 @@ body.ai-feed-active #campaign-objectives-panel {
 .log-entry.log-type-income  { border-left-color: #f59e0b; }
 .log-entry.log-type-move    { border-left-color: #60a5fa; }
 .log-entry.log-type-general { border-left-color: #64748b; }
+.log-entry.log-type-ai      { border-left-color: #38bdf8; opacity: 0.85; }
+.log-entry.log-type-alert   { border-left-color: #94a3b8; font-style: italic; }
+
+/* Flash animation for newly added entries */
+@keyframes logEntryFlash {
+  0%   { background: rgba(251, 191, 36, 0.18); }
+  100% { background: transparent; }
+}
+.log-entry.log-new {
+  animation: logEntryFlash 2.5s ease-out forwards;
+}
 
 .log-icon    { font-size: 0.68rem; margin-right: 0.2rem; }
 .log-faction { font-weight: 700; font-size: 0.68rem; margin-right: 0.25rem; }

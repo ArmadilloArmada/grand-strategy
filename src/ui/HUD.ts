@@ -691,26 +691,13 @@ export class HUD {
     if (ability) { ability.removeAttribute('style'); abilityWrap.appendChild(ability); }
     content.appendChild(abilityWrap);
 
-    // BATTLE LOG section — move #battle-log-panel into HQ
+    // BATTLE LOG section — move #battle-log-panel into HQ, expanded by default
     const blog = document.getElementById('battle-log-panel');
     if (blog) {
       blog.removeAttribute('style');
       content.appendChild(blog);
     }
-
-    // AI ACTIVITY section — pre-create container so AIActivityFeed renders here
-    const aiWrap = document.createElement('div');
-    aiWrap.id = 'hq-ai-section';
-    aiWrap.className = 'war-room-section';
-    const aiTitle = document.createElement('div');
-    aiTitle.className = 'war-room-section-title';
-    aiTitle.textContent = 'AI Activity';
-    aiWrap.appendChild(aiTitle);
-    const aiContainer = document.createElement('div');
-    aiContainer.id = 'ai-activity-feed';
-    aiContainer.className = 'hq-ai-feed';
-    aiWrap.appendChild(aiContainer);
-    content.appendChild(aiWrap);
+    battleLog.setCollapsed(false);
 
     panel.querySelector('#btn-toggle-hq')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
@@ -1838,7 +1825,11 @@ export class HUD {
    * Show toast notification
    */
   showToast(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
-    toastManager.show(message, type);
+    if (type === 'error') {
+      toastManager.show(message, type);
+    } else {
+      battleLog.notify(this.state.turnNumber, message);
+    }
   }
   
   /**
@@ -1876,6 +1867,7 @@ export class HUD {
 
   private addAIActivity(message: string, action?: string): void {
     const faction = this.state.getCurrentFaction();
+    aiActivityFeed.setTurn(this.state.turnNumber);
     aiActivityFeed.add(faction?.name ?? 'AI', faction?.color ?? '#94a3b8', message, action);
   }
 
