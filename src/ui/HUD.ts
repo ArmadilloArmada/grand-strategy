@@ -514,6 +514,17 @@ export class HUD {
 
     document.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
+    // Battle log territory focus: center map and pulse the territory
+    document.addEventListener('battlelog:focus-territory', (e) => {
+      const tid = (e as CustomEvent<{ territoryId: string }>).detail.territoryId;
+      if (!tid) return;
+      this.renderer.centerOnTerritory(tid);
+      const faction = this.state.factionRegistry.get(
+        this.state.territories.get(tid)?.owner ?? ''
+      );
+      this.renderer.startCaptureAnimation(tid, faction?.color ?? '#fbbf24');
+    });
+
     // Universal modal UX: backdrop click closes + inject sticky × button into every modal
     document.querySelectorAll<HTMLElement>('.modal').forEach(modal => {
       // Skip modals that are non-dismissable (e.g. combat modal while active)
@@ -1222,7 +1233,8 @@ export class HUD {
       this.state.turnNumber,
       attackerFaction.name,
       attackerFaction.color,
-      narration
+      narration,
+      combat.territoryId
     );
   }
 
@@ -3226,11 +3238,15 @@ export class HUD {
       const isCurrent = faction.id === currentId;
       const isNext = idx === (currentIdx + 1) % factions.length;
       const statusClass = isCurrent ? 'current' : (isNext ? 'next' : '');
-      
+      const displayName = isCurrent ? faction.name : faction.name.split(' ')[0];
+      const dotStyle = isCurrent
+        ? `background:${faction.color};box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;`
+        : `background:${faction.color};`;
+
       html += `
         <div class="turn-order-item ${statusClass}" title="${faction.name}">
-          <div class="turn-order-dot" style="background: ${faction.color};"></div>
-          <span>${faction.name.split(' ')[0]}</span>
+          <div class="turn-order-dot" style="${dotStyle}"></div>
+          <span>${displayName}</span>
         </div>
       `;
     });

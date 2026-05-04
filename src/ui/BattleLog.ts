@@ -13,6 +13,7 @@ export interface LogEntry {
   type: LogEntryType;
   message: string;
   timestamp: number;
+  territoryId?: string;
 }
 
 export class BattleLog {
@@ -85,7 +86,8 @@ export class BattleLog {
     faction: string,
     factionColor: string,
     type: LogEntryType,
-    message: string
+    message: string,
+    territoryId?: string
   ): void {
     const entry: LogEntry = {
       id: this.nextId++,
@@ -96,6 +98,7 @@ export class BattleLog {
       type,
       message,
       timestamp: Date.now(),
+      territoryId,
     };
 
     this.entries.unshift(entry); // Add to beginning
@@ -111,8 +114,8 @@ export class BattleLog {
   /**
    * Log a combat event
    */
-  logCombat(turn: number, faction: string, color: string, message: string): void {
-    this.add(turn, 'Combat', faction, color, 'combat', message);
+  logCombat(turn: number, faction: string, color: string, message: string, territoryId?: string): void {
+    this.add(turn, 'Combat', faction, color, 'combat', message, territoryId);
   }
 
   /**
@@ -138,8 +141,8 @@ export class BattleLog {
   /**
    * Log a capture event
    */
-  logCapture(turn: number, faction: string, color: string, message: string): void {
-    this.add(turn, 'Capture', faction, color, 'capture', message);
+  logCapture(turn: number, faction: string, color: string, message: string, territoryId?: string): void {
+    this.add(turn, 'Capture', faction, color, 'capture', message, territoryId);
   }
 
   /**
@@ -195,14 +198,25 @@ export class BattleLog {
       return;
     }
 
-    container.innerHTML = visible.map(entry => `
-      <div class="log-entry log-type-${entry.type}">
+    container.innerHTML = visible.map(entry => {
+      const linked = entry.territoryId
+        ? ` data-territory-id="${entry.territoryId}" class="log-entry log-type-${entry.type} log-linked" title="Click to focus on map"`
+        : ` class="log-entry log-type-${entry.type}"`;
+      return `<div${linked}>
         <span class="log-icon">${icons[entry.type]}</span>
         <span class="log-faction" style="color:${entry.factionColor}">${entry.faction}</span>
         <span class="log-message">${entry.message}</span>
         <span class="log-turn">T${entry.turn}</span>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+
+    // Click delegation: focus map on the linked territory
+    container.onclick = (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-territory-id]');
+      if (!row) return;
+      const tid = row.dataset.territoryId;
+      if (tid) document.dispatchEvent(new CustomEvent('battlelog:focus-territory', { detail: { territoryId: tid } }));
+    };
   }
 }
 

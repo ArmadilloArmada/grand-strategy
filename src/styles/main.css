@@ -2804,7 +2804,7 @@ body.ai-feed-active #campaign-objectives-panel {
   border-color: rgba(184, 134, 11, 0.3);
   color: var(--gold-bright);
   font-weight: 600;
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 0 15px rgba(184, 134, 11, 0.15);
 }
 
@@ -2818,6 +2818,18 @@ body.ai-feed-active #campaign-objectives-panel {
   height: 10px;
   border-radius: var(--radius-full);
   box-shadow: 0 0 6px currentColor;
+  transition: width 0.25s ease, height 0.25s ease, box-shadow 0.25s ease;
+}
+
+.turn-order-item.current .turn-order-dot {
+  width: 13px;
+  height: 13px;
+  animation: activeDotPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes activeDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* ==================== Battle Preview ==================== */
@@ -5992,6 +6004,11 @@ body.theme-dark .panel-grip {
 #turn-order .turn-order-dot {
   width: 10px;
   height: 10px;
+}
+
+#turn-order .turn-order-item.current .turn-order-dot {
+  width: 13px;
+  height: 13px;
 }
 
 #turn-order .turn-order-item:not(.current) {
