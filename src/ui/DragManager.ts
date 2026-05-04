@@ -20,7 +20,7 @@
  *  └──────────────────────────────────────────────────────────────┘
  */
 
-const STORAGE_KEY = 'grand-strategy-panel-positions-v4';
+const STORAGE_KEY = 'grand-strategy-panel-positions-v5';
 const DRAG_THRESHOLD = 5; // px before a mousedown becomes a drag
 
 type PanelPos = { left: number; top: number };
@@ -33,9 +33,7 @@ type PanelPos = { left: number; top: number };
 const HANDLE_SELECTORS: Record<string, string | undefined> = {
   'turn-info':         '.turn-banner',
   'resources':         undefined,
-  'selection-info':    undefined,
   'action-buttons':    '.panel-grip',
-  'battle-log-panel':  '#battle-log-header',
   'faction-panel':     '#faction-panel-header',
   'minimap-container': undefined,
   'zoom-controls':     undefined,
@@ -63,14 +61,8 @@ const DEFAULTS: Record<string, (vw: number, vh: number, r: DOMRect) => PanelPos>
   // Right column — above minimap, separated by 8 px
   'zoom-controls':     (vw,  _vh,  r)  => ({ left: vw - 326 - r.width - 24, top: 118 }),
 
-  // Bottom-left, above the battle log and away from the command bar.
-  'minimap-container': (_vw, vh,  r)  => ({ left: 104, top: Math.max(140, vh - r.height - 80) }),
-
-  // Left command inspector, fixed near the top so it never collides with the log.
-  'selection-info':    (_vw, _vh, _r) => ({ left: 16, top: 96 }),
-
-  // Bottom-left, flush against bottom edge (pull-up strip)
-  'battle-log-panel':  (_vw, vh,  r)  => ({ left: 0,                                  top: vh - r.height }),
+  // Bottom-left, clear of the HQ panel (290 px wide at 12 px inset = ~302 px).
+  'minimap-container': (_vw, vh,  r)  => ({ left: 320, top: Math.max(140, vh - r.height - 80) }),
 
   // Bottom-center, 16 px above the very bottom
   'action-buttons':    (vw,  vh,  r)  => ({ left: Math.max(320, (vw - r.width) / 2), top: vh - r.height - 16 }),

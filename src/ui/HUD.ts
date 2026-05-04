@@ -288,6 +288,7 @@ export class HUD {
     // Action buttons
     this.enhanceCommandBar();
     this.setupWarRoomLayout();
+    this.setupHQLayout();
     document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
     document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
@@ -628,6 +629,61 @@ export class HUD {
     });
   }
 
+  private setupHQLayout(): void {
+    if (document.getElementById('hq-panel')) return;
+
+    const panel = document.createElement('aside');
+    panel.id = 'hq-panel';
+    panel.innerHTML = `
+      <div id="hq-header">
+        <span>HQ</span>
+        <button id="btn-toggle-hq" title="Collapse HQ panel">−</button>
+      </div>
+      <div id="hq-content"></div>
+    `;
+    document.body.appendChild(panel);
+
+    const content = panel.querySelector('#hq-content') as HTMLElement;
+
+    // TERRITORY section — move #selection-info into HQ
+    const selection = document.getElementById('selection-info');
+    if (selection) {
+      selection.removeAttribute('style');
+      selection.classList.add('war-room-section');
+      if (!selection.querySelector('.war-room-section-title')) {
+        const t = document.createElement('div');
+        t.className = 'war-room-section-title';
+        t.textContent = 'Territory';
+        selection.prepend(t);
+      }
+      content.appendChild(selection);
+    }
+
+    // ABILITY section — wrap supply indicator + faction ability
+    const abilityWrap = document.createElement('div');
+    abilityWrap.className = 'war-room-section';
+    const abilityTitle = document.createElement('div');
+    abilityTitle.className = 'war-room-section-title';
+    abilityTitle.textContent = 'Ability';
+    abilityWrap.appendChild(abilityTitle);
+    const supply = document.getElementById('supply-indicator');
+    if (supply) { supply.removeAttribute('style'); abilityWrap.appendChild(supply); }
+    const ability = document.getElementById('faction-ability-container');
+    if (ability) { ability.removeAttribute('style'); abilityWrap.appendChild(ability); }
+    content.appendChild(abilityWrap);
+
+    // BATTLE LOG section — move #battle-log-panel into HQ
+    const blog = document.getElementById('battle-log-panel');
+    if (blog) {
+      blog.removeAttribute('style');
+      content.appendChild(blog);
+    }
+
+    panel.querySelector('#btn-toggle-hq')?.addEventListener('click', () => {
+      panel.classList.toggle('collapsed');
+    });
+  }
+
   fitMapToCommandLayout(): void {
     this.renderer.fitToScreen(this.getCommandLayoutInsets());
   }
@@ -635,7 +691,7 @@ export class HUD {
   resetUIToCommandLayout(): void {
     battleLog.setCollapsed(true);
     document.getElementById('war-room-panel')?.classList.remove('collapsed');
-    document.getElementById('selection-info')?.classList.remove('hidden');
+    document.getElementById('hq-panel')?.classList.remove('collapsed');
     dragManager.resetLayoutInPlace();
     requestAnimationFrame(() => {
       this.updateMapReadabilityLegend();
@@ -645,18 +701,18 @@ export class HUD {
   }
 
   private getCommandLayoutInsets(): { top: number; right: number; bottom: number; left: number } {
-    const selection = document.getElementById('selection-info');
+    const hqPanel = document.getElementById('hq-panel');
     const warRoom = document.getElementById('war-room-panel');
     const actions = document.getElementById('action-buttons');
     const phase = document.getElementById('phase-progress');
 
-    const selectionRect = selection?.classList.contains('hidden') ? null : selection?.getBoundingClientRect();
+    const hqRect = hqPanel?.classList.contains('collapsed') ? null : hqPanel?.getBoundingClientRect();
     const warRoomRect = warRoom?.classList.contains('collapsed') ? null : warRoom?.getBoundingClientRect();
     const actionsRect = actions?.classList.contains('hidden') ? null : actions?.getBoundingClientRect();
     const phaseRect = phase?.getBoundingClientRect();
 
     return {
-      left: selectionRect ? Math.ceil(selectionRect.right + 24) : 48,
+      left: hqRect ? Math.ceil(hqRect.right + 24) : 48,
       right: warRoomRect ? Math.ceil(window.innerWidth - warRoomRect.left + 24) : 48,
       top: phaseRect ? Math.ceil(phaseRect.bottom + 32) : 110,
       bottom: actionsRect ? Math.ceil(window.innerHeight - actionsRect.top + 36) : 96,

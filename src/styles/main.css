@@ -5852,13 +5852,13 @@ body.theme-dark .panel-grip {
   max-height: 220px;
 }
 
-body.battle-log-open #minimap-container {
-  bottom: calc(36vh + 1rem) !important;
-}
-
 #minimap-container {
-  left: 5.75rem !important;
-  bottom: 4.2rem !important;
+  left: 20rem !important;
+  right: auto !important;
+  bottom: 4.5rem !important;
+  top: auto !important;
+  transform: none !important;
+  transition: none !important;
 }
 
 #action-buttons {
@@ -5976,11 +5976,234 @@ body.battle-log-open #minimap-container {
 @media (max-width: 1320px) {
   #minimap-container {
     left: 1rem !important;
-    bottom: 4.25rem !important;
+    bottom: 4.5rem !important;
   }
 
   #action-buttons {
     max-width: calc(100vw - 340px);
     overflow-x: auto;
   }
+}
+
+/* ==================== HQ Panel (Left Sidebar) ==================== */
+
+#hq-panel {
+  position: fixed;
+  top: 3.55rem;
+  left: 0.75rem;
+  bottom: 4.5rem;
+  z-index: 230;
+  width: min(290px, calc(100vw - 2rem));
+  background: rgba(8, 16, 32, 0.94);
+  border: 1px solid rgba(201, 162, 39, 0.36);
+  border-radius: 8px;
+  color: #e5e7eb;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 2px 0 24px rgba(0, 0, 0, 0.5);
+}
+
+#hq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+  flex-shrink: 0;
+}
+
+#hq-header button {
+  background: none;
+  border: none;
+  color: #fbbf24;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+#hq-header button:hover {
+  background: rgba(251, 191, 36, 0.12);
+}
+
+#hq-content {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+#hq-content::-webkit-scrollbar { width: 4px; }
+#hq-content::-webkit-scrollbar-track { background: transparent; }
+#hq-content::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.3);
+  border-radius: 2px;
+}
+
+/* Collapsed: slim vertical tab */
+#hq-panel.collapsed {
+  width: 42px;
+  bottom: auto;
+}
+
+#hq-panel.collapsed #hq-header {
+  writing-mode: vertical-rl;
+  padding: 0.75rem 0;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  border-bottom: none;
+  border-right: 1px solid rgba(201, 162, 39, 0.2);
+  min-height: 0;
+}
+
+#hq-panel.collapsed #hq-content { display: none; }
+#hq-panel.collapsed #btn-toggle-hq { transform: rotate(90deg); }
+
+/* Force all child panels to flow statically inside HQ */
+#hq-panel #selection-info,
+#hq-panel #faction-ability-container,
+#hq-panel #supply-indicator,
+#hq-panel #battle-log-panel {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  right: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  transform: none !important;
+  animation: none !important;
+  z-index: auto !important;
+}
+
+/* Territory section */
+#hq-panel #selection-info {
+  max-height: 32vh;
+  overflow-y: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+#hq-panel #territory-name {
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+#hq-panel #territory-details {
+  font-size: 0.74rem;
+}
+
+/* Ability section items */
+#hq-panel #supply-indicator {
+  border-radius: 4px;
+  border-left: none;
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  margin-bottom: 0.3rem;
+  background: rgba(180, 60, 20, 0.85);
+  border: 1px solid #f87171;
+  border-radius: 4px;
+}
+
+#hq-panel #faction-ability-container {
+  display: block;
+}
+
+#hq-panel #btn-faction-ability {
+  width: 100%;
+  border-radius: 4px;
+  border-left: 1px solid #c89620;
+  text-align: left;
+  background: #0f2a1a;
+}
+
+#hq-panel #faction-ability-desc {
+  font-size: 0.62rem;
+  color: #94a3b8;
+  margin-top: 3px;
+  padding: 0;
+  max-width: none;
+}
+
+/* Battle log inside HQ */
+#hq-panel #battle-log-panel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+#hq-panel #battle-log-panel:not(.collapsed) {
+  top: auto !important;
+  bottom: auto !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+#hq-panel #battle-log-header {
+  background: rgba(201, 162, 39, 0.08);
+  border: 1px solid rgba(201, 162, 39, 0.2);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+#hq-panel #battle-log-panel.collapsed {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+#hq-panel #battle-log-panel.collapsed #battle-log-header {
+  min-height: auto;
+}
+
+#hq-panel #battle-log-content {
+  max-height: none;
+}
+
+#hq-panel #battle-log-panel:not(.collapsed) #battle-log-content {
+  display: flex;
+  max-height: none;
+}
+
+#hq-panel #battle-log-entries {
+  max-height: 22vh;
+}
+
+@media (max-width: 1080px) {
+  #hq-panel { display: none; }
+}
+
+/* Center turn-info between HQ panel and WAR ROOM — both ~302–318 px wide */
+#turn-info {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  top: 0.35rem !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(760px, calc(100vw - 660px)) !important;
+  min-width: 0 !important;
+}
+
+.turn-banner {
+  min-width: 0 !important;
+  width: 100% !important;
 }
