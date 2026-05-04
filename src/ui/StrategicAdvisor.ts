@@ -36,10 +36,10 @@ export class StrategicAdvisor {
         <button id="btn-advisor-collapse" title="Collapse advisor">-</button>
       </div>
       <div class="strategic-advisor-body">
-        <div class="advisor-row"><span>Objective</span><strong>${this.escape(data.objectiveLine ?? '')}</strong></div>
-        <div class="advisor-row"><span>Danger</span><strong>${this.escape(data.threatLine ?? '')}</strong></div>
-        <div class="advisor-row"><span>Opportunity</span><strong>${this.escape(data.opportunityLine ?? '')}</strong></div>
-        <div class="advisor-row"><span>Economy</span><strong>${this.escape(data.economyLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="objective"><span>Objective</span><strong>${this.escape(data.objectiveLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="danger"><span>Danger</span><strong>${this.escape(data.threatLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="opportunity"><span>Opportunity</span><strong>${this.escape(data.opportunityLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="economy"><span>Economy</span><strong>${this.escape(data.economyLine ?? '')}</strong></div>
         <div class="advisor-next-action">
           <span>Next</span>
           <strong>${this.escape(coach.headline)}</strong>

@@ -80,6 +80,9 @@ export class VictoryScreen {
       soundManager.play('defeat');
     }
 
+    // Brief cinematic flash before the full modal
+    this.showVictoryFlash(faction?.color ?? '#ffd700', isPlayerVictory);
+
     const stats = this.calculateGameStats();
 
     const allFactions = this.state.factionRegistry.getAll();
@@ -126,7 +129,7 @@ export class VictoryScreen {
       const pct = Math.round((value / max) * 100);
       return `<div style="display:flex;align-items:center;gap:0.4rem;margin-top:2px;">
         <div style="flex:1;background:rgba(0,0,0,0.12);border-radius:3px;height:10px;overflow:hidden;">
-          <div style="width:${pct}%;background:${color};height:100%;border-radius:3px;transition:width 0.4s;"></div>
+          <div class="victory-bar" data-pct="${pct}" style="width:0%;background:${color};height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(0.22,1,0.36,1);"></div>
         </div>
         <span style="min-width:2.5rem;text-align:right;font-size:0.8rem;">${value}</span>
       </div>`;
@@ -209,7 +212,16 @@ export class VictoryScreen {
         </div>
       </div>
     `;
+    setTimeout(() => {
     document.body.appendChild(modal);
+
+    // Animate bar charts from 0 → target width after a brief delay
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      modal.querySelectorAll<HTMLElement>('.victory-bar').forEach((bar, i) => {
+        const pct = bar.dataset.pct ?? '0';
+        setTimeout(() => { bar.style.width = `${pct}%`; }, i * 60);
+      });
+    }));
 
     document.getElementById('btn-victory-play-again')?.addEventListener('click', () => location.reload());
     document.getElementById('btn-victory-review')?.addEventListener('click', () => modal.remove());
@@ -222,6 +234,37 @@ export class VictoryScreen {
     if (isPlayerVictory) {
       this.runConfetti(5000);
     }
+    }, 900); // wait for flash to complete
+  }
+
+  /** Full-screen color flash with text that fades out before the modal appears. */
+  private showVictoryFlash(factionColor: string, isVictory: boolean): void {
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:fixed;inset:0;z-index:19999;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;pointer-events:none;
+      background:${factionColor};opacity:0;
+      transition:opacity 0.25s ease;
+    `;
+    const label = document.createElement('div');
+    label.textContent = isVictory ? 'VICTORY' : 'DEFEAT';
+    label.style.cssText = `
+      font-family:'Cinzel',serif;font-size:clamp(2.5rem,8vw,6rem);font-weight:700;
+      color:rgba(255,255,255,0.95);letter-spacing:0.15em;text-shadow:0 4px 24px rgba(0,0,0,0.5);
+    `;
+    flash.appendChild(label);
+    document.body.appendChild(flash);
+
+    // Fade in
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      flash.style.opacity = '0.82';
+      // Hold for 500ms, then fade out
+      setTimeout(() => {
+        flash.style.transition = 'opacity 0.35s ease';
+        flash.style.opacity = '0';
+        setTimeout(() => flash.remove(), 380);
+      }, 480);
+    }));
   }
 
   reset(): void {
