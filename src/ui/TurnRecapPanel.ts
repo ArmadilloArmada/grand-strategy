@@ -50,7 +50,7 @@ export class TurnRecapPanel {
       <div class="recap-dismiss">Click to dismiss</div>`;
 
     card.addEventListener('click', () => card.remove());
-    document.body.appendChild(card);
+    (document.getElementById('hq-recap-slot') ?? document.body).appendChild(card);
     setTimeout(() => card.remove(), 5000);
   }
 
@@ -88,7 +88,7 @@ export class TurnRecapPanel {
       card.remove();
     });
     card.addEventListener('click', () => card.remove());
-    document.body.appendChild(card);
+    (document.getElementById('hq-recap-slot') ?? document.body).appendChild(card);
     setTimeout(() => card.remove(), 9000);
   }
 

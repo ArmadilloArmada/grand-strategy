@@ -26,7 +26,10 @@ class AIActivityFeed {
 
   private render(): void {
     let feed = document.getElementById('ai-activity-feed');
+    const inHQ = feed ? !!feed.closest('#hq-panel') : false;
+
     if (!feed) {
+      // Narrow screen fallback: float from body
       feed = document.createElement('div');
       feed.id = 'ai-activity-feed';
       feed.className = 'ai-activity-feed';
@@ -34,40 +37,48 @@ class AIActivityFeed {
     }
 
     if (this.entries.length === 0) {
-      feed.classList.remove('visible');
+      feed.innerHTML = '<div class="ai-feed-empty">No recent AI activity</div>';
+      if (!inHQ) feed.classList.remove('visible');
+      if (!inHQ) document.body.classList.remove('ai-feed-active');
       return;
     }
 
-    feed.innerHTML = `
-      <div class="ai-feed-title">
-        <span>AI Activity</span>
-        <small>${this.entries.length} recent action${this.entries.length === 1 ? '' : 's'}</small>
+    feed.innerHTML = this.entries.map(e => `
+      <div class="ai-feed-row" data-action="${this.escape(e.action ?? 'think')}">
+        <span class="ai-feed-dot" style="background:${this.escape(e.factionColor)}"></span>
+        <span class="ai-feed-copy">
+          <strong>${this.escape(e.factionName)}</strong>
+          ${this.escape(e.message)}
+          <small>${this.escape(this.getActionLabel(e.action))}</small>
+        </span>
       </div>
-      ${this.entries.map(e => `
-        <div class="ai-feed-row" data-action="${this.escape(e.action ?? 'think')}">
-          <span class="ai-feed-dot" style="background:${this.escape(e.factionColor)}"></span>
-          <span class="ai-feed-copy">
-            <strong>${this.escape(e.factionName)}</strong>
-            ${this.escape(e.message)}
-            <small>${this.escape(this.getActionLabel(e.action))}</small>
-          </span>
-        </div>
-      `).join('')}
-    `;
-    feed.classList.add('visible');
-    document.body.classList.add('ai-feed-active');
+    `).join('');
+
+    if (!inHQ) {
+      feed.classList.add('visible');
+      document.body.classList.add('ai-feed-active');
+    }
   }
 
   hideBanner(): void {
     document.getElementById('ai-activity-banner')?.classList.remove('visible');
-    document.getElementById('ai-activity-feed')?.classList.remove('visible');
-    document.body.classList.remove('ai-feed-active');
+    const feed = document.getElementById('ai-activity-feed');
+    if (feed && !feed.closest('#hq-panel')) {
+      feed.classList.remove('visible');
+      document.body.classList.remove('ai-feed-active');
+    }
   }
 
   clear(): void {
     this.entries = [];
-    document.getElementById('ai-activity-feed')?.classList.remove('visible');
-    document.body.classList.remove('ai-feed-active');
+    const feed = document.getElementById('ai-activity-feed');
+    if (feed) {
+      feed.innerHTML = '<div class="ai-feed-empty">No recent AI activity</div>';
+      if (!feed.closest('#hq-panel')) {
+        feed.classList.remove('visible');
+        document.body.classList.remove('ai-feed-active');
+      }
+    }
   }
 
   private escape(str: string): string {

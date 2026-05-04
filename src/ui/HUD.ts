@@ -658,6 +658,11 @@ export class HUD {
 
     const content = panel.querySelector('#hq-content') as HTMLElement;
 
+    // RECAP SLOT — turn/phase recap cards render here instead of floating over screen
+    const recapSlot = document.createElement('div');
+    recapSlot.id = 'hq-recap-slot';
+    content.appendChild(recapSlot);
+
     // TERRITORY section — move #selection-info into HQ
     const selection = document.getElementById('selection-info');
     if (selection) {
@@ -692,6 +697,20 @@ export class HUD {
       blog.removeAttribute('style');
       content.appendChild(blog);
     }
+
+    // AI ACTIVITY section — pre-create container so AIActivityFeed renders here
+    const aiWrap = document.createElement('div');
+    aiWrap.id = 'hq-ai-section';
+    aiWrap.className = 'war-room-section';
+    const aiTitle = document.createElement('div');
+    aiTitle.className = 'war-room-section-title';
+    aiTitle.textContent = 'AI Activity';
+    aiWrap.appendChild(aiTitle);
+    const aiContainer = document.createElement('div');
+    aiContainer.id = 'ai-activity-feed';
+    aiContainer.className = 'hq-ai-feed';
+    aiWrap.appendChild(aiContainer);
+    content.appendChild(aiWrap);
 
     panel.querySelector('#btn-toggle-hq')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
@@ -2280,8 +2299,6 @@ export class HUD {
       ipcEl.textContent = `${faction.ipcs} IPCs`;
     }
 
-    const phaseToast = this.phaseGuidance.getPhaseToast(phase);
-    if (phaseToast) this.showToast(phaseToast, 'info');
     return;
   }
 

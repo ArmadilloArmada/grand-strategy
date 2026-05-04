@@ -4415,6 +4415,48 @@ kbd.kbd-hint {
   text-align: right;
 }
 
+/* Recap cards inside HQ panel — strip floating position */
+#hq-recap-slot .turn-recap-card,
+#hq-recap-slot .phase-recap-card {
+  position: relative;
+  bottom: auto;
+  right: auto;
+  width: 100%;
+  min-width: unset;
+  max-width: unset;
+  border-radius: 6px;
+  margin-bottom: 0.4rem;
+  box-shadow: none;
+  animation: none;
+}
+
+/* AI feed inside HQ panel */
+.hq-ai-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hq-ai-feed .ai-feed-row {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.hq-ai-feed .ai-feed-row:last-child {
+  border-bottom: none;
+}
+
+.ai-feed-empty {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
 #strategic-advisor-panel {
   position: fixed;
   right: 1rem;
