@@ -15,6 +15,8 @@ export interface VictoryCallbacks {
 }
 
 export class VictoryScreen {
+  private activeWinner: string | null = null;
+
   constructor(
     private state: GameState,
     private gameConfig: () => GameConfig,
@@ -22,10 +24,15 @@ export class VictoryScreen {
   ) {}
 
   show(data: { winner: string }): void {
+    if (!data.winner) return;
+    if (this.activeWinner === data.winner && document.getElementById('victory-modal')) return;
+    document.getElementById('victory-modal')?.remove();
+    this.activeWinner = data.winner;
+
     const config = this.gameConfig();
     const faction = this.state.factionRegistry.get(data.winner);
-    const currentFaction = this.state.getCurrentFaction();
-    const isPlayerVictory = currentFaction?.controlledBy === 'human' && currentFaction.id === data.winner;
+    const humanFactionIds = new Set(config.humanFactions ?? []);
+    const isPlayerVictory = humanFactionIds.has(data.winner) || faction?.controlledBy === 'human';
 
     const factionIds = this.state.factionRegistry.getAll().map(f => f.id);
     if (factionIds.length > 0) {
@@ -208,12 +215,19 @@ export class VictoryScreen {
     document.getElementById('btn-victory-review')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-victory-main-menu')?.addEventListener('click', () => {
       modal.remove();
+      this.activeWinner = null;
       this.callbacks.showMainMenu();
     });
 
     if (isPlayerVictory) {
       this.runConfetti(5000);
     }
+  }
+
+  reset(): void {
+    this.activeWinner = null;
+    document.getElementById('victory-modal')?.remove();
+    document.querySelectorAll('.confetti-canvas').forEach(canvas => canvas.remove());
   }
 
   private getVictoryFlavorText(factionId: string, isPlayerWin: boolean): string {

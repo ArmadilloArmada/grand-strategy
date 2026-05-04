@@ -18,7 +18,7 @@ export interface LogEntry {
 export class BattleLog {
   private entries: LogEntry[] = [];
   private nextId: number = 1;
-  private isCollapsed: boolean = false;
+  private isCollapsed: boolean = true;
   private maxEntries: number = 100;
   private filterText: string = '';
   private filterType: LogEntryType | 'all' = 'all';
@@ -56,9 +56,23 @@ export class BattleLog {
    */
   toggle(): void {
     this.isCollapsed = !this.isCollapsed;
+    this.applyCollapsedState();
+  }
+
+  setCollapsed(collapsed: boolean): void {
+    this.isCollapsed = collapsed;
+    this.applyCollapsedState();
+  }
+
+  private applyCollapsedState(): void {
     const panel = document.getElementById('battle-log-panel');
+    document.body.classList.toggle('battle-log-open', !this.isCollapsed);
     if (panel) {
       panel.classList.toggle('collapsed', this.isCollapsed);
+      if (!this.isCollapsed) {
+        panel.style.top = 'auto';
+        panel.style.bottom = '0px';
+      }
     }
   }
 

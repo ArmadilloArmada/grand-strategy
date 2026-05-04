@@ -20,7 +20,9 @@ import { getPhaseDisplayName as getPhaseDisplayNameFromStyle } from '../engine/T
 import { TechnologyManager } from '../engine/TechnologyManager';
 import { statisticsManager } from '../engine/StatisticsManager';
 import { turnLog } from '../engine/TurnLog';
-import { getMapList } from '../data/mapRegistry';
+import { getMapEntry, getMapList } from '../data/mapRegistry';
+import type { FactionData } from '../data/Faction';
+import type { MapData } from '../loaders/MapLoader';
 import { ESPIONAGE_OPS } from '../engine/EspionageSystem';
 import { UNIT_ICONS } from './hudConstants';
 import { CombatUI } from './CombatUI';
@@ -40,7 +42,10 @@ import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
 import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
+import { getMaxCapturableCapitals, normalizeCapitalsToWin } from '../engine/SetupValidation';
 import { dragManager } from './DragManager';
+import { toastManager } from './ToastManager';
+import { aiActivityFeed } from './AIActivityFeed';
 
 interface TurnRecapStats {
   factionId: string;
@@ -52,6 +57,7 @@ interface TurnRecapStats {
   unitsLost: number;
   enemyUnitsDestroyed: number;
 }
+
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -109,6 +115,7 @@ export class HUD {
 
   // Event announcement dismiss timer
   private eventDismissTimer: ReturnType<typeof setTimeout> | null = null;
+  private victoryHandled = false;
 
   // IPC flash tracking
   private prevIPCs: number = -1;
@@ -162,6 +169,10 @@ export class HUD {
       showToast: (msg: string, type: 'success' | 'info' | 'error') => this.showToast(msg, type),
       updateMobilizationHighlights: () => this.updateMobilizationHighlights(),
       updateSelectionInfo: () => this.updateSelectionInfo(),
+      onMobilized: (territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]) => {
+        this.undoController.recordMove({ type: 'mobilize', data: { territoryId, cost, units } });
+        this.undoController.updateButtons();
+      },
     };
     this.productionUI = new ProductionUI(state, renderer, this.productionManager, this.mobilizationSystem, productionCallbacks);
 
@@ -187,9 +198,6 @@ export class HUD {
       showToast: (msg: string, type: 'success' | 'info' | 'error') => this.showToast(msg, type),
     });
 
-    this.setupEventListeners();
-    this.subscribeToGameEvents();
-
     // Initialize sub-controllers
     this.tutorialController = new TutorialController({
       showToast: (msg, type) => this.showToast(msg, type),
@@ -201,6 +209,19 @@ export class HUD {
       updatePhaseInfo: () => this.updatePhaseInfo(),
       updateFactionPanel: () => this.updateFactionPanel(),
       updateActionButtons: () => this.updateActionButtons(),
+      undoMobilize: (territoryId, cost, units) => {
+        const faction = this.state.getCurrentFaction();
+        if (faction) faction.ipcs += cost;
+        const territory = this.state.territories.get(territoryId);
+        if (territory) {
+          for (const u of units) territory.removeUnits(u.unitTypeId, u.count);
+        }
+        this.mobilizationSystem.undoMobilize(territoryId);
+        this.updateMobilizationHighlights();
+        this.productionUI.updateMobilizationOptions();
+        const ipcEl = document.getElementById('ipc-display');
+        if (ipcEl && faction) ipcEl.textContent = `${faction.ipcs} IPCs`;
+      },
     });
     this.overlayController = new OverlayController(state, renderer, {
       showToast: (msg, type) => this.showToast(msg, type),
@@ -223,6 +244,9 @@ export class HUD {
     this.tensionSystem = new TensionSystem(state);
     this.objectiveSystem = new ObjectiveSystem(state);
     this.supplySystem = new SupplySystem(state);
+
+    this.setupEventListeners();
+    this.subscribeToGameEvents();
   }
   
   /**
@@ -255,6 +279,7 @@ export class HUD {
   private setupEventListeners(): void {
     // Action buttons
     this.enhanceCommandBar();
+    this.setupWarRoomLayout();
     document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
     document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
@@ -375,11 +400,12 @@ export class HUD {
     document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.renderer.zoom(1.2));
     document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.renderer.zoom(0.8));
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
-      this.renderer.fitToScreen();
-      dragManager.resetLayoutInPlace();
-      this.showToast('View and panels reset', 'info');
+      this.fitMapToCommandLayout();
+      this.showToast('Map view reset', 'info');
     });
+    document.getElementById('btn-ui-reset')?.addEventListener('click', () => this.resetUIToCommandLayout());
     document.getElementById('btn-overlay')?.addEventListener('click', () => this.cycleOverlay());
+    this.updateMapReadabilityLegend();
 
     // Faction panel toggle
     document.getElementById('faction-panel-header')?.addEventListener('click', () => this.toggleFactionPanel());
@@ -438,6 +464,11 @@ export class HUD {
     document.getElementById('victory-type')?.addEventListener('change', () => {
       updateVictoryRows();
       this.updateSetupSummary();
+    });
+
+    document.getElementById('map-select')?.addEventListener('change', () => {
+      this.refreshSetupFactionOptions();
+      this.syncSetupHelpers();
     });
 
     const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
@@ -524,6 +555,102 @@ export class HUD {
     }
   }
 
+  private setupWarRoomLayout(): void {
+    if (document.getElementById('war-room-panel')) return;
+
+    const panel = document.createElement('aside');
+    panel.id = 'war-room-panel';
+    panel.innerHTML = `
+      <div id="war-room-header">
+        <span>War Room</span>
+        <button id="btn-toggle-war-room" title="Collapse War Room">-</button>
+      </div>
+      <div id="war-room-content"></div>
+    `;
+    document.body.appendChild(panel);
+
+    const content = panel.querySelector('#war-room-content');
+    const advisor = document.getElementById('strategic-advisor-panel') ?? document.createElement('section');
+    advisor.id = 'strategic-advisor-panel';
+    advisor.classList.add('war-room-section', 'hidden');
+    content?.appendChild(advisor);
+
+    const objectives = document.getElementById('objectives-panel');
+    if (objectives) {
+      objectives.removeAttribute('style');
+      objectives.classList.add('war-room-section');
+      Array.from(objectives.children).forEach(child => {
+        if ((child as HTMLElement).id !== 'objectives-list' && !child.classList.contains('war-room-section-title')) {
+          child.remove();
+        }
+      });
+      const title = objectives.querySelector('.war-room-section-title');
+      if (!title) {
+        const titleEl = document.createElement('div');
+        titleEl.className = 'war-room-section-title';
+        titleEl.textContent = 'Objectives';
+        objectives.prepend(titleEl);
+      }
+      const list = document.getElementById('objectives-list');
+      list?.removeAttribute('style');
+      list?.classList.add('war-room-list');
+      content?.appendChild(objectives);
+    }
+
+    const victory = document.getElementById('victory-progress');
+    if (victory) {
+      victory.classList.add('war-room-section');
+      const headerTitle = victory.querySelector('.victory-progress-header span:first-child');
+      if (headerTitle) headerTitle.textContent = 'Victory';
+      content?.appendChild(victory);
+    }
+
+    const factions = document.getElementById('faction-panel');
+    if (factions) {
+      factions.classList.add('war-room-section');
+      content?.appendChild(factions);
+    }
+
+    panel.querySelector('#btn-toggle-war-room')?.addEventListener('click', () => {
+      panel.classList.toggle('collapsed');
+    });
+  }
+
+  fitMapToCommandLayout(): void {
+    this.renderer.fitToScreen(this.getCommandLayoutInsets());
+  }
+
+  resetUIToCommandLayout(): void {
+    battleLog.setCollapsed(true);
+    document.getElementById('war-room-panel')?.classList.remove('collapsed');
+    document.getElementById('selection-info')?.classList.remove('hidden');
+    dragManager.resetLayoutInPlace();
+    requestAnimationFrame(() => {
+      this.updateMapReadabilityLegend();
+      this.fitMapToCommandLayout();
+    });
+    this.showToast('UI layout reset', 'success');
+  }
+
+  private getCommandLayoutInsets(): { top: number; right: number; bottom: number; left: number } {
+    const selection = document.getElementById('selection-info');
+    const warRoom = document.getElementById('war-room-panel');
+    const actions = document.getElementById('action-buttons');
+    const phase = document.getElementById('phase-progress');
+
+    const selectionRect = selection?.classList.contains('hidden') ? null : selection?.getBoundingClientRect();
+    const warRoomRect = warRoom?.classList.contains('collapsed') ? null : warRoom?.getBoundingClientRect();
+    const actionsRect = actions?.classList.contains('hidden') ? null : actions?.getBoundingClientRect();
+    const phaseRect = phase?.getBoundingClientRect();
+
+    return {
+      left: selectionRect ? Math.ceil(selectionRect.right + 24) : 48,
+      right: warRoomRect ? Math.ceil(window.innerWidth - warRoomRect.left + 24) : 48,
+      top: phaseRect ? Math.ceil(phaseRect.bottom + 32) : 110,
+      bottom: actionsRect ? Math.ceil(window.innerHeight - actionsRect.top + 36) : 96,
+    };
+  }
+
   /**
    * Global keyboard shortcut handler — supplements the main.ts handler.
    * Handles shortcuts that need direct access to HUD sub-controllers.
@@ -554,6 +681,7 @@ export class HUD {
     const isHumanTurn = faction?.controlledBy === 'human';
 
     switch (key) {
+      case 'F': if (e.shiftKey) { e.preventDefault(); this.resetUIToCommandLayout(); } break;
       case 'm': case 'M': if (isHumanTurn) this.onMoveClick(); break;
       case 'a': case 'A': if (isHumanTurn) this.onAttackShortcut(); break;
       case 'r': case 'R': if (isHumanTurn) this.techUI.show(); break;
@@ -704,19 +832,23 @@ export class HUD {
       const fid = evData?.factionId ?? this.state.currentFactionId;
       this.resetTurnRecap(fid);
       const f = this.state.factionRegistry.get(fid);
-      if (f?.controlledBy === 'human') this.tickDynamicFeatures(fid);
+      if (f?.controlledBy === 'human') {
+        this.hideAIActivityBanner();
+        this.tickDynamicFeatures(fid);
+      }
     });
     this.state.on('phase_start', () => this.onPhaseStart());
     this.state.on('phase_end', (e: { type: string; data: unknown; timestamp: number }) => this.onPhaseEnd(e));
     this.state.on('territory_selected', (e) => this.onTerritorySelected(e.data as { territoryId: string | null; previousTerritoryId?: string | null }));
-    this.state.on('victory', (e) => this.victoryScreen.show(e.data as { winner: string }));
+    this.state.on('victory', (e) => this.handleVictory(e.data as { winner?: string; factionId?: string }));
     this.state.on('ai_thinking', (e) => {
-      const data = e.data as { message?: string; action?: string; territory?: string };
+      const data = e.data as { message?: string; action?: string; territory?: string; territoryId?: string };
       if (data.message) {
         this.updateAIActivityBanner(data.message);
+        if (data.action) this.addAIActivity(data.message, data.action);
       }
-      if (data.territory) {
-        this.renderer.setAIPulseTerritory(data.territory);
+      if (data.territoryId) {
+        this.renderer.setAIPulseTerritory(data.territoryId);
       }
     });
     this.state.on('combat_end', (e) => this.onCombatEnd(e));
@@ -845,6 +977,18 @@ export class HUD {
     // Calculate casualties for achievements
     const attackerLosses = combat.attackers.reduce((sum, u) => sum + u.casualties, 0);
     const defenderLosses = combat.defenders.reduce((sum, u) => sum + u.casualties, 0);
+
+    if (faction?.controlledBy === 'ai') {
+      const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      const tName = territory?.name ?? combat.territoryId;
+      const outcome = combat.winner === 'attacker' && !data.retreated ? 'captured' : 'was held at';
+      this.addAIActivity(
+        `${attackerFaction?.name ?? 'AI'} ${outcome} ${tName} (${attackerLosses}-${defenderLosses} losses)`,
+        combat.winner === 'attacker' && !data.retreated ? 'capture' : 'battle'
+      );
+      this.renderer.setAIPulseTerritory(combat.territoryId);
+    }
+
     const recapFactionId = faction?.id ?? this.state.currentFactionId;
     const recap = this.ensureTurnRecap(recapFactionId);
     if (combat.attackingFactionId === recapFactionId || combat.defendingFactionId === recapFactionId) {
@@ -1389,6 +1533,7 @@ export class HUD {
     }
     
     this.renderer.setMobilizationTargets(canMobilize, alreadyMobilized);
+    this.updateMapReadabilityLegend();
   }
 
   /**
@@ -1464,6 +1609,7 @@ export class HUD {
 
     // Update valid moves for newly selected territory
     this.updateValidMoves();
+    this.updateStrategicAdvisor();
   }
 
   /**
@@ -1653,25 +1799,7 @@ export class HUD {
    * Show toast notification
    */
   showToast(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    // Evict oldest toast if already at cap
-    while (container.children.length >= 3) {
-      (container.children[0] as HTMLElement).remove();
-    }
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    container.appendChild(toast);
-
-    const duration = type === 'info' ? 1800 : 3000;
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
+    toastManager.show(message, type);
   }
   
   /**
@@ -1706,13 +1834,14 @@ export class HUD {
       banner?.classList.remove('visible');
     }, 1500);
   }
-  
-  /**
-   * Hide AI activity banner
-   */
+
+  private addAIActivity(message: string, action?: string): void {
+    const faction = this.state.getCurrentFaction();
+    aiActivityFeed.add(faction?.name ?? 'AI', faction?.color ?? '#94a3b8', message, action);
+  }
+
   hideAIActivityBanner(): void {
-    const banner = document.getElementById('ai-activity-banner');
-    if (banner) banner.classList.remove('visible');
+    aiActivityFeed.hideBanner();
   }
 
   /** Show a compact popup to set AI turn speed (Slow / Normal / Fast). */
@@ -2190,6 +2319,51 @@ export class HUD {
   /**
    * Update selection info panel
    */
+  private getNavalStatusHtml(territory: import('../data/Territory').Territory): string {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return '';
+
+    if (territory.type === 'coastal' && territory.owner === faction.id) {
+      const adjacentSeas = territory.adjacentTo
+        .map(id => this.state.territories.get(id))
+        .filter((t): t is import('../data/Territory').Territory => !!t && t.type === 'sea');
+      if (adjacentSeas.length === 0) return '';
+
+      const blockaded = this.supplySystem.isNavalBlockaded(territory.id, faction.id);
+      const openSeas = adjacentSeas.filter(sea =>
+        sea.owner === null ||
+        sea.owner === faction.id ||
+        sea.getTotalUnitCount() === 0 ||
+        !sea.owner ||
+        !faction.isEnemyOf(sea.owner)
+      ).length;
+      return `<div class="naval-status ${blockaded ? 'danger' : 'open'}">
+        <strong>${blockaded ? 'Naval blockade' : 'Sea access open'}</strong>
+        <span>${openSeas}/${adjacentSeas.length} adjacent sea zone${adjacentSeas.length === 1 ? '' : 's'} open</span>
+      </div>`;
+    }
+
+    if (territory.type === 'sea') {
+      const transports = territory.units.reduce((sum, unit) => {
+        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
+        return sum + (unitType?.transportCapacity ?? 0) * unit.count;
+      }, 0);
+      const adjacentCoasts = territory.adjacentTo
+        .map(id => this.state.territories.get(id))
+        .filter(t => t?.isLand())
+        .slice(0, 3)
+        .map(t => t?.name ?? '')
+        .filter(Boolean);
+      const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+      return `<div class="naval-status sea">
+        <strong>${owner ? `${this.escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
+        <span>${transports > 0 ? `${transports} transport capacity` : 'No transport capacity'}${adjacentCoasts.length ? ` · Coasts: ${this.escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
+      </div>`;
+    }
+
+    return '';
+  }
+
   updateSelectionInfo(): void {
     const territory = this.state.getSelectedTerritory();
     const nameEl = document.getElementById('territory-name');
@@ -2248,6 +2422,8 @@ export class HUD {
         <span style="color: #d4a84b;">Strategic</span>
       </div>`;
     }
+
+    html += this.getNavalStatusHtml(territory);
 
     // Fortification level
     if (territory.isLand()) {
@@ -2371,10 +2547,26 @@ export class HUD {
 
       // Attack range preview (enemies reachable from this territory)
       if (isOwnedTerritory && isMovementPhase && this.validMoves.length > 0) {
-        const enemyIds = new Set(this.validMoves.filter(m => m.isAttack).map(m => m.territoryId));
-        if (enemyIds.size > 0) {
+        const enemyIds = Array.from(new Set(this.validMoves.filter(m => m.isAttack).map(m => m.territoryId)));
+        const moveIds = Array.from(new Set(this.validMoves.filter(m => !m.isAttack).map(m => m.territoryId)));
+        if (enemyIds.length > 0) {
           html += `<div class="attack-range-preview">
-            🎯 <strong>${enemyIds.size}</strong> enem${enemyIds.size === 1 ? 'y' : 'ies'} in attack range
+            🎯 <strong>${enemyIds.length}</strong> enem${enemyIds.length === 1 ? 'y' : 'ies'} in attack range
+          </div>`;
+        }
+        const previewTargets = [
+          ...enemyIds.slice(0, 3).map(id => ({ id, type: 'attack' })),
+          ...moveIds.slice(0, Math.max(0, 3 - Math.min(enemyIds.length, 3))).map(id => ({ id, type: 'move' })),
+        ];
+        if (previewTargets.length > 0) {
+          html += `<div class="target-preview-list">
+            ${previewTargets.map(target => {
+              const t = this.state.territories.get(target.id);
+              const viaTransport = this.validMoves.some(move => move.territoryId === target.id && move.viaTransport);
+              const label = target.type === 'attack' ? 'Attack' : viaTransport ? 'Transport' : 'Move';
+              const className = viaTransport ? 'transport' : target.type;
+              return `<button class="${className}" onclick="window.__hudInstance?.focusTerritory('${target.id}')">${label}: ${this.escapeHtml(t?.name ?? target.id)}</button>`;
+            }).join('')}
           </div>`;
         }
       }
@@ -2661,18 +2853,22 @@ export class HUD {
           const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
           const targetIds = new Set<string>();
           const attackIds = new Set<string>();
+          const transportIds = new Set<string>();
           for (const pu of territory.units) {
             for (const move of this.movementValidator.getValidMoves(pu.unitTypeId, territory.id, allowAttacks)) {
               if (move.isAttack) attackIds.add(move.territoryId);
               else targetIds.add(move.territoryId);
+              if (move.viaTransport) transportIds.add(move.territoryId);
             }
           }
           const moveCount = targetIds.size;
           const attackCount = attackIds.size;
+          const transportCount = transportIds.size;
           const targetText = attackCount > 0
             ? `${moveCount} move target${moveCount !== 1 ? 's' : ''}, ${attackCount} attack target${attackCount !== 1 ? 's' : ''}`
             : `${moveCount} move target${moveCount !== 1 ? 's' : ''}`;
-          newText = `🚶 ${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText})`;
+          const transportText = transportCount > 0 ? `, ${transportCount} via transport` : '';
+          newText = `🚶 ${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText})`;
           tipKey = 'movement'; tipMsg = 'Units can act once per turn. Green highlights are moves; attack highlights start a battle preview.';
         } else {
           newText = `⏸️ All units in ${territory.name} have acted. Select another territory.`;
@@ -2721,6 +2917,7 @@ export class HUD {
     if (!territory || territory.owner !== faction?.id) {
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
+      this.updateMapReadabilityLegend();
       return;
     }
 
@@ -2729,6 +2926,7 @@ export class HUD {
     if (!movementPhases.includes(phase)) {
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
+      this.updateMapReadabilityLegend();
       return;
     }
 
@@ -2766,10 +2964,55 @@ export class HUD {
     this.renderer.setValidMoveTargets(moveTargets, attackTargets);
     this.applyOverlay();
     this.updateActionButtons();
+    this.updateMapReadabilityLegend();
   }
 
   private applyOverlay(): void { this.overlayController.apply(); }
-  cycleOverlay(): void { this.overlayController.cycle(); }
+  cycleOverlay(): void {
+    this.overlayController.cycle();
+    this.updateMapReadabilityLegend();
+  }
+
+  focusTerritory(territoryId: string): void {
+    if (!this.state.territories.has(territoryId)) return;
+    this.renderer.centerOnTerritory(territoryId);
+    this.state.selectTerritory(territoryId);
+  }
+
+  private updateMapReadabilityLegend(): void {
+    const targetParent = document.getElementById('war-room-content') ?? document.getElementById('app');
+    let legend = document.getElementById('map-readability-legend');
+    if (!legend) {
+      legend = document.createElement('div');
+      legend.id = 'map-readability-legend';
+    }
+    if (targetParent && legend.parentElement !== targetParent) {
+      targetParent.appendChild(legend);
+    }
+    legend.classList.add('war-room-section', 'overlay-legend-section');
+
+    const mode = this.overlayController?.getMode() ?? 'off';
+    const moveCount = this.validMoves.filter(m => !m.isAttack).length;
+    const attackCount = this.validMoves.filter(m => m.isAttack).length;
+    const mobilizeCount = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize).length;
+    const selected = this.state.getSelectedTerritory();
+    const selectedText = selected ? selected.name : 'No territory selected';
+    const modeLabels: Record<string, string> = {
+      off: 'Overlay Off',
+      range: 'Range',
+      threat: 'Threats',
+      economic: 'Economy',
+    };
+
+    legend.innerHTML = `
+      <div class="map-legend-title">${this.escapeHtml(modeLabels[mode])}</div>
+      <div class="map-legend-row"><span class="legend-swatch selected"></span><span>${this.escapeHtml(selectedText)}</span></div>
+      <div class="map-legend-row"><span class="legend-swatch move"></span><span>${moveCount} move</span></div>
+      <div class="map-legend-row"><span class="legend-swatch attack"></span><span>${attackCount} attack</span></div>
+      <div class="map-legend-row"><span class="legend-swatch build"></span><span>${mobilizeCount} mobilize</span></div>
+    `;
+    legend.classList.toggle('quiet', mode === 'off' && moveCount === 0 && attackCount === 0 && mobilizeCount === 0);
+  }
 
   /**
    * Handle move button click
@@ -2949,6 +3192,20 @@ export class HUD {
   }
 
   // ==================== VICTORY (delegated to VictoryScreen) ====================
+
+  resetVictoryState(): void {
+    this.victoryHandled = false;
+    this.victoryScreen.reset();
+  }
+
+  private handleVictory(data: { winner?: string; factionId?: string }): void {
+    const winner = data.winner ?? data.factionId;
+    if (!winner || this.victoryHandled) return;
+    this.victoryHandled = true;
+    this.events.emit('gameOver', { winner });
+    this.victoryScreen.show({ winner });
+  }
+
   // ==================== MINIMAP (delegated to MinimapController) ====================
 
   /**
@@ -3203,6 +3460,7 @@ export class HUD {
         ? this.gameConfig.mapId
         : 'grid';
     }
+    this.refreshSetupFactionOptions();
     this.syncSetupHelpers();
     if (modal) modal.classList.remove('hidden');
   }
@@ -3226,7 +3484,10 @@ export class HUD {
     const mode = (document.getElementById('game-mode') as HTMLSelectElement)?.value || 'vs-ai';
     const turnStyle = (document.getElementById('turn-style') as HTMLSelectElement)?.value || 'classic';
     const victoryType = (document.getElementById('victory-type') as HTMLSelectElement)?.value || 'capitals';
-    const capitalsToWin = parseInt((document.getElementById('victory-capitals') as HTMLInputElement)?.value || '3') || 3;
+    const capitalsToWin = normalizeCapitalsToWin(
+      parseInt((document.getElementById('victory-capitals') as HTMLInputElement)?.value || '3') || 3,
+      this.getSetupFactionsForMap(mapId)
+    );
     const territoriesPercent = parseInt((document.getElementById('victory-domination') as HTMLInputElement)?.value || '75') || 75;
     const economicTarget = parseInt((document.getElementById('victory-economic') as HTMLInputElement)?.value || '500') || 500;
     let turnLimit = parseInt((document.getElementById('turn-limit') as HTMLSelectElement)?.value || '50');
@@ -3253,7 +3514,7 @@ export class HUD {
       const playerFactionSelect = document.getElementById('player-faction') as HTMLSelectElement;
       const playerFaction = playerFactionSelect?.value || 'atlantic_alliance';
       if (playerFaction === 'random') {
-        const playable = this.state.factionRegistry.getPlayable().map(f => f.id);
+        const playable = this.getSetupFactionsForMap(mapId).filter(f => f.isPlayable).map(f => f.id);
         humanFactions.push(playable[Math.floor(Math.random() * playable.length)] || 'atlantic_alliance');
       } else {
         humanFactions.push(playerFaction);
@@ -3315,11 +3576,97 @@ export class HUD {
     this.maybeOfferTutorial();
   }
 
+  private getSetupFactionsForMap(mapId: string): FactionData[] {
+    const entry = getMapEntry(mapId);
+    if (entry?.factions?.length) return entry.factions;
+    return this.state.factionRegistry.getAll().map(f => f.serialize());
+  }
+
+  private getSelectedSetupMap(): { id: string; name: string; data?: MapData; factions: FactionData[] } {
+    const mapSelect = document.getElementById('map-select') as HTMLSelectElement | null;
+    const id = mapSelect?.value ?? this.gameConfig.mapId ?? 'grid';
+    const entry = getMapEntry(id);
+    return {
+      id,
+      name: entry?.name ?? mapSelect?.selectedOptions[0]?.textContent?.trim() ?? 'Selected map',
+      data: entry?.data,
+      factions: this.getSetupFactionsForMap(id),
+    };
+  }
+
+  private getFactionOptionLabel(faction: FactionData): string {
+    return `${faction.name}${faction.playstyle ? ` - ${faction.playstyle}` : ''}`;
+  }
+
+  private refreshSetupFactionOptions(): void {
+    const { factions } = this.getSelectedSetupMap();
+    const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
+    const playerSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
+    const hotseatSelect = document.getElementById('human-factions') as HTMLSelectElement | null;
+    const previousPlayer = playerSelect?.value;
+    const previousHotseat = new Set(Array.from(hotseatSelect?.selectedOptions ?? []).map(o => o.value));
+
+    if (playerSelect) {
+      playerSelect.innerHTML = [
+        ...playable.map(f => `<option value="${this.escapeHtml(f.id)}">${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`),
+        '<option value="random">Random playable faction</option>',
+      ].join('');
+      playerSelect.value = previousPlayer && (previousPlayer === 'random' || playable.some(f => f.id === previousPlayer))
+        ? previousPlayer
+        : playable[0]?.id ?? 'random';
+    }
+
+    if (hotseatSelect) {
+      hotseatSelect.innerHTML = playable
+        .map((f, index) => `<option value="${this.escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`)
+        .join('');
+    }
+  }
+
+  private updateMapInfoCard(): void {
+    const card = document.getElementById('map-info-card');
+    if (!card) return;
+
+    const { name, data, factions } = this.getSelectedSetupMap();
+    if (!data) {
+      card.classList.add('hidden');
+      return;
+    }
+
+    const land = data.territories.filter(t => t.type !== 'sea').length;
+    const sea = data.territories.filter(t => t.type === 'sea').length;
+    const coastal = data.territories.filter(t => t.type === 'coastal').length;
+    const factories = data.territories.filter(t => t.hasFactory).length;
+    const startingUnits = (data.startingUnits ?? []).reduce((sum, s) => sum + s.units.reduce((inner, u) => inner + u.count, 0), 0);
+    const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
+    const navalTag = sea > 0 || coastal > 0 ? 'Naval routes' : 'Land focused';
+    const sizeTag = data.territories.length >= 80 ? 'Large map' : data.territories.length >= 40 ? 'Medium map' : 'Small map';
+
+    card.classList.remove('hidden');
+    card.innerHTML = `
+      <div class="map-info-title">${this.escapeHtml(name)}</div>
+      <div class="map-info-tags">
+        <span>${this.escapeHtml(sizeTag)}</span>
+        <span>${this.escapeHtml(navalTag)}</span>
+        <span>${playable.length} factions</span>
+      </div>
+      <div class="map-info-stats">
+        <span>${land} land</span>
+        <span>${sea} sea</span>
+        <span>${factories} factories</span>
+        <span>${startingUnits} units</span>
+      </div>
+      <div class="map-info-factions">
+        ${playable.map(f => `<span style="--faction-color:${this.escapeHtml(f.color)}">${this.escapeHtml(f.name)}</span>`).join('')}
+      </div>
+    `;
+  }
+
   private updateFactionInfoCard(factionId: string): void {
     const card = document.getElementById('faction-info-card');
     if (!card) return;
 
-    const faction = this.state.factionRegistry.get(factionId);
+    const faction = this.getSelectedSetupMap().factions.find(f => f.id === factionId);
     if (!faction || factionId === 'random') {
       card.style.display = 'none';
       return;
@@ -3328,7 +3675,7 @@ export class HUD {
     const uniqueUnit = this.state.unitRegistry.getAll().find(u => u.factionId === factionId);
 
     const bonusList: string[] = [];
-    const b = faction.bonuses;
+    const b = faction.bonuses ?? {};
     if (b.ipcPerFactory)           bonusList.push(`+${b.ipcPerFactory} IPC per factory`);
     if (b.incomeMultiplierBonus)   bonusList.push(`+${Math.round(b.incomeMultiplierBonus * 100)}% income`);
     if (b.infantryDefenseBonus)    bonusList.push(`Infantry defend at +${b.infantryDefenseBonus}`);
@@ -3362,6 +3709,7 @@ export class HUD {
     const mode = (document.getElementById('game-mode') as HTMLSelectElement | null)?.value ?? 'vs-ai';
     document.getElementById('hotseat-options')?.classList.toggle('hidden', mode !== 'hotseat');
     document.getElementById('vs-ai-options')?.classList.toggle('hidden', mode !== 'vs-ai');
+    this.updateMapInfoCard();
 
     const turnStyle = ((document.getElementById('turn-style') as HTMLSelectElement | null)?.value ?? 'quick') as TurnStyle;
     const turnDesc = document.getElementById('turn-style-description');
@@ -3375,19 +3723,32 @@ export class HUD {
     document.getElementById('victory-capitals-row')?.classList.toggle('hidden', victoryType !== 'capitals');
     document.getElementById('victory-domination-row')?.classList.toggle('hidden', victoryType !== 'domination');
     document.getElementById('victory-economic-row')?.classList.toggle('hidden', victoryType !== 'economic');
+    this.syncVictoryCapitalLimit();
 
     const factionId = (document.getElementById('player-faction') as HTMLSelectElement | null)?.value ?? 'atlantic_alliance';
     this.updateFactionInfoCard(factionId);
     this.updateSetupSummary();
   }
 
+  private syncVictoryCapitalLimit(): void {
+    const input = document.getElementById('victory-capitals') as HTMLInputElement | null;
+    if (!input) return;
+
+    const maxCapitals = getMaxCapturableCapitals(this.getSelectedSetupMap().factions);
+    const currentValue = parseInt(input.value || `${maxCapitals}`) || maxCapitals;
+    const normalized = normalizeCapitalsToWin(currentValue, this.getSelectedSetupMap().factions);
+    input.max = `${maxCapitals}`;
+    input.value = `${normalized}`;
+    input.title = `This map supports capturing up to ${maxCapitals} enemy capital${maxCapitals === 1 ? '' : 's'}.`;
+  }
+
   private updateSetupSummary(): void {
     const summary = document.getElementById('setup-summary');
     if (!summary) return;
 
-    const mapSelect = document.getElementById('map-select') as HTMLSelectElement | null;
-    const mapName = mapSelect?.selectedOptions[0]?.textContent?.trim() || 'Selected map';
-    const mapId = mapSelect?.value ?? 'grid';
+    const setupMap = this.getSelectedSetupMap();
+    const mapName = setupMap.name;
+    const mapId = setupMap.id;
     const unitEra = ((document.getElementById('unit-era') as HTMLSelectElement | null)?.value ?? 'wwii') as UnitEra;
     const mode = (document.getElementById('game-mode') as HTMLSelectElement | null)?.value ?? 'vs-ai';
     const turnStyle = ((document.getElementById('turn-style') as HTMLSelectElement | null)?.value ?? 'quick') as TurnStyle;
@@ -3406,8 +3767,13 @@ export class HUD {
       playerText = factionSelect?.selectedOptions[0]?.textContent?.trim() || 'Single player vs AI';
     }
 
+    const maxCapitals = getMaxCapturableCapitals(setupMap.factions);
+    const selectedCapitals = normalizeCapitalsToWin(
+      parseInt((document.getElementById('victory-capitals') as HTMLInputElement | null)?.value || `${maxCapitals}`) || maxCapitals,
+      setupMap.factions
+    );
     const victoryText = {
-      capitals: `Capture ${(document.getElementById('victory-capitals') as HTMLInputElement | null)?.value || '3'} capitals`,
+      capitals: `Capture ${selectedCapitals} enemy capital${selectedCapitals === 1 ? '' : 's'}`,
       domination: `Control ${(document.getElementById('victory-domination') as HTMLInputElement | null)?.value || '75'}% of territories`,
       economic: `Earn ${(document.getElementById('victory-economic') as HTMLInputElement | null)?.value || '500'} IPCs`,
       elimination: 'Eliminate every rival',
@@ -3420,6 +3786,10 @@ export class HUD {
     const recommended = mapId === 'grid' && unitEra === 'wwii' && mode === 'vs-ai' && turnStyle === 'quick'
       ? 'Recommended first game'
       : 'Custom setup';
+    const playableCount = setupMap.factions.filter(f => f.isPlayable).length;
+    const mapStats = setupMap.data
+      ? `${setupMap.data.territories.length} territories, ${playableCount} playable factions`
+      : `${playableCount} playable factions`;
 
     summary.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.35rem;">
@@ -3427,7 +3797,7 @@ export class HUD {
         <span style="color:#94a3b8;font-size:0.78rem;">${fogOfWar ? 'Fog on' : 'Fog off'} · ${autoSave ? 'Autosave on' : 'Autosave off'}</span>
       </div>
       <div>${mapName} · ${UNIT_ERA_INFO[unitEra]?.name ?? unitEra} · ${TURN_STYLE_INFO[turnStyle]?.name ?? turnStyle}</div>
-      <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText}</div>
+      <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText} · ${mapStats}</div>
     `;
   }
 
@@ -4015,11 +4385,7 @@ export class HUD {
     });
 
     if (result.winner) {
-      this.events.emit('gameOver', {
-        winner: result.winner,
-        reason: result.reason
-      });
-      this.victoryScreen.show({ winner: result.winner });
+      this.handleVictory({ winner: result.winner });
     }
   }
 
@@ -4098,6 +4464,183 @@ export class HUD {
     return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
   }
 
+  private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {
+    const best = this.mobilizationSystem.getMobilizationOptions()
+      .filter(o => o.canMobilize)
+      .sort((a, b) => {
+        const aThreat = this.getTopThreats(a.territory.owner ?? '')[0]?.territoryId === a.territory.id ? 5 : 0;
+        const bThreat = this.getTopThreats(b.territory.owner ?? '')[0]?.territoryId === b.territory.id ? 5 : 0;
+        const aValue = aThreat + (a.territory.isCapital ? 10 : 0) + (a.territory.hasFactory ? 7 : 0) + a.territory.production + a.units.reduce((s, u) => s + u.count, 0);
+        const bValue = bThreat + (b.territory.isCapital ? 10 : 0) + (b.territory.hasFactory ? 7 : 0) + b.territory.production + b.units.reduce((s, u) => s + u.count, 0);
+        return bValue - aValue || a.cost - b.cost;
+      })[0];
+
+    if (!best) return null;
+    return {
+      territoryId: best.territory.id,
+      label: `Mobilize ${best.territory.name}`,
+      detail: `${best.type} package, ${best.cost} IPC`,
+    };
+  }
+
+  private getBestMovementSource(factionId: string): { territoryId: string; label: string; detail: string; attacks: number; moves: number } | null {
+    const phase = this.state.currentPhase;
+    const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+    const candidates: Array<{ territoryId: string; label: string; detail: string; attacks: number; moves: number; score: number }> = [];
+
+    for (const territory of this.state.territories.values()) {
+      if (territory.owner !== factionId || territory.isSea()) continue;
+
+      const moveTargets = new Set<string>();
+      const attackTargets = new Set<string>();
+      let readyUnits = 0;
+      let attackPower = 0;
+
+      for (const unit of territory.units) {
+        const ready = territory.getAvailableUnitCount(unit.unitTypeId);
+        if (ready <= 0) continue;
+        readyUnits += ready;
+        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
+        attackPower += ready * (unitType?.attack ?? 0);
+
+        for (const move of this.movementValidator.getValidMoves(unit.unitTypeId, territory.id, allowAttacks)) {
+          if (move.isAttack) attackTargets.add(move.territoryId);
+          else moveTargets.add(move.territoryId);
+        }
+      }
+
+      const attacks = attackTargets.size;
+      const moves = moveTargets.size;
+      if (readyUnits === 0 || (attacks + moves) === 0) continue;
+      const strongestTarget = Array.from(attackTargets)
+        .map(id => this.state.territories.get(id))
+        .filter((t): t is NonNullable<typeof t> => !!t)
+        .sort((a, b) => (b.production + (b.hasFactory ? 4 : 0) + (b.isCapital ? 8 : 0)) - (a.production + (a.hasFactory ? 4 : 0) + (a.isCapital ? 8 : 0)))[0];
+
+      candidates.push({
+        territoryId: territory.id,
+        label: attacks > 0 ? `Inspect attack from ${territory.name}` : `Move from ${territory.name}`,
+        detail: attacks > 0
+          ? `${readyUnits} ready units, ${attacks} attack target${attacks === 1 ? '' : 's'}${strongestTarget ? `, best: ${strongestTarget.name}` : ''}`
+          : `${readyUnits} ready units, ${moves} move target${moves === 1 ? '' : 's'}`,
+        attacks,
+        moves,
+        score: attacks * 8 + moves + attackPower,
+      });
+    }
+
+    return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
+  }
+
+  private getTurnCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
+    headline: string;
+    detail: string;
+    primaryLabel: string;
+    primaryAction: string;
+    territoryId?: string;
+    secondaryLabel?: string;
+    secondaryAction?: string;
+  } {
+    const phase = this.state.currentPhase as string;
+
+    if (['purchase', 'production', 'build'].includes(phase)) {
+      const target = this.getBestMobilizationTarget();
+      if (target) {
+        return {
+          headline: target.label,
+          detail: target.detail,
+          primaryLabel: 'Focus',
+          primaryAction: 'focus-territory',
+          territoryId: target.territoryId,
+          secondaryLabel: 'Objectives',
+          secondaryAction: 'show-objectives',
+        };
+      }
+      return {
+        headline: 'No affordable mobilization',
+        detail: `Keep ${faction.ipcs} IPCs or advance to movement.`,
+        primaryLabel: 'Objectives',
+        primaryAction: 'show-objectives',
+      };
+    }
+
+    if (['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase)) {
+      const selected = this.state.getSelectedTerritory();
+      const selectedReady = selected?.owner === faction.id
+        ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
+        : 0;
+      const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
+
+      if (source && 'id' in source) {
+        return {
+          headline: `Use ${source.name}`,
+          detail: `${selectedReady} ready unit${selectedReady === 1 ? '' : 's'} selected. Green is movement, red is attack.`,
+          primaryLabel: 'Range',
+          primaryAction: 'range-overlay',
+          territoryId: source.id,
+          secondaryLabel: 'Threats',
+          secondaryAction: 'threat-overlay',
+        };
+      }
+      if (source) {
+        return {
+          headline: source.label,
+          detail: source.detail,
+          primaryLabel: 'Focus',
+          primaryAction: 'focus-territory',
+          territoryId: source.territoryId,
+          secondaryLabel: 'Threats',
+          secondaryAction: 'threat-overlay',
+        };
+      }
+      return {
+        headline: 'No ready movement',
+        detail: 'All available units have acted or no legal destinations are open.',
+        primaryLabel: 'Threats',
+        primaryAction: 'threat-overlay',
+      };
+    }
+
+    if (['combat', 'attack', 'resolve'].includes(phase)) {
+      const battles = this.state.pendingMoves.length;
+      return {
+        headline: battles > 0 ? 'Resolve queued battles' : 'No battles queued',
+        detail: battles > 0 ? `${battles} battle${battles === 1 ? '' : 's'} waiting in combat resolution.` : 'Advance when ready.',
+        primaryLabel: 'Threats',
+        primaryAction: 'threat-overlay',
+      };
+    }
+
+    const income = this.state.calculateIncome(faction.id);
+    return {
+      headline: ['collect_income', 'end'].includes(phase) ? `Collect +${income} IPC` : 'Check the board',
+      detail: ['collect_income', 'end'].includes(phase) ? 'End the turn after income resolves.' : 'Use objectives and threat overlay to decide your next commitment.',
+      primaryLabel: 'Objectives',
+      primaryAction: 'show-objectives',
+      secondaryLabel: 'Threats',
+      secondaryAction: 'threat-overlay',
+    };
+  }
+
+  private runAdvisorAction(action: string, territoryId?: string): void {
+    if (territoryId) {
+      this.renderer.centerOnTerritory(territoryId);
+      this.state.selectTerritory(territoryId);
+    }
+
+    if (action === 'range-overlay') {
+      this.overlayController.setMode('range');
+      this.showToast('Movement and attack range shown', 'info');
+    } else if (action === 'threat-overlay') {
+      this.overlayController.setMode('threat');
+      this.showToast('Threat overlay shown', 'info');
+    } else if (action === 'show-objectives') {
+      this.updateObjectivesPanel();
+      document.getElementById('objectives-panel')?.classList.remove('hidden');
+    }
+    this.updateMapReadabilityLegend();
+  }
+
   private updateStrategicAdvisor(): void {
     let panel = document.getElementById('strategic-advisor-panel');
     if (!panel) {
@@ -4116,6 +4659,7 @@ export class HUD {
     const topOpportunity = this.getOpportunityTargets(faction.id)[0];
     const activeObjective = this.objectiveSystem.getActive(faction.id)[0];
     const income = this.state.calculateIncome(faction.id);
+    const coach = this.getTurnCoach(faction);
     const threatLine = topThreat
       ? `${this.state.territories.get(topThreat.territoryId)?.name ?? topThreat.territoryId}: gap ${Math.ceil(topThreat.defenseGap)}`
       : 'No immediate front-line pressure.';
@@ -4137,12 +4681,26 @@ export class HUD {
         <div class="advisor-row"><span>Danger</span><strong>${this.escapeHtml(threatLine)}</strong></div>
         <div class="advisor-row"><span>Opportunity</span><strong>${this.escapeHtml(opportunityLine)}</strong></div>
         <div class="advisor-row"><span>Economy</span><strong>${faction.ipcs} IPC, +${income}/turn</strong></div>
+        <div class="advisor-next-action">
+          <span>Next</span>
+          <strong>${this.escapeHtml(coach.headline)}</strong>
+          <small>${this.escapeHtml(coach.detail)}</small>
+          <div class="advisor-actions">
+            <button data-advisor-action="${this.escapeHtml(coach.primaryAction)}"${coach.territoryId ? ` data-territory-id="${this.escapeHtml(coach.territoryId)}"` : ''}>${this.escapeHtml(coach.primaryLabel)}</button>
+            ${coach.secondaryAction && coach.secondaryLabel ? `<button data-advisor-action="${this.escapeHtml(coach.secondaryAction)}"${coach.territoryId ? ` data-territory-id="${this.escapeHtml(coach.territoryId)}"` : ''}>${this.escapeHtml(coach.secondaryLabel)}</button>` : ''}
+          </div>
+        </div>
         <div class="advisor-advice">${this.escapeHtml(this.getMobilizationAdvice())}</div>
       </div>
     `;
 
     panel.querySelector('#btn-advisor-collapse')?.addEventListener('click', () => {
       panel?.classList.toggle('collapsed');
+    });
+    panel.querySelectorAll<HTMLButtonElement>('[data-advisor-action]').forEach(button => {
+      button.addEventListener('click', () => {
+        this.runAdvisorAction(button.dataset.advisorAction ?? '', button.dataset.territoryId);
+      });
     });
   }
 

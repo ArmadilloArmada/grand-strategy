@@ -31,6 +31,8 @@ export interface BattlePreviewStats {
   riskLabel: string;
   riskClass: 'good' | 'even' | 'bad';
   riskDetail: string;
+  commitmentAdvice: string;
+  swingFactors: string[];
 }
 
 export class CombatUI {
@@ -586,14 +588,20 @@ export class CombatUI {
     const attackerUnitsEl = document.getElementById('preview-attacker-units');
     let attackPower = 0;
     let attackerHtml = '';
+    const readyAttackers: { unitTypeId: string; count: number }[] = [];
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
-        if (pu.unitTypeId === 'artillery') artilleryCount += pu.count;
-        if (pu.unitTypeId === 'infantry') infantryCount += pu.count;
+        const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
+        if (readyCount <= 0) continue;
+        readyAttackers.push({ unitTypeId: pu.unitTypeId, count: readyCount });
+        if (pu.unitTypeId === 'artillery') artilleryCount += readyCount;
+        if (pu.unitTypeId === 'infantry') infantryCount += readyCount;
         const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
-        attackerHtml += `<div>${icon} ${pu.count}× ${unitType.name} <small style="color:#666">(Atk:${unitType.attack} Move:${unitType.movement})</small></div>`;
-        attackPower += pu.count * unitType.attack;
+        const actedCount = pu.count - readyCount;
+        const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
+        attackerHtml += `<div>${icon} ${readyCount}× ${unitType.name}${actedText} <small style="color:#666">(Atk:${unitType.attack} Move:${unitType.movement})</small></div>`;
+        attackPower += readyCount * unitType.attack;
       }
     }
     const boostedInfantry = Math.min(artilleryCount, infantryCount);
@@ -625,7 +633,7 @@ export class CombatUI {
       effectiveDefense += defenderUnitCount;
     }
 
-    const previewStats = this.calculateBattlePreviewStats(fromTerritory.units, toTerritory.units, attackPower, defensePower, effectiveDefense);
+    const previewStats = this.calculateBattlePreviewStats(readyAttackers, toTerritory.units, attackPower, defensePower, effectiveDefense);
     const attackPowerEl = document.getElementById('preview-attacker-power');
     if (attackPowerEl) {
       attackPowerEl.innerHTML = `Attack Power: ${previewStats.attackPower}<br><small>Expected hits: ${previewStats.expectedAttackerHits.toFixed(1)}</small>`;
@@ -650,6 +658,7 @@ export class CombatUI {
       summaryEl.innerHTML = `
         <strong>${previewStats.riskLabel}</strong>
         <span>${previewStats.riskDetail}</span>
+        <small>${previewStats.commitmentAdvice}</small>
       `;
     }
 
@@ -661,6 +670,17 @@ export class CombatUI {
     }
     consequenceEl.className = `preview-consequence-summary ${previewStats.riskClass}`;
     consequenceEl.innerHTML = this.buildBattleConsequenceSummary(fromId, toId, previewStats);
+
+    let factorsEl = document.getElementById('preview-swing-factors');
+    if (!factorsEl) {
+      factorsEl = document.createElement('div');
+      factorsEl.id = 'preview-swing-factors';
+      consequenceEl.after(factorsEl);
+    }
+    factorsEl.className = 'preview-swing-factors';
+    factorsEl.innerHTML = previewStats.swingFactors.length > 0
+      ? previewStats.swingFactors.map(factor => `<span>${factor}</span>`).join('')
+      : '<span>No special modifiers spotted.</span>';
   }
 
   private buildBattleConsequenceSummary(fromId: string, toId: string, stats: BattlePreviewStats): string {
@@ -739,6 +759,22 @@ export class CombatUI {
       if (riskClass === 'even') riskClass = 'bad';
     }
 
+    const likelyAttackerLosses = Math.min(attackerUnitCount, Math.max(0, Math.round(expectedDefenderHits)));
+    const likelyDefenderLosses = Math.min(defenderUnitCount, Math.max(0, Math.round(expectedAttackerHits)));
+    const commitmentAdvice = riskClass === 'good'
+      ? `Commit if the follow-up hold is covered. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`
+      : riskClass === 'bad'
+        ? `Avoid unless the target is decisive or reinforced. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`
+        : `Caution: this can trade either way. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`;
+
+    const swingFactors: string[] = [];
+    if (defenderUnitCount === 0) swingFactors.push('No defenders');
+    if (effectiveDefense > defensePower) swingFactors.push(`Defense bonus +${effectiveDefense - defensePower}`);
+    if (expectedAttackerHits >= defenderUnitCount && defenderUnitCount > 0) swingFactors.push('Possible one-round clear');
+    if (expectedDefenderHits >= attackerUnitCount && attackerUnitCount > 0) swingFactors.push('Attack force could be wiped');
+    if (attackPower >= effectiveDefense * 2 && defenderUnitCount > 0) swingFactors.push('Power advantage');
+    if (attackPower < effectiveDefense && defenderUnitCount > 0) swingFactors.push('Power disadvantage');
+
     return {
       attackPower,
       defensePower,
@@ -751,6 +787,8 @@ export class CombatUI {
       riskLabel,
       riskClass,
       riskDetail,
+      commitmentAdvice,
+      swingFactors,
     };
   }
 
@@ -784,14 +822,16 @@ export class CombatUI {
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
-        const answer = prompt(`How many ${unitType.name} should attack?`, String(pu.count));
+        const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
+        if (availableCount <= 0) continue;
+        const answer = prompt(`How many ${unitType.name} should attack?`, String(availableCount));
         if (answer === null) {
           this.callbacks.showToast('Attack cancelled', 'info');
           return;
         }
         const parsed = Number(answer);
         const count = Number.isFinite(parsed)
-          ? Math.max(0, Math.min(pu.count, Math.floor(parsed)))
+          ? Math.max(0, Math.min(availableCount, Math.floor(parsed)))
           : 0;
         if (count > 0) {
           attackingUnits.push({ unitTypeId: pu.unitTypeId, count, veteranCount: pu.veteranCount ?? 0 });

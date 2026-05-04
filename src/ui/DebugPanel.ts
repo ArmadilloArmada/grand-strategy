@@ -15,10 +15,31 @@
 import { GameState } from '../engine/GameState';
 import { TurnManager } from '../engine/TurnManager';
 
+interface AIDebugPlanView {
+  targetName: string;
+  expectedSuccess: number;
+  strategicValue: number;
+  minSuccess: number;
+  attackPower: number;
+  defenseStrength: number;
+  attackers: { fromName: string; unitTypeId: string; count: number }[];
+  status: 'chosen' | 'rejected';
+  reason: string;
+}
+
+interface AIDebugView {
+  factionName: string;
+  personality: string;
+  phase: string;
+  plans: AIDebugPlanView[];
+  chosenCount: number;
+}
+
 export class DebugPanel {
   private panel: HTMLElement;
   private visible: boolean = false;
   private eventLog: { type: string; time: string; data: string }[] = [];
+  private aiDebug: AIDebugView | null = null;
   private frameCount: number = 0;
   private fps: number = 0;
   private lastFpsTime: number = performance.now();
@@ -108,6 +129,12 @@ export class DebugPanel {
         </div>
       </div>
 
+      <!-- AI tuning -->
+      <div style="margin-bottom:10px">
+        <div style="color:#ffcc00;margin-bottom:4px;font-size:11px;text-transform:uppercase">AI Decisions</div>
+        <div id="dbg-ai" style="font-size:10px;line-height:1.45;max-height:220px;overflow-y:auto;color:#aaa;border:1px solid #00ff8833;padding:6px;background:#001108"></div>
+      </div>
+
       <!-- Event log -->
       <div>
         <div style="color:#ffcc00;margin-bottom:4px;font-size:11px;text-transform:uppercase">Event Log (last 20)</div>
@@ -185,6 +212,7 @@ export class DebugPanel {
     this.renderState();
     this.renderFactions();
     this.renderUnitSelect();
+    this.renderAIDebug();
     this.renderLog();
   }
 
@@ -239,12 +267,53 @@ export class DebugPanel {
 
   // ── Event subscription ────────────────────────────────────────────────────
 
+  private renderAIDebug(): void {
+    const el = document.getElementById('dbg-ai');
+    if (!el) return;
+    if (!this.aiDebug) {
+      el.innerHTML = '<span style="color:#555">No AI planning snapshot yet. End a turn and let an AI move.</span>';
+      return;
+    }
+
+    const rows = this.aiDebug.plans.slice(0, 12).map(plan => {
+      const color = plan.status === 'chosen' ? '#66ff99' : '#ff9977';
+      const attackers = plan.attackers
+        .map(att => `${att.count}x ${att.unitTypeId} from ${att.fromName}`)
+        .join(', ');
+      return `
+        <div style="border-top:1px solid #00ff8822;padding:5px 0">
+          <div><span style="color:${color};font-weight:bold">${plan.status.toUpperCase()}</span> <span style="color:#fff">${this.escapeHtml(plan.targetName)}</span></div>
+          <div>odds ${Math.round(plan.expectedSuccess * 100)}% / min ${Math.round(plan.minSuccess * 100)}% · value ${Math.round(plan.strategicValue)} · power ${Math.round(plan.attackPower)} vs ${Math.round(plan.defenseStrength)}</div>
+          <div style="color:#ddd">${this.escapeHtml(plan.reason)}</div>
+          <div style="color:#777">${this.escapeHtml(attackers || 'no attackers')}</div>
+        </div>
+      `;
+    }).join('');
+
+    el.innerHTML = `
+      <div style="margin-bottom:5px;color:#fff">
+        ${this.escapeHtml(this.aiDebug.factionName)} · ${this.escapeHtml(this.aiDebug.personality)} · ${this.escapeHtml(this.aiDebug.phase)}
+      </div>
+      <div style="margin-bottom:5px;color:#88ff88">${this.aiDebug.chosenCount} chosen / ${this.aiDebug.plans.length} considered</div>
+      ${rows || '<span style="color:#ff9977">No attack plans considered.</span>'}
+    `;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   private subscribeToGameEvents(): void {
     const ALL_EVENTS = [
       'state_loaded', 'turn_start', 'turn_end', 'phase_start', 'phase_end',
       'territory_selected', 'units_moved', 'combat_start', 'combat_round',
       'combat_end', 'territory_mobilized', 'units_produced', 'income_collected',
-      'faction_defeated', 'victory', 'tech_researched', 'ai_thinking',
+      'faction_defeated', 'victory', 'tech_researched', 'ai_thinking', 'ai_debug',
       'strategic_bombing', 'naval_bombardment', 'reserve_updated', 'units_deployed',
       'game_event', 'diplomacy_proposal', 'diplomacy_accepted', 'diplomacy_declined',
       'nuclear_strike', 'alliance_betrayed', 'espionage_result',
@@ -252,6 +321,9 @@ export class DebugPanel {
 
     for (const eventType of ALL_EVENTS) {
       this.state.on(eventType, (event) => {
+        if (event.type === 'ai_debug') {
+          this.aiDebug = event.data as AIDebugView;
+        }
         const now = new Date();
         const time = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
         let data = '';

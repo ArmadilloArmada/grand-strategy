@@ -29,6 +29,7 @@ export class MapRenderer {
   
   // Interaction state
   private isDragging: boolean = false;
+  private didDrag: boolean = false;
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
   private hoveredTerritoryId: string | null = null;
@@ -60,6 +61,14 @@ export class MapRenderer {
 
   // RAF-based render debouncing: coalesce multiple render() calls into one per frame
   private renderPending: boolean = false;
+
+  // Two-layer rendering: static offscreen cache + dynamic per-frame overlay
+  private staticCanvas: HTMLCanvasElement | null = null;
+  private staticCtx: CanvasRenderingContext2D | null = null;
+  private staticDirty: boolean = true;
+  private staticLastScale: number = -1;
+  private staticLastOffsetX: number = -1;
+  private staticLastOffsetY: number = -1;
 
   // Render options
   private options: RenderOptions = {
@@ -102,8 +111,16 @@ export class MapRenderer {
     this.setupEventListeners();
 
     // Re-render whenever units are placed so AI mobilizations are visible immediately
-    this.state.on('territory_mobilized', () => this.render());
-    this.state.on('units_produced', () => this.render());
+    this.state.on('territory_mobilized', () => { this.staticDirty = true; this.render(); });
+    this.state.on('units_produced', () => { this.staticDirty = true; this.render(); });
+
+    // Invalidate static cache when game state changes visual appearance
+    const dirtyCb = () => { this.staticDirty = true; };
+    this.state.on('combat_end', dirtyCb);
+    this.state.on('fortification_built', dirtyCb);
+    this.state.on('espionage_result', dirtyCb);
+    this.state.on('units_moved', dirtyCb);
+    this.state.on('turn_start', dirtyCb);
   }
 
   /**
@@ -116,6 +133,7 @@ export class MapRenderer {
       this.height = window.innerHeight - 40;
       this.canvas.width = this.width;
       this.canvas.height = this.height;
+      this.staticDirty = true;
       this.render();
     };
 
@@ -130,6 +148,8 @@ export class MapRenderer {
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
+    window.addEventListener('mousemove', this.onWindowMouseMove.bind(this));
+    window.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('click', this.onClick.bind(this));
     this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
@@ -151,6 +171,10 @@ export class MapRenderer {
 
   setAdjacentFogCallback(callback: (territoryId: string) => boolean): void {
     this.options.adjacentFogCallback = callback;
+  }
+
+  markStaticDirty(): void {
+    this.staticDirty = true;
   }
 
   setTerritoryHoverCallback(callback: (territoryId: string | null, clientX: number, clientY: number) => void): void {
@@ -236,20 +260,27 @@ export class MapRenderer {
   private drawFrame(): void {
     if (this.state.territories.size === 0) return;
 
-    this.ctx.clearRect(0, 0, this.width, this.height);
-    this.drawBackground();
+    // Rebuild static layer when dirty or when camera moved since last build
+    const cameraChanged = this.scale !== this.staticLastScale
+      || this.offsetX !== this.staticLastOffsetX
+      || this.offsetY !== this.staticLastOffsetY;
+    if (this.staticDirty || cameraChanged) {
+      this.rebuildStaticLayer();
+    }
 
+    // Blit the cached static layer onto the main canvas
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    if (this.staticCanvas) {
+      this.ctx.drawImage(this.staticCanvas, 0, 0);
+    }
+
+    // Draw dynamic layer: interaction highlights, animations, map overlays
     this.ctx.save();
     this.ctx.translate(this.offsetX, this.offsetY);
     this.ctx.scale(this.scale, this.scale);
 
-    this.drawSeaZones();
-    this.drawLandTerritories();
-    this.drawBorders();
-
-    if (this.options.showUnitCounts) this.drawUnitTokens();
-
-    this.drawMarkers();
+    this.drawDynamicTerritoryOverlays();
+    this.drawSelectionGlow();
 
     if (this.overlayMode === 'economic') {
       this.drawEconomicOverlay();
@@ -319,11 +350,23 @@ export class MapRenderer {
   private drawBackground(): void {
     // Parchment base — diagonal gradient for aged-paper warmth
     const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height);
-    gradient.addColorStop(0,   '#d8c88a');
-    gradient.addColorStop(0.4, '#cfc090');
-    gradient.addColorStop(1,   '#bfae78');
+    gradient.addColorStop(0, '#243a5e');
+    gradient.addColorStop(0.55, '#1e3252');
+    gradient.addColorStop(1, '#14243d');
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, this.width, this.height);
+
+    this.ctx.save();
+    this.ctx.strokeStyle = 'rgba(180, 210, 255, 0.08)';
+    this.ctx.lineWidth = 1;
+    const spacing = 18;
+    for (let x = -this.height; x < this.width + this.height; x += spacing) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, 0);
+      this.ctx.lineTo(x + this.height, this.height);
+      this.ctx.stroke();
+    }
+    this.ctx.restore();
 
     // Edge vignette — makes it feel like a real map on a table
     const vignette = this.ctx.createRadialGradient(
@@ -331,7 +374,7 @@ export class MapRenderer {
       this.width / 2, this.height / 2, Math.max(this.width, this.height) * 0.85
     );
     vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(30,18,8,0.38)');
+    vignette.addColorStop(1, 'rgba(2,8,20,0.46)');
     this.ctx.fillStyle = vignette;
     this.ctx.fillRect(0, 0, this.width, this.height);
   }
@@ -403,61 +446,13 @@ export class MapRenderer {
     }
     this.ctx.closePath();
 
-    // Determine fill color
-    let fillColor = this.getTerritoryColor(territory, isSea);
-    
+    // Determine fill color (base only — dynamic highlights are drawn as overlays in drawDynamicTerritoryOverlays)
+    const fillColor = this.getTerritoryColor(territory, isSea);
+
     // Check fog of war
-    const isVisible = this.options.fogOfWarCallback 
-      ? this.options.fogOfWarCallback(territory.id) 
+    const isVisible = this.options.fogOfWarCallback
+      ? this.options.fogOfWarCallback(territory.id)
       : true;
-    
-    // Highlight effects
-    const isSelected = territory.id === this.state.selectedTerritoryId;
-    const isHovered = territory.id === this.hoveredTerritoryId;
-    
-    if (this.options.highlightSelected && isSelected) {
-      fillColor = this.lightenColor(fillColor, 40);
-    } else if (isHovered) {
-      fillColor = this.lightenColor(fillColor, 20);
-    }
-
-    // Valid move highlight
-    if (this.options.highlightValidMoves) {
-      if (this.attackTargets.has(territory.id)) {
-        fillColor = this.blendColors(fillColor, '#ff4444', 0.5);
-      } else if (this.validMoveTargets.has(territory.id)) {
-        fillColor = this.blendColors(fillColor, '#44ff44', 0.4);
-      }
-    }
-
-    // Mobilization highlight (build phase)
-    if (this.mobilizedTargets.has(territory.id)) {
-      // Already mobilized - green tint
-      fillColor = this.blendColors(fillColor, '#22c55e', 0.35);
-    } else if (this.mobilizableTargets.has(territory.id)) {
-      // Can mobilize - gold pulsing tint
-      fillColor = this.blendColors(fillColor, '#ffd700', 0.25);
-    }
-
-    // ZOC tint: land territories in enemy Zone of Control get a subtle orange overlay.
-    // Only shown when valid-move highlighting is active so it doesn't clutter idle view.
-    if (!isSea && this.options.highlightValidMoves
-        && !this.attackTargets.has(territory.id)
-        && !this.validMoveTargets.has(territory.id)) {
-      const currentFaction = this.state.getCurrentFaction();
-      if (currentFaction) {
-        const inZOC = territory.adjacentTo.some(adjId => {
-          const adj = this.state.territories.get(adjId);
-          return adj && adj.type !== 'sea'
-            && adj.owner !== null
-            && currentFaction.isEnemyOf(adj.owner)
-            && adj.getTotalUnitCount() > 0;
-        });
-        if (inZOC) {
-          fillColor = this.blendColors(fillColor, '#ff6600', 0.22);
-        }
-      }
-    }
 
     // Fill gradient — sea gets a depth gradient, land gets a top-lit shading
     const [cx, cy] = territory.center;
@@ -479,38 +474,6 @@ export class MapRenderer {
     // Terrain texture overlay — clipped to polygon, drawn before capture animation
     if (!isSea) {
       this.drawTerrainTexture(polygon, territory.terrain ?? 'plains');
-    }
-
-    // Capture color-bleed: faction color pulses in then out over 1.5s
-    const captureAnim = !isSea ? this.captureAnimations.get(territory.id) : undefined;
-    if (captureAnim) {
-      const progress = Math.min(1, (Date.now() - captureAnim.startTime) / 1600);
-      const alpha = Math.sin(progress * Math.PI) * 0.55;
-      this.ctx.save();
-      this.ctx.beginPath();
-      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
-      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
-      this.ctx.closePath();
-      this.ctx.globalAlpha = alpha;
-      this.ctx.fillStyle = captureAnim.factionColor;
-      this.ctx.fill();
-      this.ctx.restore();
-    }
-
-    // AI activity shimmer: teal pulse on territories the AI is currently acting on
-    const aiPulseStart = !isSea ? this.aiPulseTerritories.get(territory.id) : undefined;
-    if (aiPulseStart !== undefined) {
-      const progress = Math.min(1, (Date.now() - aiPulseStart) / 1800);
-      const alpha = Math.sin(progress * Math.PI) * 0.38;
-      this.ctx.save();
-      this.ctx.beginPath();
-      this.ctx.moveTo(polygon[0][0], polygon[0][1]);
-      for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
-      this.ctx.closePath();
-      this.ctx.globalAlpha = alpha;
-      this.ctx.fillStyle = '#00d2b8';
-      this.ctx.fill();
-      this.ctx.restore();
     }
 
     // Fog of war: draw a dark overlay polygon on top of hidden territories
@@ -592,7 +555,6 @@ export class MapRenderer {
       const polygon = territory.polygon;
       if (polygon.length < 3) continue;
 
-      const isSelected = territory.id === this.state.selectedTerritoryId;
       this.ctx.setLineDash([]);
 
       if (territory.isSea()) {
@@ -605,18 +567,7 @@ export class MapRenderer {
         continue;
       }
 
-      // Selected: animated gold glow that pulses in width and opacity
-      if (isSelected) {
-        const pulse = (Math.sin(Date.now() / 280) + 1) / 2; // 0→1 over ~1.76s
-        tracePath(polygon);
-        this.ctx.strokeStyle = `rgba(220, 170, 30, ${0.65 + pulse * 0.35})`;
-        this.ctx.lineWidth = 3 + pulse * 2.5;
-        this.ctx.shadowColor = '#ffd700';
-        this.ctx.shadowBlur = 8 + pulse * 10;
-        this.ctx.stroke();
-        this.ctx.shadowBlur = 0;
-        continue;
-      }
+      // Selected glow is drawn dynamically by drawSelectionGlow(); here just draw the base border.
 
       // Owned territory: dark thin base stroke first, then faction color on top
       const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
@@ -639,6 +590,28 @@ export class MapRenderer {
         this.ctx.stroke();
       }
     }
+  }
+
+  /** Draw the animated selection glow on the currently selected territory (dynamic layer only). */
+  private drawSelectionGlow(): void {
+    const id = this.state.selectedTerritoryId;
+    if (!id) return;
+    const territory = this.state.territories.get(id);
+    if (!territory || territory.isSea()) return;
+    const polygon = territory.polygon;
+    if (polygon.length < 3) return;
+
+    const pulse = (Math.sin(Date.now() / 280) + 1) / 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+    for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+    this.ctx.closePath();
+    this.ctx.strokeStyle = `rgba(220, 170, 30, ${0.65 + pulse * 0.35})`;
+    this.ctx.lineWidth = 3 + pulse * 2.5;
+    this.ctx.shadowColor = '#ffd700';
+    this.ctx.shadowBlur = 8 + pulse * 10;
+    this.ctx.stroke();
+    this.ctx.shadowBlur = 0;
   }
 
   /**
@@ -1018,6 +991,144 @@ export class MapRenderer {
   }
 
   /**
+   * Draw per-interaction and per-animation overlays on top of the static layer.
+   * Called every frame during the animation loop — must be cheap.
+   */
+  private drawDynamicTerritoryOverlays(): void {
+    const selectedId = this.state.selectedTerritoryId;
+    const currentFaction = this.state.getCurrentFaction();
+
+    for (const territory of this.state.territories.values()) {
+      const polygon = territory.polygon;
+      if (polygon.length < 3) continue;
+      const isSea = territory.isSea();
+
+      // Determine fill overlay color for this territory
+      let overlayColor: string | null = null;
+
+      const isSelected = territory.id === selectedId;
+      const isHovered = territory.id === this.hoveredTerritoryId;
+
+      if (this.options.highlightSelected && isSelected) {
+        overlayColor = 'rgba(255,255,255,0.18)';
+      } else if (isHovered) {
+        overlayColor = 'rgba(255,255,255,0.10)';
+      }
+
+      if (!isSea && this.options.highlightValidMoves) {
+        if (this.attackTargets.has(territory.id)) {
+          overlayColor = 'rgba(255,68,68,0.50)';
+        } else if (this.validMoveTargets.has(territory.id)) {
+          overlayColor = 'rgba(68,255,68,0.40)';
+        }
+      }
+
+      if (!isSea) {
+        if (this.mobilizedTargets.has(territory.id)) {
+          overlayColor = 'rgba(34,197,94,0.35)';
+        } else if (this.mobilizableTargets.has(territory.id)) {
+          overlayColor = 'rgba(255,215,0,0.25)';
+        }
+      }
+
+      // ZOC tint for non-move, non-attack land territories when move-highlights active
+      if (!isSea && this.options.highlightValidMoves && currentFaction
+          && !this.attackTargets.has(territory.id)
+          && !this.validMoveTargets.has(territory.id)) {
+        const inZOC = territory.adjacentTo.some(adjId => {
+          const adj = this.state.territories.get(adjId);
+          return adj && adj.type !== 'sea'
+            && adj.owner !== null
+            && currentFaction.isEnemyOf(adj.owner)
+            && adj.getTotalUnitCount() > 0;
+        });
+        if (inZOC) overlayColor = 'rgba(255,102,0,0.22)';
+      }
+
+      if (overlayColor) {
+        this.ctx.fillStyle = overlayColor;
+        this.ctx.beginPath();
+        this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+        for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+        this.ctx.closePath();
+        this.ctx.fill();
+      }
+
+      // Capture color-bleed animation
+      const captureAnim = !isSea ? this.captureAnimations.get(territory.id) : undefined;
+      if (captureAnim) {
+        const progress = Math.min(1, (Date.now() - captureAnim.startTime) / 1600);
+        const alpha = Math.sin(progress * Math.PI) * 0.55;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+        for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+        this.ctx.closePath();
+        this.ctx.globalAlpha = alpha;
+        this.ctx.fillStyle = captureAnim.factionColor;
+        this.ctx.fill();
+        this.ctx.restore();
+      }
+
+      // AI activity shimmer
+      const aiPulseStart = !isSea ? this.aiPulseTerritories.get(territory.id) : undefined;
+      if (aiPulseStart !== undefined) {
+        const progress = Math.min(1, (Date.now() - aiPulseStart) / 1800);
+        const alpha = Math.sin(progress * Math.PI) * 0.38;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+        for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+        this.ctx.closePath();
+        this.ctx.globalAlpha = alpha;
+        this.ctx.fillStyle = '#00d2b8';
+        this.ctx.fill();
+        this.ctx.restore();
+      }
+    }
+  }
+
+  /** Rebuild the static offscreen layer. Called when staticDirty or camera changes. */
+  private rebuildStaticLayer(): void {
+    if (!this.staticCanvas) {
+      this.staticCanvas = document.createElement('canvas');
+      const sCtx = this.staticCanvas.getContext('2d');
+      if (!sCtx) return;
+      this.staticCtx = sCtx;
+    }
+    if (this.staticCanvas.width !== this.width || this.staticCanvas.height !== this.height) {
+      this.staticCanvas.width = this.width;
+      this.staticCanvas.height = this.height;
+    }
+
+    // Swap to offscreen context for the static draw pass
+    const mainCtx = this.ctx;
+    this.ctx = this.staticCtx!;
+
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.drawBackground();
+
+    this.ctx.save();
+    this.ctx.translate(this.offsetX, this.offsetY);
+    this.ctx.scale(this.scale, this.scale);
+
+    this.drawSeaZones();
+    this.drawLandTerritories();
+    this.drawBorders();
+    if (this.options.showUnitCounts) this.drawUnitTokens();
+    this.drawMarkers();
+
+    this.ctx.restore();
+
+    // Restore main context and mark static clean
+    this.ctx = mainCtx;
+    this.staticDirty = false;
+    this.staticLastScale = this.scale;
+    this.staticLastOffsetX = this.offsetX;
+    this.staticLastOffsetY = this.offsetY;
+  }
+
+  /**
    * Get color for a territory based on owner.
    * Owned territories use a muted faction tint over a parchment base —
    * ownership is primarily communicated via the faction-colored border.
@@ -1185,7 +1296,7 @@ export class MapRenderer {
   /**
    * Fit map to screen
    */
-  fitToScreen(): void {
+  fitToScreen(insets: Partial<{ top: number; right: number; bottom: number; left: number }> = {}): void {
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
 
@@ -1200,14 +1311,20 @@ export class MapRenderer {
 
     const mapWidth = maxX - minX;
     const mapHeight = maxY - minY;
+    const leftInset = insets.left ?? 0;
+    const rightInset = insets.right ?? 0;
+    const topInset = insets.top ?? 0;
+    const bottomInset = insets.bottom ?? 0;
+    const availableWidth = Math.max(320, this.width - leftInset - rightInset);
+    const availableHeight = Math.max(240, this.height - topInset - bottomInset);
 
     const padding = 80;
-    const scaleX = (this.width - padding * 2) / mapWidth;
-    const scaleY = (this.height - padding * 2) / mapHeight;
+    const scaleX = (availableWidth - padding * 2) / mapWidth;
+    const scaleY = (availableHeight - padding * 2) / mapHeight;
     this.scale = Math.min(scaleX, scaleY, 2);
 
-    this.offsetX = (this.width - mapWidth * this.scale) / 2 - minX * this.scale;
-    this.offsetY = (this.height - mapHeight * this.scale) / 2 - minY * this.scale;
+    this.offsetX = leftInset + (availableWidth - mapWidth * this.scale) / 2 - minX * this.scale;
+    this.offsetY = topInset + (availableHeight - mapHeight * this.scale) / 2 - minY * this.scale;
 
     this.render();
   }
@@ -1216,6 +1333,7 @@ export class MapRenderer {
   private onMouseDown(e: MouseEvent): void {
     if (e.button === 0) {
       this.isDragging = true;
+      this.didDrag = false;
       this.lastMouseX = e.clientX;
       this.lastMouseY = e.clientY;
       this.canvas.style.cursor = 'grabbing';
@@ -1227,26 +1345,33 @@ export class MapRenderer {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    if (this.isDragging) {
-      const dx = e.clientX - this.lastMouseX;
-      const dy = e.clientY - this.lastMouseY;
-      this.offsetX += dx;
-      this.offsetY += dy;
-      this.lastMouseX = e.clientX;
-      this.lastMouseY = e.clientY;
+    if (this.isDragging) return;
+
+    const world = this.screenToWorld(x, y);
+    const territory = this.getTerritoryAtPoint(world.x, world.y);
+    const newHoveredId = territory?.id ?? null;
+
+    if (newHoveredId !== this.hoveredTerritoryId) {
+      this.hoveredTerritoryId = newHoveredId;
+      this.canvas.style.cursor = newHoveredId ? 'pointer' : 'grab';
+      this.territoryHoverCallback?.(newHoveredId, e.clientX, e.clientY);
       this.render();
-    } else {
-      const world = this.screenToWorld(x, y);
-      const territory = this.getTerritoryAtPoint(world.x, world.y);
-      const newHoveredId = territory?.id ?? null;
-      
-      if (newHoveredId !== this.hoveredTerritoryId) {
-        this.hoveredTerritoryId = newHoveredId;
-        this.canvas.style.cursor = newHoveredId ? 'pointer' : 'grab';
-        this.territoryHoverCallback?.(newHoveredId, e.clientX, e.clientY);
-        this.render();
-      }
     }
+  }
+
+  private onWindowMouseMove(e: MouseEvent): void {
+    if (!this.isDragging) return;
+
+    const dx = e.clientX - this.lastMouseX;
+    const dy = e.clientY - this.lastMouseY;
+    if (dx === 0 && dy === 0) return;
+
+    this.didDrag = true;
+    this.offsetX += dx;
+    this.offsetY += dy;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
+    this.render();
   }
 
   private onMouseUp(_e: MouseEvent): void {
@@ -1272,7 +1397,10 @@ export class MapRenderer {
   }
 
   private onClick(e: MouseEvent): void {
-    if (this.isDragging) return;
+    if (this.didDrag) {
+      this.didDrag = false;
+      return;
+    }
 
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;

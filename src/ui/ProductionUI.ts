@@ -13,6 +13,7 @@ export interface ProductionCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
   updateMobilizationHighlights(): void;
   updateSelectionInfo(): void;
+  onMobilized(territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]): void;
 }
 
 export class ProductionUI {
@@ -141,9 +142,14 @@ export class ProductionUI {
   }
 
   onMobilizeTerritory(territoryId: string): void {
+    const option = this.mobilizationSystem.getTerritoryMobilization(
+      this.state.territories.get(territoryId)!
+    );
     const result = this.mobilizationSystem.mobilize(territoryId);
 
     if (result.success) {
+      this.callbacks.onMobilized(territoryId, option.cost, result.unitsSpawned ?? []);
+
       const territory = this.state.territories.get(territoryId);
       const unitsDesc = result.unitsSpawned?.map(u => {
         const unit = this.state.unitRegistry.get(u.unitTypeId);
@@ -189,6 +195,8 @@ export class ProductionUI {
     const result = this.mobilizationSystem.mobilize(territoryId);
 
     if (result.success) {
+      this.callbacks.onMobilized(territoryId, option.cost, result.unitsSpawned ?? []);
+
       const territory = this.state.territories.get(territoryId);
       const unitsDesc = result.unitsSpawned?.map(u => {
         const icon = UNIT_ICONS[u.unitTypeId] || '⬜';

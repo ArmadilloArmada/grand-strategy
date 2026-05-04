@@ -35,6 +35,9 @@ import { cloudSaveManager } from './engine/CloudSaveManager';
 import { WeatherSystem } from './engine/WeatherSystem';
 import { FortificationSystem } from './engine/FortificationSystem';
 import { dragManager } from './ui/DragManager';
+import { normalizeCapitalsToWin, normalizeHumanFactions } from './engine/SetupValidation';
+import { selectTrait, ALL_TRAITS } from './engine/CommanderProgression';
+import type { Commander, CommanderTraitId } from './data/Territory';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -66,7 +69,7 @@ import _gridMediterraneanData from '../assets/maps/grid-mediterranean.json';
 import _gridArcticData from '../assets/maps/grid-arctic.json';
 import _gridArchipelagoData from '../assets/maps/grid-archipelago.json';
 import { registerMap, getMapEntry, getMapById } from './data/mapRegistry';
-import { EUROPE_FACTIONS, PACIFIC_FACTIONS, AMERICAS_FACTIONS, AFRICA_FACTIONS, EASTERN_FRONT_FACTIONS, SKIRMISH_FACTIONS, MEDITERRANEAN_FACTIONS, ARCTIC_FACTIONS, ARCHIPELAGO_FACTIONS } from './data/mapFactions';
+import { EUROPE_FACTIONS, PACIFIC_FACTIONS, AMERICAS_FACTIONS, AFRICA_FACTIONS, EASTERN_FRONT_FACTIONS, SKIRMISH_FACTIONS, MEDITERRANEAN_FACTIONS, ARCTIC_FACTIONS, ARCHIPELAGO_FACTIONS, TUTORIAL_FACTIONS } from './data/mapFactions';
 import type { MapData } from './loaders/MapLoader';
 const gridMapData = _gridMapData as unknown as MapData;
 const tutorialMapData = _tutorialMapData as unknown as MapData;
@@ -136,8 +139,8 @@ class Game {
    */
   async init(): Promise<void> {
     // Register available maps — themed maps supply their own faction definitions
-    registerMap('grid', 'World at War (Grid)', gridMapData);
-    registerMap('tutorial', 'Tutorial', tutorialMapData);
+    registerMap('grid', 'World at War (Grid)', gridMapData, undefined, factionsData as import('./data/Faction').FactionData[]);
+    registerMap('tutorial', 'Tutorial', tutorialMapData, undefined, TUTORIAL_FACTIONS);
     registerMap('grid-europe',        'European Theater (Grid)',   gridEuropeData,       undefined, EUROPE_FACTIONS);
     registerMap('grid-pacific',       'Pacific Ring (Grid)',       gridPacificData,      undefined, PACIFIC_FACTIONS);
     registerMap('grid-americas',      'Western Hemisphere (Grid)', gridAmericasData,     undefined, AMERICAS_FACTIONS);
@@ -159,8 +162,12 @@ class Game {
     this.renderer = new MapRenderer(this.state, 'game-canvas');
     this.hud = new HUD(this.state, this.turnManager, this.renderer);
     this.hud.setAISpeedCallback((multiplier) => this.aiController.setSpeed(multiplier));
-    // DebugPanel registers DOM/keyboard listeners and manages its own lifecycle
-    new DebugPanel(this.state, this.turnManager);
+    // DebugPanel is dev-only; never let it block the main menu from wiring up.
+    try {
+      new DebugPanel(this.state, this.turnManager);
+    } catch (error) {
+      console.warn('Debug panel failed to initialize:', error);
+    }
 
     this.state.systems.technologyManager = this.hud.technologyManager;
 
@@ -245,12 +252,27 @@ class Game {
 
     // Wire replay recording events (recordAction is a no-op when not recording)
     this.state.on('combat_end', (e: any) => {
-      const data = e.data as { combat?: { winner?: string; attackingFactionId?: string; defendingFactionId?: string; territoryId?: string }; attackingFactionId?: string; xpOutcome?: { attackerResult?: { leveledUp?: boolean }; defenderResult?: { leveledUp?: boolean } } };
+      const data = e.data as {
+        combat?: { winner?: string; attackingFactionId?: string; defendingFactionId?: string; territoryId?: string };
+        attackingFactionId?: string;
+        xpOutcome?: { attackerResult?: { leveledUp?: boolean; newLevel?: number; traitChoices?: CommanderTraitId[] }; defenderResult?: { leveledUp?: boolean; newLevel?: number; traitChoices?: CommanderTraitId[] } };
+        attackerCommander?: Commander | null;
+        defenderCommander?: Commander | null;
+      };
       const combat = data.combat;
       const attackerId = combat?.attackingFactionId ?? data.attackingFactionId ?? '';
       replayManager.recordAction(this.state.turnNumber, this.state.currentPhase, attackerId, 'combat_result', e.data);
       if (data.xpOutcome?.attackerResult?.leveledUp) achievementManager.updateProgress('commander_leveled', 1);
       if (data.xpOutcome?.defenderResult?.leveledUp) achievementManager.updateProgress('commander_leveled', 1);
+      // Show trait choice modal if a player commander leveled up
+      const atkResult = data.xpOutcome?.attackerResult;
+      if (atkResult?.leveledUp && atkResult.traitChoices?.length && data.attackerCommander) {
+        this.showCommanderTraitModal(data.attackerCommander, atkResult.traitChoices, atkResult.newLevel ?? 2);
+      }
+      const defResult = data.xpOutcome?.defenderResult;
+      if (defResult?.leveledUp && defResult.traitChoices?.length && data.defenderCommander) {
+        this.showCommanderTraitModal(data.defenderCommander, defResult.traitChoices, defResult.newLevel ?? 2);
+      }
       // Morale: battle victory reduces war weariness for the winning side
       if (combat?.winner === 'attacker' && combat.attackingFactionId) {
         const ter = combat.territoryId ? this.state.territories.get(combat.territoryId) : null;
@@ -364,6 +386,7 @@ class Game {
    * Start a new game
    */
   startNewGame(): void {
+    this.hud.resetVictoryState();
     const mapId = this.hud.gameConfig.mapId ?? 'grid';
     const mapEntry = getMapEntry(mapId);
     const mapToLoad = mapEntry?.data ?? gridMapData;
@@ -381,7 +404,9 @@ class Game {
 
     // Set faction AI control based on game config (from HUD setup modal)
     const factions = this.state.factionRegistry.getInTurnOrder();
-    const humanFactions = this.hud.gameConfig.humanFactions;
+    const humanFactions = normalizeHumanFactions(this.hud.gameConfig.humanFactions, mapFactions);
+    this.hud.gameConfig.humanFactions = humanFactions;
+    this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWin(this.hud.gameConfig.capitalsToWin, mapFactions);
     
     for (const faction of factions) {
       // Check if this faction should be human controlled
@@ -401,6 +426,7 @@ class Game {
     // Reset dynamic feature systems for fresh game
     this.hud.tensionSystem.reset();
     this.hud.objectiveSystem.reset();
+    this.hud.objectiveSystem.setScenarioMap(mapId);
     factionAbilityManager.reset();
 
     // Start the game
@@ -1229,6 +1255,18 @@ class Game {
    * Setup menu button listeners
    */
   private setupMenuListeners(): void {
+    const runMenuAction = (action: () => void): void => {
+      try {
+        action();
+      } catch (error) {
+        console.error('Main menu action failed:', error);
+        this.hud?.showToast?.(
+          error instanceof Error ? `Could not start: ${error.message}` : 'Could not start game',
+          'error'
+        );
+      }
+    };
+
     // Theme toggle button in HUD
     document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
       const current = settings.getSetting('theme') ?? 'dark';
@@ -1239,24 +1277,20 @@ class Game {
 
     // Quick Start - Classic Mode
     document.getElementById('btn-quick-classic')?.addEventListener('click', () => {
-      this.confirmLeaveGame(() => {
-        this.quickStart('classic');
-      });
+      runMenuAction(() => this.confirmLeaveGame(() => this.quickStart('classic')));
     });
 
     // Quick Start - Simple Mode
     document.getElementById('btn-quick-simple')?.addEventListener('click', () => {
-      this.confirmLeaveGame(() => {
-        this.quickStart('quick');
-      });
+      runMenuAction(() => this.confirmLeaveGame(() => this.quickStart('quick')));
     });
 
     // Custom Game Setup
     document.getElementById('btn-new-game')?.addEventListener('click', () => {
-      this.confirmLeaveGame(() => {
+      runMenuAction(() => this.confirmLeaveGame(() => {
         this.hideMainMenu();
         this.hud.showNewGameModal();
-      });
+      }));
     });
 
     // Listen for game started event from HUD
@@ -1375,6 +1409,9 @@ class Game {
 
     // Game menu buttons
     document.getElementById('btn-resume')?.addEventListener('click', () => {
+      this.hideGameMenu();
+    });
+    document.getElementById('btn-close-game-menu')?.addEventListener('click', () => {
       this.hideGameMenu();
     });
 
@@ -1515,8 +1552,8 @@ class Game {
   }
 
   private resetViewAndPanels(): void {
-    this.renderer.fitToScreen();
     dragManager.resetLayoutInPlace();
+    requestAnimationFrame(() => this.hud.fitMapToCommandLayout());
   }
 
   /**
@@ -1675,6 +1712,7 @@ class Game {
       this.hud.updateTurnInfo();
       this.hud.updatePhaseInfo();
       this.renderer.render();
+      this.updateCampaignObjectivesPanel();
       return; // STOP - wait for human input
     }
     
@@ -1976,6 +2014,47 @@ class Game {
   }
 
   /**
+   * Refresh the campaign mission objectives sidebar panel.
+   * Shown only when an active campaign mission is in progress.
+   */
+  private updateCampaignObjectivesPanel(): void {
+    const panel = document.getElementById('campaign-objectives-panel');
+    const listEl = document.getElementById('campaign-objectives-list');
+    const nameEl = document.getElementById('campaign-mission-name');
+    if (!panel || !listEl || !nameEl) return;
+
+    if (!this.activeCampaignId || !this.activeMission) {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
+    const gameState = {
+      turnNumber: this.state.turnNumber,
+      territoriesOwnedBy: (fId: string) =>
+        Array.from(this.state.territories.values())
+          .filter(t => t.owner === fId)
+          .map(t => ({ id: t.id, name: t.name })),
+      totalUnitsKilled: 0,
+      totalUnitsProduced: 0,
+    };
+
+    const results = campaignManager.checkObjectives(this.activeMission, gameState, humanFactionId);
+
+    nameEl.textContent = this.activeMission.name;
+    listEl.innerHTML = results.map(r => {
+      const icon = r.met ? '✅' : '⬜';
+      return `<div style="display:flex;gap:6px;align-items:flex-start;">
+        <span style="flex-shrink:0;">${icon}</span>
+        <span style="${r.met ? 'color:#4ade80;' : ''}">${r.objective.description} <span style="color:#5b9bd5;">(${r.progress})</span></span>
+      </div>`;
+    }).join('');
+
+    panel.classList.remove('hidden');
+    document.getElementById('objectives-panel')?.classList.add('hidden');
+  }
+
+  /**
    * Check for victory at end of turn
    */
   private checkVictory(): void {
@@ -1983,13 +2062,57 @@ class Game {
       this.hud.checkVictoryConditions();
     }
   }
+
+  /**
+   * Show the commander trait selection modal when a player commander levels up.
+   * Blocks until the player picks a trait (no dismiss without choosing).
+   */
+  private showCommanderTraitModal(commander: Commander, choices: CommanderTraitId[], newLevel: number): void {
+    if (!settings.getSetting('commanderAbilities')) return;
+    const modal = document.getElementById('commander-levelup-modal');
+    const title = document.getElementById('commander-levelup-title');
+    const subtitle = document.getElementById('commander-levelup-subtitle');
+    const container = document.getElementById('commander-trait-choices');
+    if (!modal || !title || !subtitle || !container) return;
+
+    title.textContent = `${commander.name} Promoted to Level ${newLevel}!`;
+    subtitle.textContent = `"${commander.name}" gains a new combat trait`;
+    container.innerHTML = '';
+
+    for (const traitId of choices) {
+      const trait = ALL_TRAITS[traitId];
+      if (!trait) continue;
+      const btn = document.createElement('button');
+      btn.className = 'primary';
+      btn.style.cssText = 'text-align:left;padding:0.75rem 1rem;line-height:1.4;';
+      btn.innerHTML = `<strong>${trait.name}</strong><br><span style="font-size:0.8rem;color:#94a3b8;">${trait.description}</span>`;
+      btn.addEventListener('click', () => {
+        selectTrait(commander, traitId);
+        modal.classList.add('hidden');
+        this.hud.showToast(`${commander.name} learned: ${trait.name}`, 'success');
+      });
+      container.appendChild(btn);
+    }
+
+    modal.classList.remove('hidden');
+  }
 }
 
 // Initialize game when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   const game = new Game();
-  await game.init();
+  try {
+    await game.init();
 
-  // Expose game instance for debugging
-  (window as any).game = game;
+    // Expose game instance for debugging
+    (window as any).game = game;
+  } catch (error) {
+    console.error('Game failed to initialize:', error);
+    const crash = document.getElementById('crash-screen');
+    const detail = document.getElementById('crash-detail');
+    if (crash && detail) {
+      crash.style.display = 'flex';
+      detail.textContent = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    }
+  }
 });

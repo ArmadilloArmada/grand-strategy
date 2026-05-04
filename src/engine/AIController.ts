@@ -33,6 +33,30 @@ export interface AttackPlan {
   strategicValue: number;
 }
 
+export interface AIDebugPlan {
+  targetId: string;
+  targetName: string;
+  owner: string | null;
+  expectedSuccess: number;
+  strategicValue: number;
+  minSuccess: number;
+  minValue: number;
+  attackPower: number;
+  defenseStrength: number;
+  attackers: { fromId: string; fromName: string; unitTypeId: string; count: number }[];
+  status: "chosen" | "rejected";
+  reason: string;
+}
+
+export interface AIDebugSnapshot {
+  factionId: string;
+  factionName: string;
+  personality: string;
+  phase: string;
+  plans: AIDebugPlan[];
+  chosenCount: number;
+}
+
 interface AttackCandidate {
   fromId: string;
   unitTypeId: string;
@@ -587,13 +611,31 @@ export class AIController {
   // ── Phase handlers ──────────────────────────────────────────────────────
 
   private async processPhase(evaluations: Map<string, TerritoryEvaluation>): Promise<void> {
-    switch (this.state.currentPhase) {
+    const phase = this.state.currentPhase as string;
+    switch (phase) {
       case "purchase":        this.handlePurchasePhase(evaluations); break;
       case "combat_move":     this.handleCombatMovePhase(evaluations); break;
       case "combat":          await this.handleCombatPhase(); break;
       case "noncombat_move":  this.handleNonCombatMovePhase(evaluations); break;
       case "production":      this.handleMobilizationPhase(evaluations); break;
       case "collect_income":  break; // Auto-handled
+
+      // Simplified turn styles use player-facing phase names. Keep the AI's
+      // tactical behavior mapped to the same underlying systems.
+      case "build":
+        this.handleMobilizationPhase(evaluations);
+        break;
+      case "move":
+      case "orders":
+      case "action":
+        this.handleCombatMovePhase(evaluations);
+        await this.handleCombatPhase();
+        break;
+      case "resolve":
+        await this.handleCombatPhase();
+        break;
+      case "end":
+        break; // Auto-handled by TurnManager when the phase starts
     }
   }
 
@@ -644,6 +686,7 @@ export class AIController {
           message: `Mobilizing forces at ${option.territory.name}`,
           action: 'mobilize',
           territory: option.territory.name,
+          territoryId: option.territory.id,
         });
       }
     }
@@ -775,18 +818,61 @@ export class AIController {
         : this.riskTolerance * (0.5 + this.aggressiveness * 0.3);
     }
 
+    const minValue = 18 * (1 - this.expansionFocus * 0.4);
+    const opportunisticSuccess = Math.max(behaviorMinSuccess + 0.15, 0.55 - this.aggressiveness * 0.1);
+    const debugPlans: AIDebugPlan[] = [];
+    const recordPlan = (plan: AttackPlan, status: "chosen" | "rejected", reason: string): void => {
+      const target = this.state.territories.get(plan.targetId);
+      const eval_ = evaluations.get(plan.targetId);
+      const attackPower = plan.attackers.reduce((sum, attacker) => {
+        const unit = this.state.unitRegistry.get(attacker.unitTypeId);
+        return sum + attacker.count * (unit?.attack ?? 0);
+      }, 0);
+      debugPlans.push({
+        targetId: plan.targetId,
+        targetName: target?.name ?? plan.targetId,
+        owner: target?.owner ?? null,
+        expectedSuccess: plan.expectedSuccess,
+        strategicValue: plan.strategicValue,
+        minSuccess: behaviorMinSuccess,
+        minValue,
+        attackPower,
+        defenseStrength: eval_?.defenseStrength ?? 0,
+        attackers: plan.attackers.map(attacker => ({
+          fromId: attacker.fromId,
+          fromName: this.state.territories.get(attacker.fromId)?.name ?? attacker.fromId,
+          unitTypeId: attacker.unitTypeId,
+          count: attacker.count,
+        })),
+        status,
+        reason,
+      });
+    };
+
     for (const plan of plans) {
       const minSuccess = behaviorMinSuccess;
-      if (plan.expectedSuccess < minSuccess) continue;
+      if (plan.expectedSuccess < minSuccess) {
+        recordPlan(plan, "rejected", `success ${Math.round(plan.expectedSuccess * 100)}% below minimum ${Math.round(minSuccess * 100)}%`);
+        continue;
+      }
 
-      const minValue = 30 * (1 - this.expansionFocus * 0.5);
-      if (plan.strategicValue < minValue && plan.expectedSuccess < 0.8) continue;
+      if (plan.strategicValue < minValue && plan.expectedSuccess < opportunisticSuccess) {
+        recordPlan(plan, "rejected", `low value ${Math.round(plan.strategicValue)} and only ${Math.round(plan.expectedSuccess * 100)}% success`);
+        continue;
+      }
 
       let canExecute = true;
       for (const att of plan.attackers) {
         if (usedUnits.has(`${att.fromId}-${att.unitTypeId}`)) { canExecute = false; break; }
       }
-      if (!canExecute) continue;
+      if (!canExecute) {
+        recordPlan(plan, "rejected", "attackers already committed to a better plan");
+        continue;
+      }
+      if (this.wouldOverextendKeyTerritory(plan, evaluations, faction)) {
+        recordPlan(plan, "rejected", "would overextend a capital or factory");
+        continue;
+      }
 
       const target = this.state.territories.get(plan.targetId);
       let totalCommitted = 0;
@@ -808,13 +894,26 @@ export class AIController {
       }
 
       if (totalCommitted > 0 && target) {
+        recordPlan(plan, "chosen", `committed ${totalCommitted} unit${totalCommitted === 1 ? "" : "s"}`);
         this.state.emit("ai_thinking", {
           message: `Attacking ${target.name} with ${totalCommitted} units`,
           action: 'attack',
           territory: target.name,
+          territoryId: target.id,
         });
+      } else {
+        recordPlan(plan, "rejected", "no available units remained");
       }
     }
+
+    this.state.emit("ai_debug", {
+      factionId: faction.id,
+      factionName: faction.name,
+      personality: this.personality.name,
+      phase: this.state.currentPhase,
+      plans: debugPlans,
+      chosenCount: debugPlans.filter(plan => plan.status === "chosen").length,
+    } satisfies AIDebugSnapshot);
   }
 
   private generateAttackPlans(
@@ -1035,10 +1134,11 @@ export class AIController {
     faction: Faction
   ): number {
     const unit = this.state.unitRegistry.get(unitTypeId);
-    if (!unit || unit.domain !== 'land') return count;
+    const readyCount = Math.min(count, this.movementValidator.getAvailableUnits(source.id, unitTypeId));
+    if (!unit || unit.domain !== 'land') return readyCount;
 
     const reserve = this.getAttackReserveCount(source, evaluations, faction);
-    return Math.max(0, count - reserve);
+    return Math.max(0, readyCount - reserve);
   }
 
   private getAttackReserveCount(
@@ -1063,6 +1163,42 @@ export class AIController {
     }
 
     return reserve;
+  }
+
+  private wouldOverextendKeyTerritory(
+    plan: AttackPlan,
+    evaluations: Map<string, TerritoryEvaluation>,
+    faction: Faction
+  ): boolean {
+    const target = this.state.territories.get(plan.targetId);
+    if (!target) return true;
+    const isDecisiveTarget = target.isCapital || target.hasFactory || plan.expectedSuccess >= 0.85;
+
+    const committedBySource = new Map<string, number>();
+    for (const attacker of plan.attackers) {
+      committedBySource.set(attacker.fromId, (committedBySource.get(attacker.fromId) ?? 0) + attacker.count);
+    }
+
+    for (const [sourceId, committedCount] of committedBySource) {
+      const source = this.state.territories.get(sourceId);
+      if (!source || source.owner !== faction.id || source.isSea()) continue;
+      if (!source.isCapital && source.id !== faction.capital && !source.hasFactory) continue;
+
+      const evaluation = evaluations.get(sourceId);
+      const currentUnits = source.getTotalUnitCount();
+      const remainingUnits = currentUnits - committedCount;
+      const reserve = this.getAttackReserveCount(source, evaluations, faction);
+      const threatLevel = evaluation?.threatLevel ?? 0;
+      const defenseStrength = evaluation?.defenseStrength ?? 0;
+      const unitDefenseShare = currentUnits > 0 ? defenseStrength / currentUnits : 0;
+      const projectedDefense = Math.max(0, defenseStrength - committedCount * unitDefenseShare);
+
+      if (remainingUnits < reserve) return true;
+      if (!isDecisiveTarget && threatLevel > 0 && projectedDefense < threatLevel * 0.8) return true;
+      if ((source.isCapital || source.id === faction.capital) && projectedDefense < threatLevel && !isDecisiveTarget) return true;
+    }
+
+    return false;
   }
 
   private estimateSuccessRate(attackPower: number, defensePower: number): number {

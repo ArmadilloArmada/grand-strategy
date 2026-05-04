@@ -62,12 +62,13 @@
     <div id="zoom-controls">
       <button id="btn-zoom-in" title="Zoom In">+</button>
       <button id="btn-zoom-out" title="Zoom Out">−</button>
-      <button id="btn-zoom-fit" title="Reset view to fit the whole map (F)" style="font-size:0.72rem;padding:0.3rem 0.55rem;letter-spacing:0.01em;">⊡ Reset View</button>
-      <button id="btn-overlay" title="Toggle overlays: range / threat (O)">⊞ Overlay</button>
+      <button id="btn-zoom-fit" title="Reset view to fit the whole map (F)" aria-label="Reset view">[]</button>
+      <button id="btn-ui-reset" title="Reset UI panels to their default layout (Shift+F)" aria-label="Reset UI layout">UI</button>
+      <button id="btn-overlay" title="Toggle overlays: range / threat (O)" aria-label="Toggle overlay">O</button>
     </div>
     
     <!-- Battle Log Panel -->
-    <div id="battle-log-panel">
+    <div id="battle-log-panel" class="collapsed">
       <div id="battle-log-header">
         <span>📜 Battle Log</span>
         <div style="display:flex;align-items:center;gap:0.3rem;">
@@ -216,6 +217,15 @@
       </div>
     </div>
 
+    <!-- Campaign Mission Objectives Panel — shown only during campaign missions -->
+    <div id="campaign-objectives-panel" class="hidden" style="position:fixed;right:1rem;top:8rem;z-index:200;width:230px;background:rgba(13,20,30,0.93);border:1px solid #2a3f5f;border-radius:6px;padding:8px 10px;backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.4);">
+      <div style="font-size:0.7rem;color:#5b9bd5;letter-spacing:0.08em;margin-bottom:6px;border-bottom:1px solid #1a2f4a;padding-bottom:4px;">🎖️ MISSION OBJECTIVES</div>
+      <div id="campaign-mission-name" style="font-size:0.65rem;color:#c89620;margin-bottom:6px;"></div>
+      <div id="campaign-objectives-list" style="display:flex;flex-direction:column;gap:5px;font-size:0.65rem;color:#94a3b8;">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
     <!-- Supply Warning Indicator — sits just above the battle log -->
     <div id="supply-indicator" class="hidden" style="position:fixed;left:0;bottom:228px;z-index:250;background:rgba(180,60,20,0.92);color:#fff;font-size:0.7rem;padding:4px 12px;border-radius:0 4px 4px 0;border:1px solid #f87171;border-left:none;letter-spacing:0.05em;">
       ⚠ SUPPLY CRITICAL
@@ -330,6 +340,7 @@
               <option value="tutorial">Tutorial</option>
             </select>
           </div>
+          <div id="map-info-card" class="map-info-card"></div>
           <div class="setting-row">
             <label for="preset-hold10">Short game (10 turns)</label>
             <input type="checkbox" id="preset-hold10" title="Override turn limit to 10">
@@ -467,6 +478,7 @@
     <!-- In-Game Menu Modal -->
     <div id="game-menu-modal" class="modal hidden">
       <div class="modal-content" style="text-align: center;">
+        <button id="btn-close-game-menu" class="modal-x-close" aria-label="Close">×</button>
         <h2>☰ Game Menu</h2>
 
         <div class="menu-button-group">
@@ -1229,6 +1241,19 @@
           <div id="tutorial-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
             <!-- Populated by JS -->
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Commander Level-Up Modal -->
+    <div id="commander-levelup-modal" class="modal hidden">
+      <div class="modal-content" style="max-width: 420px; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⭐</div>
+        <h2 id="commander-levelup-title" style="margin-bottom: 0.25rem;">Commander Promoted!</h2>
+        <p id="commander-levelup-subtitle" style="color: #c89620; margin-bottom: 1rem; font-size: 0.9rem;"></p>
+        <p style="color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.85rem;">Choose a new trait for your commander:</p>
+        <div id="commander-trait-choices" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem;">
+          <!-- Populated by JS -->
         </div>
       </div>
     </div>

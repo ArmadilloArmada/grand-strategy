@@ -20,7 +20,7 @@
  *  └──────────────────────────────────────────────────────────────┘
  */
 
-const STORAGE_KEY = 'grand-strategy-panel-positions';
+const STORAGE_KEY = 'grand-strategy-panel-positions-v4';
 const DRAG_THRESHOLD = 5; // px before a mousedown becomes a drag
 
 type PanelPos = { left: number; top: number };
@@ -57,29 +57,23 @@ const DEFAULTS: Record<string, (vw: number, vh: number, r: DOMRect) => PanelPos>
   // Top-right corner, 16 px inset
   'resources':         (vw,  _vh, r)  => ({ left: vw - r.width - 16,                 top: 16 }),
 
-  // Right column — just below resources
-  'faction-panel':     (vw,  _vh, r)  => ({ left: vw - r.width - 16,                 top: 72 }),
+  // War Room content is managed by the panel layout; keep this static if reset touches it.
+  'faction-panel':     (vw,  _vh, r)  => ({ left: vw - r.width - 16,                 top: 112 }),
 
   // Right column — above minimap, separated by 8 px
-  'zoom-controls':     (vw,  vh,  r)  => {
-    const minimapH = 136; // approximate minimap height + 16 px margin
-    return { left: vw - r.width - 16, top: vh - minimapH - r.height - 8 };
-  },
+  'zoom-controls':     (vw,  _vh,  r)  => ({ left: vw - 326 - r.width - 24, top: 118 }),
 
-  // Bottom-right corner, 16 px inset
-  'minimap-container': (vw,  vh,  r)  => ({ left: vw - r.width - 16,                 top: vh - r.height - 16 }),
+  // Bottom-left, above the battle log and away from the command bar.
+  'minimap-container': (_vw, vh,  r)  => ({ left: 104, top: Math.max(140, vh - r.height - 80) }),
 
-  // Left column — sits above battle log, separated by 8 px
-  'selection-info':    (_vw, vh,  r)  => {
-    const blogH = 44; // collapsed battle-log header height
-    return { left: 16, top: Math.max(80, vh - r.height - blogH - 8) };
-  },
+  // Left command inspector, fixed near the top so it never collides with the log.
+  'selection-info':    (_vw, _vh, _r) => ({ left: 16, top: 96 }),
 
   // Bottom-left, flush against bottom edge (pull-up strip)
   'battle-log-panel':  (_vw, vh,  r)  => ({ left: 0,                                  top: vh - r.height }),
 
   // Bottom-center, 16 px above the very bottom
-  'action-buttons':    (vw,  vh,  r)  => ({ left: Math.max(0, (vw - r.width) / 2),   top: vh - r.height - 16 }),
+  'action-buttons':    (vw,  vh,  r)  => ({ left: Math.max(320, (vw - r.width) / 2), top: vh - r.height - 16 }),
 };
 
 export class DragManager {

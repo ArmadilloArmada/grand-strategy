@@ -106,6 +106,7 @@ export type GameEventType =
   | 'victory'
   | 'tech_researched'
   | 'ai_thinking'
+  | 'ai_debug'
   | 'strategic_bombing'
   | 'naval_bombardment'
   | 'reserve_updated'

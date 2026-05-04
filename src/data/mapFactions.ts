@@ -12,6 +12,11 @@ const EASTERN_BONUSES  = { infantryDefenseBonus: 1, counterIntelBonus: 0.3 };
 const PACIFIC_BONUSES  = { movementBonus: 1, navalAttackBonus: 1 };
 const SOUTHERN_BONUSES = { unitCostDiscount: 1, incomeMultiplierBonus: 0.05 };
 
+export const TUTORIAL_FACTIONS: FactionData[] = [
+  { id: 'atlantic_alliance', name: 'Atlantic Alliance', color: '#4a90d9', colorLight: '#7eb3eb', capital: 'player_capital', startingIPCs: 30, turnOrder: 1, isPlayable: true, allies: [], bonuses: ATLANTIC_BONUSES, playstyle: 'Tutorial Command', description: 'Learn the core loop with a forgiving starting position.' },
+  { id: 'eastern_bloc', name: 'Eastern Bloc', color: '#e85d75', colorLight: '#f08090', capital: 'enemy_capital', startingIPCs: 20, turnOrder: 2, isPlayable: true, allies: [], bonuses: EASTERN_BONUSES, playstyle: 'Training Opponent', description: 'A simple enemy faction for the tutorial.' },
+];
+
 // ── European Theater ─────────────────────────────────────────────────────────
 export const EUROPE_FACTIONS: FactionData[] = [
   { id: 'atlantic_alliance', name: 'Atlantic Alliance', color: '#4a90d9', colorLight: '#7eb3eb', capital: 'england',   startingIPCs: 30, turnOrder: 1, isPlayable: true, allies: [], bonuses: ATLANTIC_BONUSES, playstyle: 'Industrial Powerhouse',  description: 'Strong economy and production. Excels at building and sustaining large armies.' },

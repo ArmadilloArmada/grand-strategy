@@ -269,6 +269,14 @@ export class MobilizationSystem {
   }
 
   /**
+   * Reverse a single mobilization (undo): refund units and unmark the territory.
+   * The caller is responsible for refunding IPCs.
+   */
+  undoMobilize(territoryId: string): void {
+    this.mobilizedThisTurn.delete(territoryId);
+  }
+
+  /**
    * Reset mobilization tracking (called at start of faction's turn)
    */
   resetForNewTurn(): void {

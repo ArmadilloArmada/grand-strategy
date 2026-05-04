@@ -675,7 +675,7 @@ export class CombatResolver {
       for (const unit of defTer.units) delete unit.commander;
     }
 
-    this.state.emit("combat_end", { combat, xpOutcome });
+    this.state.emit("combat_end", { combat, xpOutcome, attackerCommander: atkCmd, defenderCommander: defCmd });
   }
 
   /**

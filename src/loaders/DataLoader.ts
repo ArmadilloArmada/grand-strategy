@@ -27,19 +27,34 @@ export class DataLoader {
    * Load all game data from a bundle
    */
   loadBundle(bundle: GameDataBundle): void {
-    // Load rules first
     if (bundle.rules) {
-      this.state.rules = new GameRules(bundle.rules);
+      try {
+        this.state.rules = new GameRules(bundle.rules);
+      } catch (e) {
+        console.error('[DataLoader] Failed to load rules:', e);
+      }
     }
 
-    // Load unit definitions
-    this.state.unitRegistry.loadFromData(bundle.units);
+    try {
+      this.state.unitRegistry.loadFromData(bundle.units);
+    } catch (e) {
+      console.error('[DataLoader] Failed to load unit definitions:', e);
+      throw new Error(`Unit data is corrupt or invalid: ${e instanceof Error ? e.message : e}`);
+    }
 
-    // Load factions
-    this.state.factionRegistry.loadFromData(bundle.factions);
+    try {
+      this.state.factionRegistry.loadFromData(bundle.factions);
+    } catch (e) {
+      console.error('[DataLoader] Failed to load factions:', e);
+      throw new Error(`Faction data is corrupt or invalid: ${e instanceof Error ? e.message : e}`);
+    }
 
-    // Load map
-    this.mapLoader.loadMap(bundle.map);
+    try {
+      this.mapLoader.loadMap(bundle.map);
+    } catch (e) {
+      console.error('[DataLoader] Failed to load map:', e);
+      throw new Error(`Map data is corrupt or invalid: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   /**
@@ -77,17 +92,14 @@ export class DataLoader {
    * Use for DLC or user mods dropped in /mods folder
    */
   loadModBundle(mod: Partial<GameDataBundle>): void {
-    if (mod.units?.length) {
-      this.state.unitRegistry.loadFromData(mod.units);
-    }
-    if (mod.factions?.length) {
-      this.state.factionRegistry.loadFromData(mod.factions);
-    }
-    if (mod.map) {
-      this.mapLoader.loadMap(mod.map);
-    }
-    if (mod.rules) {
-      this.state.rules = new GameRules(mod.rules);
+    try {
+      if (mod.units?.length) this.state.unitRegistry.loadFromData(mod.units);
+      if (mod.factions?.length) this.state.factionRegistry.loadFromData(mod.factions);
+      if (mod.map) this.mapLoader.loadMap(mod.map);
+      if (mod.rules) this.state.rules = new GameRules(mod.rules);
+    } catch (e) {
+      console.error('[DataLoader] Failed to load mod bundle:', e);
+      throw new Error(`Mod data is invalid: ${e instanceof Error ? e.message : e}`);
     }
   }
 

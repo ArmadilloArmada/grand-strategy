@@ -50,8 +50,13 @@ export class ObjectiveSystem {
   private idCounter = 0;
   private listeners: Array<(obj: Objective, event: 'new' | 'complete' | 'fail') => void> = [];
   private openingIssued: Set<string> = new Set();
+  private mapId: string = 'grid';
 
   constructor(private state: GameState) {}
+
+  setScenarioMap(mapId: string): void {
+    this.mapId = mapId;
+  }
 
   // ── Per-turn hook ─────────────────────────────────────────────────────────
 
@@ -181,6 +186,12 @@ export class ObjectiveSystem {
       this.emit(obj, 'new');
     }
 
+    const scenarioObjective = this.generateScenarioOpeningObjective(factionId);
+    if (scenarioObjective) {
+      this.objectives.push(scenarioObjective);
+      this.emit(scenarioObjective, 'new');
+    }
+
     const enemyBorder = Array.from(this.state.territories.values())
       .filter(t => t.owner && faction.isEnemyOf(t.owner) && t.isLand())
       .map(t => {
@@ -210,6 +221,80 @@ export class ObjectiveSystem {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  private generateScenarioOpeningObjective(factionId: string): Objective | null {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return null;
+
+    const turn = this.state.turnNumber;
+    const targetValue = (t: import('../data/Territory').Territory): number =>
+      t.production + (t.hasFactory ? 5 : 0) + (t.isCapital ? 10 : 0) + (t.type === 'coastal' ? 2 : 0);
+
+    const adjacentEnemy = Array.from(this.state.territories.values())
+      .filter(t => t.owner && faction.isEnemyOf(t.owner) && t.isLand())
+      .filter(t => t.adjacentTo.some(id => this.state.territories.get(id)?.owner === factionId));
+    const ownedLand = Array.from(this.state.territories.values()).filter(t => t.owner === factionId && t.isLand());
+
+    const pickCapture = (title: string, prefix: string, candidates: typeof adjacentEnemy, reward = 18): Objective | null => {
+      const target = candidates.sort((a, b) => targetValue(b) - targetValue(a))[0];
+      if (!target) return null;
+      return {
+        id: `obj_${++this.idCounter}`,
+        title,
+        description: `${prefix} ${target.name} before turn ${turn + 5}.`,
+        reward: { type: 'ipc', amount: reward },
+        deadline: turn + 5,
+        factionId,
+        condition: { type: 'capture_territory', territoryId: target.id, territoryName: target.name, count: 1 },
+        progress: 0,
+        completed: false,
+        failed: false,
+      };
+    };
+
+    const pickHold = (title: string, prefix: string, candidates: typeof ownedLand, reward = 16): Objective | null => {
+      const target = candidates.sort((a, b) => targetValue(b) - targetValue(a))[0];
+      if (!target) return null;
+      return {
+        id: `obj_${++this.idCounter}`,
+        title,
+        description: `${prefix} ${target.name} for 3 turns.`,
+        reward: { type: 'ipc', amount: reward },
+        deadline: turn + 5,
+        factionId,
+        condition: { type: 'hold_territory', territoryId: target.id, territoryName: target.name, holdUntilTurn: turn + 3 },
+        progress: 0,
+        completed: false,
+        failed: false,
+      };
+    };
+
+    if (this.mapId.includes('pacific') || this.mapId.includes('archipelago')) {
+      return pickCapture('Island Hopping', 'Seize the coastal stepping stone at',
+        adjacentEnemy.filter(t => t.type === 'coastal' || t.adjacentTo.some(id => this.state.territories.get(id)?.type === 'sea')), 22);
+    }
+    if (this.mapId.includes('europe') || this.mapId.includes('eastern-front')) {
+      return pickCapture('Break the Front', 'Punch through the main line and capture',
+        adjacentEnemy.filter(t => t.hasFactory || t.isCapital || t.production >= 3), 22);
+    }
+    if (this.mapId.includes('africa') || this.mapId.includes('mediterranean')) {
+      return pickHold('Secure the Route', 'Keep the supply route open at',
+        ownedLand.filter(t => !t.isCapital && (t.type === 'coastal' || t.hasFactory)), 18);
+    }
+    if (this.mapId.includes('americas')) {
+      return pickCapture('Hemisphere Pressure', 'Control the approach by taking',
+        adjacentEnemy.filter(t => t.production >= 3 || t.hasFactory), 20);
+    }
+    if (this.mapId.includes('arctic')) {
+      return pickHold('Hold the Ice Road', 'Protect the northern route at',
+        ownedLand.filter(t => !t.isCapital && (t.production >= 2 || t.hasFactory)), 18);
+    }
+    if (this.mapId.includes('skirmish')) {
+      return pickCapture('First Blood', 'Win the first border clash at', adjacentEnemy, 16);
+    }
+
+    return null;
+  }
 
   private checkFailures(factionId: string): void {
     const turn = this.state.turnNumber;

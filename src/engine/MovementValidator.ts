@@ -242,9 +242,10 @@ export class MovementValidator {
     }
 
     // For land units that require sea transport, also check transport routes
-    if (unitType.domain === 'land' && unitType.requiredTransport && isCombatMove) {
+    if (unitType.domain === 'land' && unitType.requiredTransport) {
       const transportMoves = this.getTransportMoves(fromTerritoryId, unitType);
       for (const tm of transportMoves) {
+        if (!isCombatMove && tm.isAttack) continue;
         // Don't duplicate moves that BFS already found on land
         if (!validMoves.some(m => m.territoryId === tm.territoryId)) {
           validMoves.push(tm);
@@ -294,7 +295,12 @@ export class MovementValidator {
     for (const seaId of fromTerritory.adjacentTo) {
       const seaZone = this.state.territories.get(seaId);
       if (!seaZone || seaZone.type !== 'sea') continue;
-      if (seaZone.owner !== currentFaction.id) continue;
+      const hasFriendlyFleet = seaZone.units.some(pu => {
+        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+        return !!unitType && unitType.domain === 'sea' && pu.count > 0;
+      });
+      const isFriendlySea = seaZone.owner === null || seaZone.owner === currentFaction.id;
+      if (!isFriendlySea || !hasFriendlyFleet) continue;
 
       const capacity = this.getAvailableTransportCapacity(seaId);
       if (capacity <= 0) continue;
@@ -451,7 +457,6 @@ export class MovementValidator {
     this.state.pendingMoves = [];
   }
 }
-
 
 
 

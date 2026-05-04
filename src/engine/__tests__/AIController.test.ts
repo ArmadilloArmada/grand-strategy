@@ -193,6 +193,42 @@ describe('AIController grudge system', () => {
 });
 
 describe('AIController attack planning', () => {
+  it('executes attacks during quick mode move phase', async () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+
+    const axis = state.factionRegistry.get('axis')!;
+    const allies = state.factionRegistry.get('allies')!;
+    axis.controlledBy = 'ai';
+    allies.controlledBy = 'human';
+    axis.ipcs = 0;
+
+    const berlin = makeTerritory('berlin', 'axis', {
+      adjacentTo: ['poland'],
+      isCapital: true,
+      hasFactory: true,
+      production: 2,
+    });
+    berlin.addUnits('infantry', 4);
+
+    const poland = makeTerritory('poland', 'allies', {
+      adjacentTo: ['berlin'],
+      production: 4,
+    });
+
+    state.territories.set('berlin', berlin);
+    state.territories.set('poland', poland);
+
+    const { ai, tm } = makeAI(state);
+    tm.setTurnStyle('quick');
+    state.currentPhase = tm.getFirstPhase();
+
+    await ai.executeTurn();
+
+    expect(state.territories.get('poland')?.owner).toBe('axis');
+    expect(state.currentFactionId).toBe('allies');
+  });
+
   it('keeps an extra capital garrison when planning attacks from threatened territory', () => {
     const state = makeState();
     state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2 }));
@@ -256,6 +292,67 @@ describe('AIController attack planning', () => {
       { fromId: 'border', unitTypeId: 'infantry', count: 1 },
     ]);
     expect(frontierPlan.expectedSuccess).toBe(0.95);
+  });
+
+  it('does not execute attacks that strip a threatened capital below reserve', () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+    state.unitRegistry.register(makeUnitData({ id: 'tank', attack: 3, defense: 3, cost: 6 }));
+
+    const berlin = makeTerritory('berlin', 'axis', {
+      adjacentTo: ['poland', 'prussia'],
+      isCapital: true,
+      hasFactory: true,
+    });
+    berlin.addUnits('infantry', 5);
+
+    const poland = makeTerritory('poland', 'allies', {
+      adjacentTo: ['berlin'],
+      production: 1,
+    });
+    poland.addUnits('infantry', 1);
+
+    const prussia = makeTerritory('prussia', 'allies', {
+      adjacentTo: ['berlin'],
+      production: 3,
+    });
+    prussia.addUnits('tank', 3);
+
+    state.territories.set('berlin', berlin);
+    state.territories.set('poland', poland);
+    state.territories.set('prussia', prussia);
+
+    const { ai } = makeAI(state);
+    const evaluations = (ai as any).evaluateAllTerritories();
+    (ai as any).handleCombatMovePhase(evaluations);
+
+    expect(state.pendingMoves).toEqual([]);
+  });
+
+  it('does not plan attacks with units that already acted', () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+
+    const border = makeTerritory('border', 'axis', {
+      adjacentTo: ['empty_frontier'],
+      production: 2,
+    });
+    border.units.push({ unitTypeId: 'infantry', count: 4, movedCount: 4 });
+
+    const emptyFrontier = makeTerritory('empty_frontier', 'allies', {
+      adjacentTo: ['border'],
+      production: 1,
+    });
+
+    state.territories.set('border', border);
+    state.territories.set('empty_frontier', emptyFrontier);
+
+    const { ai } = makeAI(state);
+    const axis = state.factionRegistry.get('axis')!;
+    const evaluations = (ai as any).evaluateAllTerritories();
+    const plans = (ai as any).generateAttackPlans(evaluations, axis);
+
+    expect(plans.find((plan: any) => plan.targetId === 'empty_frontier')).toBeUndefined();
   });
 });
 

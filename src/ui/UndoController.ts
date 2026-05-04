@@ -14,10 +14,12 @@ export interface UndoCallbacks {
   updatePhaseInfo: () => void;
   updateFactionPanel: () => void;
   updateActionButtons: () => void;
+  /** Reverse a mobilize: remove spawned units, refund IPCs, unmark territory. */
+  undoMobilize: (territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]) => void;
 }
 
 interface MoveRecord {
-  type: 'move' | 'queue';
+  type: 'move' | 'queue' | 'mobilize';
   data: any;
 }
 
@@ -126,6 +128,14 @@ export class UndoController {
         }
       }
       this.callbacks.showToast('Move undone', 'info');
+    } else if (lastAction.type === 'mobilize') {
+      const { territoryId, cost, units } = lastAction.data as {
+        territoryId: string;
+        cost: number;
+        units: { unitTypeId: string; count: number }[];
+      };
+      this.callbacks.undoMobilize(territoryId, cost, units);
+      this.callbacks.showToast('Mobilization undone', 'info');
     }
 
     this.callbacks.updateActionButtons();
@@ -176,8 +186,14 @@ export class UndoController {
     if (undoBtn) {
       undoBtn.disabled = !this.canUndo();
       if (this.moveHistory.length > 0) {
-        undoBtn.textContent = '↩️ Undo Move';
-        undoBtn.title = 'Undo last move';
+        const last = this.moveHistory[this.moveHistory.length - 1];
+        if (last.type === 'mobilize') {
+          undoBtn.textContent = '↩️ Undo Mobilize';
+          undoBtn.title = 'Undo last mobilization';
+        } else {
+          undoBtn.textContent = '↩️ Undo Move';
+          undoBtn.title = 'Undo last move';
+        }
       } else if (this.phaseSnapshots.length >= 2) {
         undoBtn.textContent = '↩️ Undo Phase';
         undoBtn.title = 'Revert to start of phase';

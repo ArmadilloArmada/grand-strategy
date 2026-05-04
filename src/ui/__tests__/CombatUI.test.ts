@@ -35,6 +35,8 @@ describe('CombatUI preview stats', () => {
     expect(stats.riskClass).toBe('good');
     expect(stats.expectedAttackerHits).toBe(1.5);
     expect(stats.expectedDefenderHits).toBeCloseTo(0.33, 2);
+    expect(stats.commitmentAdvice).toContain('Commit');
+    expect(stats.swingFactors).toContain('Power advantage');
   });
 
   it('warns when defenders are favored in the first round', () => {
@@ -51,5 +53,20 @@ describe('CombatUI preview stats', () => {
     expect(stats.riskLabel).toBe('High-risk attack');
     expect(stats.riskClass).toBe('bad');
     expect(stats.riskDetail).toContain('first round');
+    expect(stats.commitmentAdvice).toContain('Avoid');
+    expect(stats.swingFactors).toContain('Power disadvantage');
+  });
+
+  it('surfaces defensive bonuses as swing factors', () => {
+    const ui = makeCombatUI();
+    const stats = ui.calculateBattlePreviewStats(
+      [{ unitTypeId: 'infantry', count: 3 }],
+      [{ unitTypeId: 'infantry', count: 2 }],
+      3,
+      4,
+      6
+    );
+
+    expect(stats.swingFactors).toContain('Defense bonus +2');
   });
 });
