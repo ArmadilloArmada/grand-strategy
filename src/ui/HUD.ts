@@ -1368,11 +1368,8 @@ export class HUD {
         this.showTurnRecap();
         return;
       }
-      // Show rich recap if anything happened; otherwise just toast
       if (this.battlesThisPhase > 0 || this.territoriesCapturedThisPhase > 0) {
         this.showPhaseRecap(phaseName);
-      } else {
-        this.showToast(summary, 'info');
       }
     }
   }
@@ -2084,7 +2081,6 @@ export class HUD {
     // Show turn notification
     if (faction) {
       if (faction.controlledBy === 'human') {
-        this.showToast(`🎮 YOUR TURN: ${faction.name}`, 'success');
         soundManager.play('turn_start');
 
         this.stopTurnTimer();
@@ -3197,7 +3193,6 @@ export class HUD {
    * Show income notification
    */
   private showIncomeNotification(data: { amount: number }): void {
-    this.showToast(`+${data.amount} IPCs collected!`, 'success');
     soundManager.play('income');
     this.updateTurnInfo();
     
