@@ -6187,6 +6187,173 @@ body.theme-dark .panel-grip {
   max-height: 22vh;
 }
 
+/* ── HQ dark-theme overrides for stat-rows / unit items ── */
+
+#hq-panel #territory-details .stat-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  font-size: 0.78rem;
+}
+
+#hq-panel #territory-details .stat-row:last-of-type {
+  border-bottom: none;
+}
+
+#hq-panel #territory-details .stat-row span:first-child {
+  color: #9ca3af;
+}
+
+#hq-panel #territory-details .unit-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+#hq-panel #territory-details .unit-item {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  margin: 0.2rem 0;
+  font-size: 0.76rem;
+}
+
+#hq-panel #territory-details .unit-item:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+#hq-panel #territory-details .naval-status {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.73rem;
+  color: #d1d5db;
+  margin-top: 0.4rem;
+}
+
+#hq-panel #territory-details .naval-status.danger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+#hq-panel #territory-details .naval-status.open {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+/* Faction summary shown when no territory is selected */
+.hq-faction-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.1rem 0;
+}
+
+.hq-faction-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 0.25rem;
+}
+
+.hq-faction-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hq-faction-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hq-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.hq-stat-cell {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.hq-stat-cell .hq-stat-label {
+  font-size: 0.62rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hq-stat-cell .hq-stat-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+.hq-stat-cell .hq-stat-value.positive { color: #6ee7b7; }
+.hq-stat-cell .hq-stat-value.warning  { color: #fbbf24; }
+.hq-stat-cell .hq-stat-value.danger   { color: #fca5a5; }
+
+.hq-capital-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.73rem;
+  color: #d1d5db;
+  padding: 0.3rem 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 5px;
+}
+
+.hq-capital-row.safe   { border-left: 3px solid #6ee7b7; }
+.hq-capital-row.at-risk { border-left: 3px solid #fbbf24; }
+.hq-capital-row.lost   { border-left: 3px solid #fca5a5; }
+
+/* Faction color accent bar on HQ header */
+#hq-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 8px 0 0 0;
+  background: var(--hq-faction-color, transparent);
+  transition: background 0.4s ease;
+}
+
+#hq-header {
+  position: relative;
+}
+
+/* Smooth collapse/expand for HQ content */
+#hq-panel:not(.collapsed) #hq-content {
+  animation: hqFadeIn 0.2s ease-out;
+}
+
+@keyframes hqFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 1080px) {
   #hq-panel { display: none; }
 }

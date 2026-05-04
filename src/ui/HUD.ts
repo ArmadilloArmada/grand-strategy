@@ -661,6 +661,7 @@ export class HUD {
 
     // ABILITY section — wrap supply indicator + faction ability
     const abilityWrap = document.createElement('div');
+    abilityWrap.id = 'hq-ability-section';
     abilityWrap.className = 'war-room-section';
     const abilityTitle = document.createElement('div');
     abilityTitle.className = 'war-room-section-title';
@@ -681,6 +682,7 @@ export class HUD {
 
     panel.querySelector('#btn-toggle-hq')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
+      soundManager.play('click');
     });
   }
 
@@ -1923,6 +1925,26 @@ export class HUD {
     }, 5000); // Tips stay longer
   }
 
+  /** Sync the HQ panel header label and faction-color accent bar. */
+  private updateHQHeader(): void {
+    const panel = document.getElementById('hq-panel');
+    if (!panel) return;
+    const faction = this.state.getCurrentFaction();
+    const color = faction?.colorLight ?? faction?.color ?? '';
+    panel.style.setProperty('--hq-faction-color', color);
+
+    const headerSpan = panel.querySelector<HTMLElement>('#hq-header > span');
+    if (headerSpan && faction) {
+      headerSpan.textContent = `HQ · ${faction.name}`;
+    }
+
+    // Refresh the faction summary if no territory is currently selected
+    if (!this.state.getSelectedTerritory()) {
+      const detailsEl = document.getElementById('territory-details');
+      if (detailsEl) detailsEl.innerHTML = this.buildFactionSummaryHtml();
+    }
+  }
+
   /**
    * Update turn info display
    */
@@ -2024,6 +2046,7 @@ export class HUD {
     this.undoController.clearMoveHistory();
     this.undoController.clearPhaseSnapshots();
     this.undoController.updateButton();
+    this.updateHQHeader();
 
     // Show turn notification
     if (faction) {
@@ -2307,6 +2330,78 @@ export class HUD {
     this.renderer.render();
   }
 
+  /** Faction overview shown inside HQ when no territory is selected. */
+  private buildFactionSummaryHtml(): string {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) {
+      return `<p style="color:#6b7280;font-style:italic;font-size:0.78rem;text-align:center;padding:0.5rem 0;">Click any territory to inspect it.</p>`;
+    }
+
+    // Owned territory count and income
+    const ownedTerritories = Array.from(this.state.territories.values())
+      .filter(t => t.owner === faction.id);
+    const income = this.state.calculateIncome(faction.id);
+
+    // Total unit strength
+    let totalUnits = 0;
+    for (const t of ownedTerritories) totalUnits += t.getTotalUnitCount();
+
+    // Capital status
+    const capital = ownedTerritories.find(t => t.isCapital);
+    let capitalHtml = '';
+    if (capital) {
+      const capitalUnits = capital.getTotalUnitCount();
+      // Check if enemy units are adjacent to our capital
+      const adjacentEnemies = capital.adjacentTo.some(adjId => {
+        const adj = this.state.territories.get(adjId);
+        return adj && adj.owner && faction.isEnemyOf(adj.owner) && adj.getTotalUnitCount() > 0;
+      });
+      const statusClass = adjacentEnemies ? 'at-risk' : 'safe';
+      const statusText = adjacentEnemies ? '⚠ Under threat' : '✓ Secured';
+      capitalHtml = `<div class="hq-capital-row ${statusClass}">
+        <span>⭐ ${this.escapeHtml(capital.name)}</span>
+        <span style="margin-left:auto;font-size:0.7rem;">${statusText} · ${capitalUnits} unit${capitalUnits !== 1 ? 's' : ''}</span>
+      </div>`;
+    }
+
+    // Threat count (enemy-adjacent territories we own)
+    const threatenedCount = ownedTerritories.filter(t =>
+      t.adjacentTo.some(adjId => {
+        const adj = this.state.territories.get(adjId);
+        return adj && adj.owner && faction.isEnemyOf(adj.owner) && adj.getTotalUnitCount() > 0;
+      })
+    ).length;
+
+    const incomeClass = income >= 20 ? 'positive' : income >= 8 ? 'warning' : 'danger';
+    const unitsClass  = totalUnits >= 10 ? 'positive' : totalUnits >= 4 ? 'warning' : 'danger';
+
+    return `<div class="hq-faction-summary">
+      <div class="hq-faction-banner">
+        <div class="hq-faction-dot" style="background:${this.escapeHtml(faction.color)};box-shadow:0 0 5px ${this.escapeHtml(faction.color)}44;"></div>
+        <span class="hq-faction-name" style="color:${this.escapeHtml(faction.colorLight ?? faction.color)};">${this.escapeHtml(faction.name)}</span>
+      </div>
+      <div class="hq-stat-grid">
+        <div class="hq-stat-cell">
+          <span class="hq-stat-label">Territories</span>
+          <span class="hq-stat-value">${ownedTerritories.length}</span>
+        </div>
+        <div class="hq-stat-cell">
+          <span class="hq-stat-label">Income</span>
+          <span class="hq-stat-value ${incomeClass}">+${income}</span>
+        </div>
+        <div class="hq-stat-cell">
+          <span class="hq-stat-label">Units</span>
+          <span class="hq-stat-value ${unitsClass}">${totalUnits}</span>
+        </div>
+        <div class="hq-stat-cell">
+          <span class="hq-stat-label">Threatened</span>
+          <span class="hq-stat-value ${threatenedCount > 0 ? 'danger' : 'positive'}">${threatenedCount}</span>
+        </div>
+      </div>
+      ${capitalHtml}
+    </div>`;
+  }
+
   /**
    * Update selection info panel
    */
@@ -2361,13 +2456,9 @@ export class HUD {
     const detailsEl = document.getElementById('territory-details');
 
     if (!territory) {
-      if (nameEl) nameEl.textContent = 'Select a Territory';
+      if (nameEl) nameEl.textContent = 'No Territory Selected';
       if (detailsEl) {
-        detailsEl.innerHTML = `
-          <p style="text-align: center; color: #666; font-style: italic;">
-            Click on any territory to view details and available units.
-          </p>
-        `;
+        detailsEl.innerHTML = this.buildFactionSummaryHtml();
       }
       this.updateActionButtons();
       return;
@@ -4681,12 +4772,17 @@ export class HUD {
 
   /** Update the faction ability button state. */
   updateFactionAbilityButton(factionId: string): void {
-    const hide = () => this.abilityPanel.update({ visible: false });
+    const abilitySection = document.getElementById('hq-ability-section');
+    const hide = () => {
+      this.abilityPanel.update({ visible: false });
+      abilitySection?.classList.add('hidden');
+    };
     if (!settings.getSetting('factionAbilities')) { hide(); return; }
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction || faction.controlledBy !== 'human') { hide(); return; }
     const ability = this.abilityManager.getAbilityForFaction(factionId);
     if (!ability) { hide(); return; }
+    abilitySection?.classList.remove('hidden');
     const ready = this.abilityManager.isReady(factionId, this.state.turnNumber);
     const turnsLeft = this.abilityManager.turnsUntilReady(factionId, this.state.turnNumber);
     this.abilityPanel.update({
