@@ -212,16 +212,11 @@ export class VictoryScreen {
         </div>
       </div>
     `;
-    setTimeout(() => {
+    // Append immediately so duplicate-guard and tests can find it.
+    // Keep it hidden until the flash completes, then reveal with animation.
+    modal.style.opacity = '0';
+    modal.style.transition = 'opacity 0.3s ease';
     document.body.appendChild(modal);
-
-    // Animate bar charts from 0 → target width after a brief delay
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      modal.querySelectorAll<HTMLElement>('.victory-bar').forEach((bar, i) => {
-        const pct = bar.dataset.pct ?? '0';
-        setTimeout(() => { bar.style.width = `${pct}%`; }, i * 60);
-      });
-    }));
 
     document.getElementById('btn-victory-play-again')?.addEventListener('click', () => location.reload());
     document.getElementById('btn-victory-review')?.addEventListener('click', () => modal.remove());
@@ -231,9 +226,20 @@ export class VictoryScreen {
       this.callbacks.showMainMenu();
     });
 
-    if (isPlayerVictory) {
-      this.runConfetti(5000);
-    }
+    // Reveal modal and animate bar charts after flash completes
+    setTimeout(() => {
+      modal.style.opacity = '1';
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        modal.querySelectorAll<HTMLElement>('.victory-bar').forEach((bar, i) => {
+          const pct = bar.dataset.pct ?? '0';
+          setTimeout(() => { bar.style.width = `${pct}%`; }, i * 60);
+        });
+      }));
+
+      if (isPlayerVictory) {
+        this.runConfetti(5000);
+      }
     }, 900); // wait for flash to complete
   }
 

@@ -156,7 +156,8 @@ export class AIController {
         }
       }
     }
-    const faction = this.state.factionRegistry.get(factionId)!;
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) throw new Error(`AIController: unknown faction "${factionId}"`);
     return {
       factionId,
       ipcs: faction.ipcs,

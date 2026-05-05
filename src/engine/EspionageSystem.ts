@@ -203,7 +203,10 @@ export class EspionageSystem {
   }
 
   private applyEffect(opType: EspionageOpType, initiatorId: string, targetFactionId: string): string {
-    const target = this.state.factionRegistry.get(targetFactionId)!;
+    const initiator = this.state.factionRegistry.get(initiatorId);
+    const target = this.state.factionRegistry.get(targetFactionId);
+    if (!initiator || !target) return 'Operation failed: invalid faction.';
+
 
     switch (opType) {
       case 'steal_intel': {
@@ -252,7 +255,7 @@ export class EspionageSystem {
       case 'economic_disruption': {
         const take = Math.floor(target.ipcs * 0.15);
         target.ipcs = Math.max(0, target.ipcs - take);
-        this.state.factionRegistry.get(initiatorId)!.ipcs += take;
+        initiator.ipcs += take;
         return `Disrupted ${target.name}'s economy — seized ${take} IPCs.`;
       }
 
@@ -262,8 +265,7 @@ export class EspionageSystem {
       }
 
       case 'steal_nuclear_secrets': {
-        const initiatorFaction = this.state.factionRegistry.get(initiatorId)!;
-        initiatorFaction.nuclearReadiness = Math.min(100, initiatorFaction.nuclearReadiness + 30);
+        initiator.nuclearReadiness = Math.min(100, initiator.nuclearReadiness + 30);
         return `Nuclear secrets stolen from ${target.name}! Your readiness +30%.`;
       }
 

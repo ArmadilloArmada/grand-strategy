@@ -20,9 +20,9 @@ export interface Achievement {
 }
 
 export interface AchievementCondition {
-  type: 'win_games' | 'win_faction' | 'capture_territories' | 'destroy_units' |
+  type: 'win_games' | 'capture_territories' | 'destroy_units' |
         'produce_units' | 'earn_ipcs' | 'complete_campaign' | 'win_streak' |
-        'speed_victory' | 'domination' | 'no_losses' | 'underdog' | 'custom' |
+        'speed_victory' | 'no_losses' | 'underdog' | 'custom' |
         'espionage_op' | 'nuclear_strike' | 'fortification_built' | 'alliance_formed' |
         'commander_leveled';
   value: number;
