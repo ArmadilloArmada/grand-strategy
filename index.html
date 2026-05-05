@@ -913,38 +913,6 @@
       </div>
     </div>
 
-    <!-- Battle Preview Modal -->
-    <div id="battle-preview-modal" class="modal hidden">
-      <div class="modal-content" style="max-width: 450px;">
-        <h2>⚔️ Battle Preview</h2>
-        <div id="preview-territory" style="text-align: center; font-family: 'Cinzel', serif; margin-bottom: 1rem;"></div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-          <div id="preview-attackers" style="background: rgba(37, 99, 235, 0.1); padding: 1rem; border-radius: 8px;">
-            <h3 style="color: #2563eb; margin-bottom: 0.5rem;">🗡️ Your Forces</h3>
-            <div id="preview-attacker-units"></div>
-            <div id="preview-attacker-power" style="margin-top: 0.5rem; font-weight: bold;"></div>
-          </div>
-          <div id="preview-defenders" style="background: rgba(220, 38, 38, 0.1); padding: 1rem; border-radius: 8px;">
-            <h3 style="color: #dc2626; margin-bottom: 0.5rem;">🛡️ Defenders</h3>
-            <div id="preview-defender-units"></div>
-            <div id="preview-defender-power" style="margin-top: 0.5rem; font-weight: bold;"></div>
-          </div>
-        </div>
-        
-        <div id="preview-odds" style="text-align: center; padding: 1rem; background: rgba(0,0,0,0.1); border-radius: 8px; margin-bottom: 1rem;">
-          <div style="font-size: 1.5rem; font-weight: bold;" id="odds-display">~50%</div>
-          <div style="font-size: 0.9rem; color: #666;">Estimated Victory Chance</div>
-          <div id="preview-risk-summary" class="preview-risk-summary even"></div>
-        </div>
-        
-        <div style="text-align: center;">
-          <button id="btn-confirm-attack" class="primary">⚔️ Attack!</button>
-          <button id="btn-cancel-attack">Cancel</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Unit Tooltip -->
     <div id="unit-tooltip" class="tooltip hidden">
       <div id="tooltip-content"></div>
@@ -972,36 +940,66 @@
       </div>
     </div>
 
-    <!-- Combat Modal -->
+    <!-- Combined Combat Modal: preview phase → battle phase in one window -->
     <div id="combat-modal" class="modal hidden">
-      <div class="modal-content">
-        <h2>⚔️ Battle!</h2>
-        <div id="combat-territory" style="text-align: center; margin-bottom: 1rem; font-family: 'Cinzel', serif; font-size: 1.2rem;"></div>
-        <div id="combat-odds" style="text-align: center; margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px;">
-          <span id="odds-text" style="font-size: 0.9rem; color: #aaa;">Calculating odds...</span>
+      <div class="modal-content" style="max-width:520px;">
+        <h2 id="combat-modal-title">⚔️ Battle</h2>
+
+        <!-- PHASE: Preview — unit comparison + odds before committing -->
+        <div id="combat-phase-preview">
+          <div id="preview-territory" style="text-align:center; font-family:'Cinzel',serif; margin-bottom:1rem;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div id="preview-attackers" style="background:rgba(37,99,235,0.1); padding:1rem; border-radius:8px;">
+              <h3 style="color:#2563eb; margin-bottom:0.5rem;">🗡️ Your Forces</h3>
+              <div id="preview-attacker-units"></div>
+              <div id="preview-attacker-power" style="margin-top:0.5rem; font-weight:bold;"></div>
+            </div>
+            <div id="preview-defenders" style="background:rgba(220,38,38,0.1); padding:1rem; border-radius:8px;">
+              <h3 style="color:#dc2626; margin-bottom:0.5rem;">🛡️ Defenders</h3>
+              <div id="preview-defender-units"></div>
+              <div id="preview-defender-power" style="margin-top:0.5rem; font-weight:bold;"></div>
+            </div>
+          </div>
+          <div id="preview-odds" style="text-align:center; padding:1rem; background:rgba(0,0,0,0.1); border-radius:8px; margin-bottom:1rem;">
+            <div style="font-size:1.5rem; font-weight:bold;" id="odds-display">~50%</div>
+            <div style="font-size:0.9rem; color:#666;">Estimated Victory Chance</div>
+            <div id="preview-risk-summary" class="preview-risk-summary even"></div>
+          </div>
+          <div style="text-align:center;">
+            <button id="btn-confirm-attack" class="primary">⚔️ Attack!</button>
+            <button id="btn-cancel-attack">Cancel</button>
+          </div>
         </div>
-        <div id="combat-attacker">
-          <h3>🗡️ Attacking Forces</h3>
-          <div id="attacker-units"></div>
+
+        <!-- PHASE: Battle — dice, log, unit health -->
+        <div id="combat-phase-battle" class="hidden">
+          <div id="combat-territory" style="text-align:center; margin-bottom:1rem; font-family:'Cinzel',serif; font-size:1.1rem;"></div>
+          <div id="combat-odds" style="text-align:center; margin-bottom:1rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:6px;">
+            <span id="odds-text" style="font-size:0.9rem; color:#aaa;">Calculating odds...</span>
+          </div>
+          <div id="combat-attacker">
+            <h3>🗡️ Attacking Forces</h3>
+            <div id="attacker-units"></div>
+          </div>
+          <div id="combat-defender">
+            <h3>🛡️ Defending Forces</h3>
+            <div id="defender-units"></div>
+          </div>
+          <div id="combat-dice-row" class="hidden">
+            <div class="dice-side-label">⚔️ Attack rolls</div>
+            <div id="attacker-dice" class="dice-group"></div>
+            <div class="dice-side-label">🛡️ Defense rolls</div>
+            <div id="defender-dice" class="dice-group"></div>
+          </div>
+          <div id="combat-log"></div>
+          <div style="text-align:center; display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+            <button id="btn-roll-combat" class="primary">🎲 Roll Dice</button>
+            <button id="btn-auto-resolve" style="background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;">⚡ Auto-Resolve</button>
+            <button id="btn-retreat" disabled>🏃 Retreat</button>
+            <button id="btn-close-combat" disabled>✓ Continue</button>
+          </div>
         </div>
-        <div id="combat-defender">
-          <h3>🛡️ Defending Forces</h3>
-          <div id="defender-units"></div>
-        </div>
-        <!-- Animated dice display — populated by JS on each roll -->
-        <div id="combat-dice-row" class="hidden">
-          <div class="dice-side-label">⚔️ Attack rolls</div>
-          <div id="attacker-dice" class="dice-group"></div>
-          <div class="dice-side-label">🛡️ Defense rolls</div>
-          <div id="defender-dice" class="dice-group"></div>
-        </div>
-        <div id="combat-log"></div>
-        <div style="text-align: center; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-          <button id="btn-roll-combat" class="primary">🎲 Roll Dice</button>
-          <button id="btn-auto-resolve" style="background: linear-gradient(135deg, #7c3aed, #6366f1); color: #fff;">⚡ Auto-Resolve</button>
-          <button id="btn-retreat" disabled>🏃 Retreat</button>
-          <button id="btn-close-combat" disabled>✓ Continue</button>
-        </div>
+
       </div>
     </div>
 

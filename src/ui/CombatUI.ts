@@ -56,8 +56,21 @@ export class CombatUI {
 
   showCombatModal(combat: CombatState): void {
     this.activeCombat = combat;
+
+    // Switch combined modal to battle phase (opens it if not already open)
     const modal = document.getElementById('combat-modal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+      modal.classList.remove('hidden');
+      document.getElementById('combat-phase-preview')?.classList.add('hidden');
+      const battlePhase = document.getElementById('combat-phase-battle');
+      if (battlePhase) {
+        battlePhase.classList.remove('hidden');
+        battlePhase.classList.add('combat-phase-enter');
+        requestAnimationFrame(() => battlePhase.classList.remove('combat-phase-enter'));
+      }
+      const title = document.getElementById('combat-modal-title');
+      if (title) title.textContent = '⚔️ Battle!';
+    }
 
     soundManager.play('combat_start');
 
@@ -611,8 +624,15 @@ export class CombatUI {
     const toTerritory = this.state.territories.get(toId);
     if (!fromTerritory || !toTerritory) return;
 
-    const modal = document.getElementById('battle-preview-modal');
-    if (modal) modal.classList.remove('hidden');
+    // Open combined modal in preview phase
+    const modal = document.getElementById('combat-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      document.getElementById('combat-phase-battle')?.classList.add('hidden');
+      document.getElementById('combat-phase-preview')?.classList.remove('hidden');
+      const title = document.getElementById('combat-modal-title');
+      if (title) title.textContent = '⚔️ Battle Preview';
+    }
 
     const territoryEl = document.getElementById('preview-territory');
     let territoryLabel = `Attack on ${toTerritory.name}`;
@@ -865,8 +885,7 @@ export class CombatUI {
       return;
     }
 
-    this.closeBattlePreview();
-
+    // Keep modal open (in preview phase) while gathering unit counts
     const attackingUnits: { unitTypeId: string; count: number; veteranCount?: number }[] = [];
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
@@ -875,6 +894,7 @@ export class CombatUI {
         if (availableCount <= 0) continue;
         const answer = prompt(`How many ${unitType.name} should attack?`, String(availableCount));
         if (answer === null) {
+          this.closeBattlePreview();
           this.callbacks.showToast('Attack cancelled', 'info');
           return;
         }
@@ -889,6 +909,7 @@ export class CombatUI {
     }
 
     if (attackingUnits.length === 0) {
+      this.closeBattlePreview();
       this.callbacks.showToast('No units can attack!', 'info');
       return;
     }
@@ -899,6 +920,7 @@ export class CombatUI {
     }
 
     if (defendingUnits.length === 0) {
+      this.closeBattlePreview();
       for (const au of attackingUnits) {
         fromTerritory.removeUnits(au.unitTypeId, au.count);
       }
@@ -922,6 +944,7 @@ export class CombatUI {
     );
 
     if (!combat) {
+      this.closeBattlePreview();
       this.callbacks.showToast('Cannot initiate combat!', 'info');
       return;
     }
@@ -936,7 +959,7 @@ export class CombatUI {
   }
 
   closeBattlePreview(): void {
-    const modal = document.getElementById('battle-preview-modal');
+    const modal = document.getElementById('combat-modal');
     if (modal) modal.classList.add('hidden');
     this.pendingAttackFrom = null;
     this.pendingAttackTarget = null;

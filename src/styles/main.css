@@ -938,6 +938,17 @@ body.theme-dark #help-button {
   color: #fff;
 }
 
+/* Combined combat modal phase transitions */
+#combat-phase-preview,
+#combat-phase-battle {
+  animation: combatPhaseIn 0.22s ease-out;
+}
+
+@keyframes combatPhaseIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes modalSlideUp {
   from { transform: translateY(20px) scale(0.98); opacity: 0; }
   to { transform: translateY(0) scale(1); opacity: 1; }
