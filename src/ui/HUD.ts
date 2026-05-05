@@ -1388,6 +1388,8 @@ export class HUD {
       ['Ctrl+Z', 'Undo last action'],
       ['Ctrl+Y', 'Redo'],
       ['Esc', 'Deselect / close modal / game menu'],
+      ['F11', 'Toggle fullscreen'],
+      ['Ctrl+,', 'Open settings'],
       ['?', 'Show this cheat-sheet'],
     ];
 

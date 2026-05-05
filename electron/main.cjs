@@ -501,6 +501,15 @@ ipcMain.handle('workshop-update', async (_event, { itemId, title, description, t
   }
 });
 
+// Window state
+ipcMain.handle('toggle-fullscreen', () => {
+  if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
+});
+
+ipcMain.handle('is-fullscreen', () => {
+  return mainWindow ? mainWindow.isFullScreen() : false;
+});
+
 // Crash and error handling
 
 process.on('uncaughtException', (err) => {

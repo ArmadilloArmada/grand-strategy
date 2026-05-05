@@ -1181,6 +1181,8 @@ class Game {
     (document.getElementById('setting-music-enabled') as HTMLInputElement).checked = s.musicEnabled;
     (document.getElementById('setting-sfx-enabled') as HTMLInputElement).checked = s.sfxEnabled;
     (document.getElementById('setting-master-volume') as HTMLInputElement).value = s.masterVolume.toString();
+    (document.getElementById('setting-music-volume') as HTMLInputElement).value = s.musicVolume.toString();
+    (document.getElementById('setting-sfx-volume') as HTMLInputElement).value = s.sfxVolume.toString();
     (document.getElementById('setting-animations') as HTMLInputElement).checked = s.animationsEnabled;
     (document.getElementById('setting-territory-names') as HTMLInputElement).checked = s.showTerritoryNames;
     (document.getElementById('setting-battle-narratives') as HTMLInputElement).checked = s.battleNarratives ?? true;
@@ -1195,6 +1197,16 @@ class Game {
     (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
     (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
     (document.getElementById('setting-theme') as HTMLSelectElement).value = s.theme ?? 'dark';
+
+    // Sync fullscreen button label
+    const fsBtn = document.getElementById('btn-toggle-fullscreen') as HTMLButtonElement | null;
+    if (fsBtn) {
+      const updateFsLabel = async () => {
+        const isFull = await window.electronAPI?.isFullscreen?.() ?? document.fullscreenElement != null;
+        fsBtn.textContent = isFull ? 'Exit Fullscreen' : 'Enter Fullscreen';
+      };
+      updateFsLabel();
+    }
   }
 
   /**
@@ -1218,6 +1230,8 @@ class Game {
       musicEnabled: (document.getElementById('setting-music-enabled') as HTMLInputElement).checked,
       sfxEnabled: (document.getElementById('setting-sfx-enabled') as HTMLInputElement).checked,
       masterVolume: parseInt((document.getElementById('setting-master-volume') as HTMLInputElement).value),
+      musicVolume: parseInt((document.getElementById('setting-music-volume') as HTMLInputElement).value),
+      sfxVolume: parseInt((document.getElementById('setting-sfx-volume') as HTMLInputElement).value),
       animationsEnabled: (document.getElementById('setting-animations') as HTMLInputElement).checked,
       showTerritoryNames: (document.getElementById('setting-territory-names') as HTMLInputElement).checked,
       battleNarratives: (document.getElementById('setting-battle-narratives') as HTMLInputElement).checked,
@@ -1548,6 +1562,23 @@ class Game {
         dragManager.resetLayoutInPlace();
         this.hud.showToast('Panel layout reset', 'success');
       });
+    });
+
+    document.getElementById('btn-toggle-fullscreen')?.addEventListener('click', async () => {
+      if (window.electronAPI?.toggleFullscreen) {
+        await window.electronAPI.toggleFullscreen();
+      } else {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.();
+        } else {
+          document.exitFullscreen?.();
+        }
+      }
+      // Refresh label after toggle
+      await new Promise(r => setTimeout(r, 100));
+      const isFull = await window.electronAPI?.isFullscreen?.() ?? document.fullscreenElement != null;
+      const btn = document.getElementById('btn-toggle-fullscreen') as HTMLButtonElement | null;
+      if (btn) btn.textContent = isFull ? 'Exit Fullscreen' : 'Enter Fullscreen';
     });
   }
 

@@ -43,6 +43,27 @@
       });
     })();
   </script>
+  <!-- Minimum resolution warning — shown before the app boots if viewport is too small -->
+  <div id="resolution-warning" style="display:none;position:fixed;inset:0;background:#0d1a0f;color:#e8e8d0;font-family:Georgia,serif;z-index:99998;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;">
+    <div style="font-size:3rem;margin-bottom:1rem;">⚔️</div>
+    <h2 style="color:#c89620;margin:0 0 0.5rem;letter-spacing:0.05em;">WINDOW TOO SMALL</h2>
+    <p style="color:#94a3b8;margin:0 0 0.5rem;max-width:400px;">Grand Strategy requires a minimum window size of <strong style="color:#e8e8d0;">1024 × 768</strong>.</p>
+    <p style="color:#64748b;font-size:0.85rem;">Please resize or maximise the window to continue.</p>
+  </div>
+  <script>
+    (function () {
+      var MIN_W = 1024, MIN_H = 640;
+      var el = document.getElementById('resolution-warning');
+      function check() {
+        if (!el) return;
+        var small = window.innerWidth < MIN_W || window.innerHeight < MIN_H;
+        el.style.display = small ? 'flex' : 'none';
+      }
+      check();
+      window.addEventListener('resize', check);
+    })();
+  </script>
+
   <!-- Skip link for keyboard navigation - WCAG 2.1 requirement -->
   <a href="#game-canvas" class="skip-link">Skip to game</a>
   
@@ -588,6 +609,16 @@
             <label>Master Volume</label>
             <input type="range" id="setting-master-volume" min="0" max="100" value="80">
           </div>
+
+          <div class="setting-row">
+            <label>Music Volume</label>
+            <input type="range" id="setting-music-volume" min="0" max="100" value="60">
+          </div>
+
+          <div class="setting-row">
+            <label>SFX Volume</label>
+            <input type="range" id="setting-sfx-volume" min="0" max="100" value="80">
+          </div>
         </div>
         
         <div class="settings-section">
@@ -599,6 +630,11 @@
               <option value="dark">Dark (War Room)</option>
               <option value="light">Light (Accessibility)</option>
             </select>
+          </div>
+
+          <div class="setting-row">
+            <label>Fullscreen <span style="font-size:0.75rem;opacity:0.6;">(F11)</span></label>
+            <button id="btn-toggle-fullscreen" style="padding:0.35rem 0.9rem;font-size:0.85rem;">Enter Fullscreen</button>
           </div>
 
           <div class="setting-row">

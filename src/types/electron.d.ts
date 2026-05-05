@@ -33,6 +33,10 @@ interface ElectronAPI {
   importModFile(): Promise<unknown>;
   deleteModFile(filename: string): Promise<void>;
 
+  // Window controls
+  toggleFullscreen(): Promise<void>;
+  isFullscreen(): Promise<boolean>;
+
   // Native OS menu event listeners (Electron only)
   onMenuNewGame?(callback: () => void): void;
   onMenuSaveGame?(callback: () => void): void;
