@@ -52,6 +52,7 @@ import { PhaseGuidance } from './PhaseGuidance';
 import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
 import { AbilityPanel } from './AbilityPanel';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
+import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase } from './hud/PhaseHelpers';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -1626,9 +1627,9 @@ export class HUD {
 
     // Check if clicking on a valid move target
     // Handle all movement-capable phases across different turn styles
-    const isMovementPhase = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
+    const movementPhase = isMovementPhase(phase);
     
-    if (isMovementPhase) {
+    if (movementPhase) {
       // PREVENT double-click on same territory
       if (previousTerritoryId === territoryId) {
         // Clicking same territory again - just refresh selection, don't move
@@ -2740,18 +2741,18 @@ export class HUD {
 
     // Determine which phases allow which actions based on turn style
     const phaseStr = phase as string;
-    const isMovementPhase = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phaseStr);
-    const isBuildPhase = ['purchase', 'build', 'production'].includes(phaseStr);
-    const isCombatPhase = ['combat', 'attack', 'resolve'].includes(phaseStr);
+    const movementPhase = isMovementPhase(phaseStr);
+    const buildPhase = isBuildPhase(phaseStr);
+    const combatPhase = isCombatPhase(phaseStr);
     const isEndPhase = ['collect_income', 'end'].includes(phaseStr);
-    const hasAttackTargets = isMovementPhase && this.validMoves.some(m => m.isAttack);
+    const hasAttackTargets = movementPhase && this.validMoves.some(m => m.isAttack);
 
     // Move button - enabled during movement phases with owned territory selected that has available units
     if (moveBtn) {
       // Check for units that haven't acted yet this turn
       const hasAvailableUnits = territory && territory.owner === faction?.id && 
         territory.units.some(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
-      const canMove = isMovementPhase && isHumanTurn && hasAvailableUnits;
+      const canMove = movementPhase && isHumanTurn && hasAvailableUnits;
       moveBtn.disabled = !canMove;
       
       if (canMove) {
@@ -2759,7 +2760,7 @@ export class HUD {
         moveBtn.title = 'Click a highlighted friendly/empty territory to move units';
       } else {
         moveBtn.innerHTML = '🚶 Move <kbd class="kbd-hint">M</kbd>';
-        moveBtn.title = isMovementPhase
+        moveBtn.title = movementPhase
           ? 'Select one of your territories with ready units'
           : 'Only available in movement phases';
       }
@@ -2767,7 +2768,7 @@ export class HUD {
 
     // Attack button - opens battle preview when selected territory has attack targets
     if (attackBtn) {
-      if (isMovementPhase && isHumanTurn) {
+      if (movementPhase && isHumanTurn) {
         attackBtn.innerHTML = hasAttackTargets
           ? '⚔️ Attack Target <kbd class="kbd-hint">A</kbd>'
           : '⚔️ Attack <kbd class="kbd-hint">A</kbd>';
@@ -2775,7 +2776,7 @@ export class HUD {
         attackBtn.title = hasAttackTargets
           ? 'Open battle preview for available attack target'
           : 'Select your territory, then click an enemy territory to attack';
-      } else if (isCombatPhase) {
+      } else if (combatPhase) {
         attackBtn.textContent = '⚔️ Resolve Combat';
         attackBtn.disabled = this.state.pendingMoves.length === 0 || !isHumanTurn;
         attackBtn.title = this.state.pendingMoves.length > 0
@@ -2791,12 +2792,12 @@ export class HUD {
     // Phase-active class: highlight buttons relevant to the current phase
     const allActionBtns = [moveBtn, attackBtn, buildBtn];
     for (const b of allActionBtns) b?.classList.remove('phase-active');
-    if (isMovementPhase) {
+    if (movementPhase) {
       moveBtn?.classList.add('phase-active');
       if (hasAttackTargets) attackBtn?.classList.add('phase-active');
     }
-    if (isBuildPhase) buildBtn?.classList.add('phase-active');
-    if (isCombatPhase) attackBtn?.classList.add('phase-active');
+    if (buildPhase) buildBtn?.classList.add('phase-active');
+    if (combatPhase) attackBtn?.classList.add('phase-active');
 
     // Build/Mobilize button - enabled during purchase/build/production phase
     if (buildBtn) {
@@ -2806,14 +2807,14 @@ export class HUD {
       const mobilizeOptions = this.mobilizationSystem.getMobilizationOptions();
       const canMobilize = mobilizeOptions.some(o => o.canMobilize);
       
-      const canBuild = isBuildPhase && isHumanTurn;
+      const canBuild = buildPhase && isHumanTurn;
       buildBtn.disabled = !canBuild;
       
       // Update button tooltip with reason
       if (!canBuild) {
         if (!isHumanTurn) {
           buildBtn.title = 'Wait for your turn';
-        } else if (!isBuildPhase) {
+        } else if (!buildPhase) {
           buildBtn.title = `Only available in ${turnStyle === 'quick' ? 'Build' : 'Purchase/Production'} phase`;
         }
       } else if (!canMobilize) {
@@ -2837,7 +2838,7 @@ export class HUD {
         }
         return false;
       })();
-      const showBomb = (isCombatPhase || isMovementPhase) && isHumanTurn && hasBombers;
+      const showBomb = (combatPhase || movementPhase) && isHumanTurn && hasBombers;
       bombBtn.classList.toggle('hidden', !showBomb);
       bombBtn.disabled = !showBomb;
     }
@@ -2846,10 +2847,10 @@ export class HUD {
     const fortifyBtn = document.getElementById('btn-fortify') as HTMLButtonElement | null;
     if (fortifyBtn) {
       const fort = this.state.systems.fortificationSystem;
-      const canFortify = isBuildPhase && isHumanTurn && fort !== undefined &&
+      const canFortify = buildPhase && isHumanTurn && fort !== undefined &&
         territory != null && territory.isLand() && territory.owner === faction?.id &&
         (territory.fortificationLevel ?? 0) < 2 && fort.canBuild(territory.id, faction?.id ?? '');
-      const showFortify = isBuildPhase && isHumanTurn && fort !== undefined;
+      const showFortify = buildPhase && isHumanTurn && fort !== undefined;
       fortifyBtn.classList.toggle('hidden', !showFortify);
       fortifyBtn.disabled = !canFortify;
       if (showFortify && territory?.owner === faction?.id && fort) {
@@ -2911,9 +2912,9 @@ export class HUD {
       faction,
       territory,
       isHumanTurn,
-      isBuildPhase,
-      isMovementPhase,
-      isCombatPhase,
+      isBuildPhase: buildPhase,
+      isMovementPhase: movementPhase,
+      isCombatPhase: combatPhase,
       isEndPhase,
     });
     if (contextTip) this.showFirstTimeTip(contextTip.tipId, contextTip.message);
@@ -2958,8 +2959,7 @@ export class HUD {
     }
 
     // Check if current phase allows movement
-    const movementPhases = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'];
-    if (!movementPhases.includes(phase)) {
+    if (!isMovementPhase(phase)) {
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
       this.updateMapReadabilityLegend();
@@ -2969,7 +2969,7 @@ export class HUD {
     // Get valid moves for all unit types in territory
     const allMoves: ValidMove[] = [];
     // Determine if attacks are allowed based on phase and turn style
-    const isCombatMove = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+    const isCombatMove = isAttackMovePhase(phase);
 
     for (const pu of territory.units) {
       const moves = this.movementValidator.getValidMoves(
@@ -3061,7 +3061,7 @@ export class HUD {
    * Handle attack button click - START COMBAT RESOLUTION
    */
   private onAttackClick(): void {
-    if (['combat_move', 'move', 'orders', 'action'].includes(this.state.currentPhase)) {
+    if (isAttackMovePhase(this.state.currentPhase)) {
       this.onAttackShortcut();
       return;
     }
@@ -3075,8 +3075,8 @@ export class HUD {
    */
   private onAttackShortcut(): void {
     const phase = this.state.currentPhase;
-    const isMovementPhase = ['combat_move', 'move', 'orders', 'action'].includes(phase);
-    if (!isMovementPhase) {
+    const movementPhase = isAttackMovePhase(phase);
+    if (!movementPhase) {
       this.showToast('Attack only available in combat/move phases', 'info');
       return;
     }
