@@ -2,6 +2,12 @@ name: Build & Test
 
 on:
   workflow_dispatch:
+    inputs:
+      signed_build:
+        description: "Enable signing/notarization (requires secrets)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build-windows:
@@ -23,9 +29,18 @@ jobs:
         run: npm run build
 
       - name: Package (unpacked, no installer)
+        if: ${{ !inputs.signed_build }}
         run: npx electron-builder --win --dir
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (signed installer build)
+        if: ${{ inputs.signed_build }}
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -53,9 +68,21 @@ jobs:
         run: npm run build
 
       - name: Package
+        if: ${{ !inputs.signed_build }}
         run: npx electron-builder --mac --dir
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (signed/notarized)
+        if: ${{ inputs.signed_build }}
+        run: npm run dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

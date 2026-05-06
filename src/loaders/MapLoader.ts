@@ -20,7 +20,12 @@ export interface StartingUnits {
 }
 
 export class MapLoader {
-  constructor(private state: GameState) {}
+  private readonly strictMapTopology: boolean;
+
+  constructor(private state: GameState) {
+    const envStrict = (import.meta as any)?.env?.VITE_STRICT_MAP_TOPOLOGY === '1';
+    this.strictMapTopology = Boolean(envStrict);
+  }
 
   /**
    * Load map from JSON data
@@ -53,6 +58,14 @@ export class MapLoader {
   }
 
   private withGeneratedSeaCells(mapData: MapData): MapData {
+    if (this.strictMapTopology) {
+      const issues = this.validateMap(mapData);
+      if (issues.length > 0) {
+        throw new Error(`Strict map topology enabled; map has ${issues.length} issue(s): ${issues[0]}`);
+      }
+      return { ...mapData, territories: this.cloneTerritories(mapData.territories) };
+    }
+
     const cellSize = this.inferGridCellSize(mapData);
     const territories = this.cloneTerritories(mapData.territories);
     if (!cellSize) {

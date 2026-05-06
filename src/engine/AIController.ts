@@ -203,6 +203,7 @@ export class AIController {
    * Execute AI turn for current faction
    */
   async executeTurn(): Promise<void> {
+    const perfStart = performance.now();
     const faction = this.state.getCurrentFaction();
     if (!faction || faction.controlledBy !== "ai") return;
 
@@ -225,17 +226,32 @@ export class AIController {
     this.considerNuclear(faction);
 
     while (true) {
+      const phaseStart = performance.now();
       await this.processPhase(evaluations);
+      this.emitPerf('aiPhaseMs', performance.now() - phaseStart, { phase: this.state.currentPhase, factionId: faction.id });
       if (this.state.getCurrentFaction()?.id !== faction.id) break;
       this.turnManager.advancePhase();
       await this.delay(400);
     }
+    this.emitPerf('aiTurnMs', performance.now() - perfStart, { factionId: faction.id });
   }
 
   /** Clean up Worker when no longer needed */
   terminateWorker(): void {
     this.worker?.terminate();
     this.worker = null;
+  }
+
+  private emitPerf(metric: string, value: number, extra: Record<string, unknown> = {}): void {
+    const root = globalThis as any;
+    if (root?.localStorage?.getItem?.('gs-perf') !== '1') return;
+    const perfRoot = root.__gsPerf ?? (root.__gsPerf = {});
+    const bucket = perfRoot[metric] ?? { samples: 0, avg: 0, max: 0 };
+    bucket.samples += 1;
+    bucket.avg += (value - bucket.avg) / bucket.samples;
+    bucket.max = Math.max(bucket.max, value);
+    perfRoot[metric] = bucket;
+    this.state.emit('ai_debug', { type: 'perf', metric, value, ...extra });
   }
 
   /**

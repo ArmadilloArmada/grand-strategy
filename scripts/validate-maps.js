@@ -7,6 +7,7 @@ const mapFiles = fs.readdirSync(mapsDir)
   .sort();
 
 let totalErrors = 0;
+const strictTopology = process.env.STRICT_MAP_VALIDATION === '1';
 
 for (const file of mapFiles) {
   const f = path.basename(file, '.json');
@@ -30,7 +31,24 @@ for (const file of mapFiles) {
   }
 
   const isolated = map.territories.filter(t => t.type !== 'sea' && t.adjacentTo.length === 0);
-  if (isolated.length) console.log(f, 'ISOLATED:', isolated.map(t => t.id).join(', '));
+  if (isolated.length) {
+    console.log(f, 'ISOLATED:', isolated.map(t => t.id).join(', '));
+    errors += isolated.length;
+  }
+
+  const coastalWithoutSea = map.territories.filter(t =>
+    t.type === 'coastal' &&
+    !t.adjacentTo.some(adj => {
+      const other = map.territories.find(x => x.id === adj);
+      return other && other.type === 'sea';
+    })
+  );
+  if (coastalWithoutSea.length) {
+    console.log(f, 'COASTAL_WITHOUT_SEA:', coastalWithoutSea.map(t => t.id).join(', '));
+    if (strictTopology) {
+      errors += coastalWithoutSea.length;
+    }
+  }
 
   const capitals = map.territories.filter(t => t.isCapital).map(t => t.id).join(', ');
   const factories = map.territories.filter(t => t.hasFactory).length;

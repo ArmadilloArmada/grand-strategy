@@ -72,6 +72,28 @@ npm run dist:all
 
 Built files go to the `release/` directory.
 
+### Optional Strict Map Topology Mode
+
+To disable runtime map auto-repair and fail fast on map topology problems, run with:
+
+```bash
+VITE_STRICT_MAP_TOPOLOGY=1 npm run dev
+```
+
+Use this for release-candidate verification to ensure authored map data is valid without repair fallbacks.
+
+### Signing / Notarization (CI)
+
+The manual packaging workflow supports both unsigned and signed builds:
+
+- Unsigned (default): unpacked artifacts for smoke testing
+- Signed: installer/notarized builds when secrets are configured
+
+Configure repository secrets before enabling signed runs:
+
+- `CSC_LINK`, `CSC_KEY_PASSWORD`
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` (macOS notarization)
+
 ## Running Tests
 
 ```bash

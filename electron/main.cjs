@@ -19,6 +19,32 @@ try {
 
 // Check if running in development
 const isDev = !app.isPackaged;
+const MAX_CLOUD_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_MOD_JSON_BYTES = 2 * 1024 * 1024;
+const SAFE_FILENAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+function asSafeString(value, maxLen = 256) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLen) return null;
+  return trimmed;
+}
+
+function asSafeFilename(value) {
+  const s = asSafeString(value, 128);
+  if (!s || !SAFE_FILENAME_RE.test(s)) return null;
+  if (path.basename(s) !== s) return null;
+  return s;
+}
+
+function toBigIntSafe(value) {
+  try {
+    if (typeof value === 'bigint') return value;
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return BigInt(value);
+    if (typeof value === 'string' && /^[0-9]+$/.test(value)) return BigInt(value);
+  } catch (_) {}
+  return null;
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -47,6 +73,13 @@ function createWindow() {
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
     mainWindow.loadFile(indexPath);
   }
+
+  // Security: never allow renderer to navigate away or open arbitrary popups.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = isDev ? 'http://localhost:19123/' : `file://${path.join(__dirname, '..', 'dist', 'index.html')}`;
+    if (!url.startsWith(allowed)) event.preventDefault();
+  });
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
@@ -211,7 +244,10 @@ function unlockAchievement(achievementId) {
 ipcMain.handle('get-app-path', () => app.getPath('userData'));
 
 ipcMain.handle('unlock-achievement', (event, achievementId) => {
-  unlockAchievement(achievementId);
+  const id = asSafeString(achievementId, 80);
+  if (!id) return false;
+  unlockAchievement(id);
+  return true;
 });
 
 ipcMain.handle('is-steam-running', () => {
@@ -231,9 +267,14 @@ ipcMain.handle('get-steam-username', () => {
 
 // Steam Cloud file operations
 ipcMain.handle('steam-cloud-write', (event, filename, data) => {
+  const safeName = asSafeFilename(filename);
+  if (!safeName) return false;
+  if (!(typeof data === 'string' || Buffer.isBuffer(data))) return false;
+  const bytes = Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data, 'utf8');
+  if (bytes <= 0 || bytes > MAX_CLOUD_FILE_BYTES) return false;
   if (steamworks) {
     try {
-      steamworks.cloud.writeFile(filename, data);
+      steamworks.cloud.writeFile(safeName, data);
       return true;
     } catch (e) {
       console.error('Steam cloud write failed:', e);
@@ -243,9 +284,11 @@ ipcMain.handle('steam-cloud-write', (event, filename, data) => {
 });
 
 ipcMain.handle('steam-cloud-read', (event, filename) => {
+  const safeName = asSafeFilename(filename);
+  if (!safeName) return null;
   if (steamworks) {
     try {
-      const data = steamworks.cloud.readFile(filename);
+      const data = steamworks.cloud.readFile(safeName);
       // readFile returns a Buffer; convert to string for JSON save data
       return Buffer.isBuffer(data) ? data.toString('utf8') : data;
     } catch (e) {
@@ -267,9 +310,11 @@ ipcMain.handle('steam-cloud-list', () => {
 });
 
 ipcMain.handle('steam-cloud-delete', (event, filename) => {
+  const safeName = asSafeFilename(filename);
+  if (!safeName) return false;
   if (steamworks) {
     try {
-      steamworks.cloud.deleteFile(filename);
+      steamworks.cloud.deleteFile(safeName);
       return true;
     } catch (e) {
       console.error('Steam cloud delete failed:', e);
@@ -280,12 +325,16 @@ ipcMain.handle('steam-cloud-delete', (event, filename) => {
 
 // Steam Rich Presence
 ipcMain.handle('set-rich-presence', (event, status, details) => {
+  const safeStatus = asSafeString(status, 128) ?? '';
   if (steamworks) {
     try {
-      steamworks.localplayer.setRichPresence('status', String(status ?? ''));
+      steamworks.localplayer.setRichPresence('status', safeStatus);
       if (details && typeof details === 'object') {
-        for (const [key, value] of Object.entries(details)) {
-          steamworks.localplayer.setRichPresence(key, String(value));
+        for (const [key, value] of Object.entries(details).slice(0, 8)) {
+          const safeKey = asSafeString(key, 64);
+          const safeVal = asSafeString(String(value ?? ''), 256);
+          if (!safeKey || safeVal == null) continue;
+          steamworks.localplayer.setRichPresence(safeKey, safeVal);
         }
       }
     } catch (e) {
@@ -296,13 +345,18 @@ ipcMain.handle('set-rich-presence', (event, status, details) => {
 
 // Steam Overlay
 ipcMain.handle('open-steam-overlay', (event, dialog) => {
+  const allowed = new Set(['Achievements', 'Friends', 'Community', 'Players', 'Settings', 'OfficialGameGroup', 'Stats']);
+  const safeDialog = asSafeString(dialog, 64) ?? 'Achievements';
+  if (!allowed.has(safeDialog)) return false;
   if (steamworks) {
     try {
-      steamworks.overlay.activateOverlay(dialog ?? 'Achievements');
+      steamworks.overlay.activateOverlay(safeDialog);
+      return true;
     } catch (e) {
       console.error('Open steam overlay failed:', e);
     }
   }
+  return false;
 });
 
 // Save file dialog
@@ -375,7 +429,10 @@ ipcMain.handle('import-mod-file', async () => {
 /** Export a mod to the userData/mods/ folder */
 ipcMain.handle('export-mod-file', async (event, modJson) => {
   try {
+    if (typeof modJson !== 'string') return null;
+    if (Buffer.byteLength(modJson, 'utf8') > MAX_MOD_JSON_BYTES) return null;
     const parsed = JSON.parse(modJson);
+    if (!parsed?.manifest?.id) return null;
     // Sanitize id so it can't escape the mods directory via path traversal
     const safeId = String(parsed.manifest.id).replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `${safeId}.json`;
@@ -392,8 +449,10 @@ ipcMain.handle('export-mod-file', async (event, modJson) => {
 /** Delete a mod file from the userData/mods/ folder */
 ipcMain.handle('delete-mod-file', async (event, filename) => {
   try {
+    const safeName = asSafeFilename(filename);
+    if (!safeName) return false;
     const modsDir = path.resolve(path.join(app.getPath('userData'), 'mods'));
-    const fullPath = path.resolve(path.join(modsDir, filename));
+    const fullPath = path.resolve(path.join(modsDir, safeName));
     // Guard against path traversal (e.g. "../evil" resolving outside modsDir)
     if (!fullPath.startsWith(modsDir + path.sep)) return false;
     if (fs.existsSync(fullPath)) {
@@ -422,11 +481,13 @@ ipcMain.handle('get-workshop-items', (_event, query, tags) => {
 });
 
 ipcMain.handle('subscribe-workshop-item', (_event, itemId) => {
+  const safeItemId = toBigIntSafe(itemId);
+  if (safeItemId == null) return false;
   if (!steamworks) return false;
   try {
     const ugc = steamworks.ugc ?? steamworks.workshop;
     if (!ugc) return false;
-    ugc.subscribeItem?.(BigInt(itemId));
+    ugc.subscribeItem?.(safeItemId);
     return true;
   } catch (e) {
     console.error('subscribe-workshop-item failed:', e);
@@ -435,11 +496,13 @@ ipcMain.handle('subscribe-workshop-item', (_event, itemId) => {
 });
 
 ipcMain.handle('unsubscribe-workshop-item', (_event, itemId) => {
+  const safeItemId = toBigIntSafe(itemId);
+  if (safeItemId == null) return false;
   if (!steamworks) return false;
   try {
     const ugc = steamworks.ugc ?? steamworks.workshop;
     if (!ugc) return false;
-    ugc.unsubscribeItem?.(BigInt(itemId));
+    ugc.unsubscribeItem?.(safeItemId);
     return true;
   } catch (e) {
     console.error('unsubscribe-workshop-item failed:', e);
@@ -450,6 +513,9 @@ ipcMain.handle('unsubscribe-workshop-item', (_event, itemId) => {
 ipcMain.handle('workshop-publish', async (_event, { title, description, tags, contentPath, previewPath }) => {
   if (!steamworks) return { success: false, error: 'Steam not available' };
   try {
+    const safeTitle = asSafeString(title, 128);
+    const safeDesc = asSafeString(description, 8000);
+    if (!safeTitle || !safeDesc) return { success: false, error: 'Invalid title/description' };
     const ugc = steamworks.ugc ?? steamworks.workshop;
     if (!ugc) return { success: false, error: 'UGC API not available in this build' };
     // createItem is async in steamworks.js and returns published file metadata.
@@ -459,11 +525,11 @@ ipcMain.handle('workshop-publish', async (_event, { title, description, tags, co
     const handle = ugc.startItemUpdate?.(STEAM_APP_ID, createResult.publishedFileId);
     if (handle == null) return { success: false, error: 'startItemUpdate not supported' };
 
-    ugc.setItemTitle?.(handle, String(title).slice(0, 128));
-    ugc.setItemDescription?.(handle, String(description).slice(0, 8000));
-    if (Array.isArray(tags) && tags.length) ugc.setItemTags?.(handle, tags.map(String));
-    if (contentPath) ugc.setItemContent?.(handle, contentPath);
-    if (previewPath) ugc.setItemPreview?.(handle, previewPath);
+    ugc.setItemTitle?.(handle, safeTitle);
+    ugc.setItemDescription?.(handle, safeDesc);
+    if (Array.isArray(tags) && tags.length) ugc.setItemTags?.(handle, tags.map(t => String(t).slice(0, 32)).slice(0, 16));
+    if (typeof contentPath === 'string' && contentPath) ugc.setItemContent?.(handle, contentPath);
+    if (typeof previewPath === 'string' && previewPath) ugc.setItemPreview?.(handle, previewPath);
 
     const submitResult = await ugc.submitItemUpdate?.(handle, 'Initial upload');
     if (!submitResult) return { success: false, error: 'submitItemUpdate not supported' };
@@ -479,17 +545,27 @@ ipcMain.handle('workshop-publish', async (_event, { title, description, tags, co
 ipcMain.handle('workshop-update', async (_event, { itemId, title, description, tags, contentPath, previewPath, changeNote }) => {
   if (!steamworks) return { success: false, error: 'Steam not available' };
   try {
+    const safeItemId = toBigIntSafe(itemId);
+    if (safeItemId == null) return { success: false, error: 'Invalid itemId' };
     const ugc = steamworks.ugc ?? steamworks.workshop;
     if (!ugc) return { success: false, error: 'UGC API not available in this build' };
 
-    const handle = ugc.startItemUpdate?.(STEAM_APP_ID, BigInt(itemId));
+    const handle = ugc.startItemUpdate?.(STEAM_APP_ID, safeItemId);
     if (handle == null) return { success: false, error: 'startItemUpdate not supported' };
 
-    if (title != null)       ugc.setItemTitle?.(handle, String(title).slice(0, 128));
-    if (description != null) ugc.setItemDescription?.(handle, String(description).slice(0, 8000));
-    if (Array.isArray(tags) && tags.length) ugc.setItemTags?.(handle, tags.map(String));
-    if (contentPath != null) ugc.setItemContent?.(handle, contentPath);
-    if (previewPath != null) ugc.setItemPreview?.(handle, previewPath);
+    if (title != null) {
+      const safeTitle = asSafeString(title, 128);
+      if (!safeTitle) return { success: false, error: 'Invalid title' };
+      ugc.setItemTitle?.(handle, safeTitle);
+    }
+    if (description != null) {
+      const safeDesc = asSafeString(description, 8000);
+      if (!safeDesc) return { success: false, error: 'Invalid description' };
+      ugc.setItemDescription?.(handle, safeDesc);
+    }
+    if (Array.isArray(tags) && tags.length) ugc.setItemTags?.(handle, tags.map(t => String(t).slice(0, 32)).slice(0, 16));
+    if (typeof contentPath === 'string' && contentPath) ugc.setItemContent?.(handle, contentPath);
+    if (typeof previewPath === 'string' && previewPath) ugc.setItemPreview?.(handle, previewPath);
 
     const submitResult = await ugc.submitItemUpdate?.(handle, changeNote ?? 'Update');
     if (!submitResult) return { success: false, error: 'submitItemUpdate not supported' };

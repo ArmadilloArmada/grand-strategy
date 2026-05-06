@@ -1,4 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const MENU_CHANNELS = new Set([
+  'menu-new-game',
+  'menu-save-game',
+  'menu-load-game',
+  'menu-settings',
+  'menu-help',
+  'menu-zoom-in',
+  'menu-zoom-out',
+  'menu-zoom-reset',
+]);
 
 // Expose protected APIs to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -48,7 +58,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuZoomReset: (callback) => ipcRenderer.on('menu-zoom-reset', callback),
 
   // Remove listeners
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+  removeAllListeners: (channel) => {
+    if (!MENU_CHANNELS.has(channel)) return;
+    ipcRenderer.removeAllListeners(channel);
+  },
 
   // Window controls
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),

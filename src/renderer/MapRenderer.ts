@@ -77,6 +77,7 @@ export class MapRenderer {
     highlightSelected: true,
     highlightValidMoves: true,
   };
+  private perfEnabled: boolean = false;
 
   // Military map / wargame color palette
   private readonly COLORS = {
@@ -106,6 +107,7 @@ export class MapRenderer {
       throw new Error('Failed to get 2D context');
     }
     this.ctx = ctx;
+    this.perfEnabled = this.readPerfFlag();
 
     this.setupCanvas();
     this.setupEventListeners();
@@ -208,7 +210,9 @@ export class MapRenderer {
     if (this.mobilizableTargets.size > 0) anyActive = true;
     // Use drawFrame() directly — the animation loop already owns the RAF cadence
     this.renderPending = false;
+    const start = performance.now();
     this.drawFrame();
+    this.recordPerf('captureLoopFrameMs', performance.now() - start);
     if (anyActive) this.captureRafId = requestAnimationFrame(() => this.runCaptureLoop());
     else this.captureRafId = null;
   }
@@ -253,8 +257,29 @@ export class MapRenderer {
     this.renderPending = true;
     requestAnimationFrame(() => {
       this.renderPending = false;
+      const start = performance.now();
       this.drawFrame();
+      this.recordPerf('renderFrameMs', performance.now() - start);
     });
+  }
+
+  private readPerfFlag(): boolean {
+    try {
+      return localStorage.getItem('gs-perf') === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private recordPerf(metric: string, value: number): void {
+    if (!this.perfEnabled) return;
+    const root = globalThis as any;
+    root.__gsPerf = root.__gsPerf ?? {};
+    const bucket = root.__gsPerf[metric] ?? { samples: 0, avg: 0, max: 0 };
+    bucket.samples += 1;
+    bucket.avg += (value - bucket.avg) / bucket.samples;
+    bucket.max = Math.max(bucket.max, value);
+    root.__gsPerf[metric] = bucket;
   }
 
   /** Immediate synchronous draw — used internally and by the capture animation loop. */
