@@ -52,6 +52,7 @@ import { PhaseGuidance } from './PhaseGuidance';
 import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
 import { AbilityPanel } from './AbilityPanel';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
+import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
 import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase } from './hud/PhaseHelpers';
 
 export class HUD {
@@ -1629,29 +1630,23 @@ export class HUD {
     // Handle all movement-capable phases across different turn styles
     const movementPhase = isMovementPhase(phase);
     
-    if (movementPhase) {
-      // PREVENT double-click on same territory
-      if (previousTerritoryId === territoryId) {
-        // Clicking same territory again - just refresh selection, don't move
-        this.updateValidMoves();
-        return;
-      }
-      
-      // If we had a previous selection with valid moves, check if clicked territory is a valid target
-      if (this.validMoves.length > 0 && previousTerritoryId) {
-        const validMove = this.validMoves.find(m => m.territoryId === territoryId);
-        
-        if (validMove) {
-          if (validMove.isAttack) {
-            // ATTACK - Show battle preview, then immediate combat
-            this.combatUI.showBattlePreview(previousTerritoryId, territoryId);
-          } else {
-            // Regular move - execute immediately
-            this.executePlayerMove(previousTerritoryId, territoryId, false);
-          }
-          return;
-        }
-      }
+    const moveResolution = resolveTerritorySelectionMove({
+      phaseIsMovement: movementPhase,
+      territoryId,
+      previousTerritoryId,
+      validMoves: this.validMoves,
+    });
+    if (moveResolution.kind === 'refresh') {
+      this.updateValidMoves();
+      return;
+    }
+    if (moveResolution.kind === 'previewAttack') {
+      this.combatUI.showBattlePreview(moveResolution.fromId, moveResolution.toId);
+      return;
+    }
+    if (moveResolution.kind === 'executeMove') {
+      this.executePlayerMove(moveResolution.fromId, moveResolution.toId, false);
+      return;
     }
 
     // Update valid moves for newly selected territory
@@ -2980,21 +2975,7 @@ export class HUD {
       allMoves.push(...moves);
     }
 
-    // Deduplicate by territory
-    const moveTargets: string[] = [];
-    const attackTargets: string[] = [];
-    const seen = new Set<string>();
-
-    for (const move of allMoves) {
-      if (seen.has(move.territoryId)) continue;
-      seen.add(move.territoryId);
-      
-      if (move.isAttack) {
-        attackTargets.push(move.territoryId);
-      } else {
-        moveTargets.push(move.territoryId);
-      }
-    }
+    const { moveTargets, attackTargets } = splitMoveAndAttackTargets(allMoves);
 
     this.validMoves = allMoves;
     this.renderer.setValidMoveTargets(moveTargets, attackTargets);
