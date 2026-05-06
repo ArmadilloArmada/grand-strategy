@@ -16,6 +16,18 @@ export interface RenderOptions {
   adjacentFogCallback?: (territoryId: string) => boolean; // Returns true if adjacent-but-hidden
 }
 
+interface PerfBucket {
+  samples: number;
+  avg: number;
+  max: number;
+  p95: number;
+  recent: number[];
+}
+
+interface PerfRoot {
+  [metric: string]: PerfBucket;
+}
+
 export class MapRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -273,12 +285,17 @@ export class MapRenderer {
 
   private recordPerf(metric: string, value: number): void {
     if (!this.perfEnabled) return;
-    const root = globalThis as any;
+    const root = globalThis as unknown as { __gsPerf?: PerfRoot };
     root.__gsPerf = root.__gsPerf ?? {};
-    const bucket = root.__gsPerf[metric] ?? { samples: 0, avg: 0, max: 0 };
+    const bucket: PerfBucket = root.__gsPerf[metric] ?? { samples: 0, avg: 0, max: 0, p95: 0, recent: [] };
     bucket.samples += 1;
     bucket.avg += (value - bucket.avg) / bucket.samples;
     bucket.max = Math.max(bucket.max, value);
+    bucket.recent.push(value);
+    if (bucket.recent.length > 120) bucket.recent.shift();
+    const sorted = [...bucket.recent].sort((a, b) => a - b);
+    const idx = Math.max(0, Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95) - 1));
+    bucket.p95 = sorted[idx] ?? value;
     root.__gsPerf[metric] = bucket;
   }
 

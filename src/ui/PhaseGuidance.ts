@@ -31,8 +31,8 @@ export class PhaseGuidance {
 
   getPhaseToast(phase: string): string | null {
     const tips: Record<string, string> = {
-      purchase: 'Click Build to buy units',
-      build: 'Click Build to buy and place units',
+      purchase: 'Click Mobilize to buy units',
+      build: 'Click Mobilize to buy and place units',
       combat_move: 'Click your territory, then click an enemy to attack',
       move: 'Click your territory, then click a highlighted destination',
       combat: 'Resolving queued battles...',
@@ -56,13 +56,13 @@ export class PhaseGuidance {
       combat_move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
       move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
       orders: 'First turn: select a territory with units, then click a highlighted destination to issue orders.',
-      action: 'First turn: make one strong move or attack, then end the phase.',
+      action: 'First turn: make one strong move or attack, then click End Turn.',
       combat: 'Combat only happens after you move into enemy territory. If no battles are queued, continue to the next phase.',
       resolve: 'Resolve queued battles, then continue once the map is quiet.',
       noncombat_move: 'Use non-combat movement to reinforce fronts. You cannot attack in this phase.',
-      production: 'Production places your reserved units. If nothing is waiting, continue to income.',
-      collect_income: 'Income pays for the next round. End the turn after reviewing your IPCs.',
-      end: 'Income pays for the next round. End the turn after reviewing your IPCs.',
+      production: 'Production places your reserved units. If nothing is waiting, click Next Phase.',
+      collect_income: 'Income pays for the next round. Click End Turn after reviewing your IPCs.',
+      end: 'Income pays for the next round. Click End Turn after reviewing your IPCs.',
     };
 
     const message = tips[phase];

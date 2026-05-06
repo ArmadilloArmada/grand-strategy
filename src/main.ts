@@ -38,6 +38,8 @@ import { dragManager } from './ui/DragManager';
 import { normalizeCapitalsToWin, normalizeHumanFactions } from './engine/SetupValidation';
 import { selectTrait, ALL_TRAITS } from './engine/CommanderProgression';
 import type { Commander, CommanderTraitId } from './data/Territory';
+import type { UnitTypeData } from './data/Unit';
+import { bootstrapGame } from './app/bootstrap';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -51,11 +53,12 @@ import modernUnitsData from '../assets/units/modern-units.json';
 import factionsData from '../assets/factions/world-factions.json';
 
 // Unit era registry
-const UNIT_ERAS: Record<string, { name: string; description: string; data: any }> = {
-  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Limited mobility.', data: wwiUnitsData },
-  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Balanced gameplay.', data: wwiiUnitsData },
-  'coldwar': { name: 'Cold War (1970)', description: 'Faster units. Jet age warfare.', data: coldwarUnitsData },
-  'modern': { name: 'Modern (2020)', description: 'High-tech, fast, and expensive.', data: modernUnitsData },
+type UnitEraEntry = { name: string; description: string; data: UnitTypeData[] };
+const UNIT_ERAS: Record<string, UnitEraEntry> = {
+  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Limited mobility.', data: wwiUnitsData as unknown as UnitTypeData[] },
+  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Balanced gameplay.', data: wwiiUnitsData as unknown as UnitTypeData[] },
+  'coldwar': { name: 'Cold War (1970)', description: 'Faster units. Jet age warfare.', data: coldwarUnitsData as unknown as UnitTypeData[] },
+  'modern': { name: 'Modern (2020)', description: 'High-tech, fast, and expensive.', data: modernUnitsData as unknown as UnitTypeData[] },
 };
 import _gridMapData from '../assets/maps/grid-world-map.json';
 import _tutorialMapData from '../assets/maps/tutorial-map.json';
@@ -415,7 +418,7 @@ class Game {
 
     // Apply current difficulty and personality
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
-    this.aiController.setPersonality((settings.getSetting('aiPersonality') ?? 'default') as any);
+    this.aiController.setPersonality(settings.getSetting('aiPersonality') ?? 'default');
 
     // Set turn style from config
     this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
@@ -1217,9 +1220,9 @@ class Game {
    */
   saveSettings(): void {
     settings.update({
-      gameSpeed: (document.getElementById('setting-game-speed') as HTMLSelectElement).value as any,
-      aiDifficulty: (document.getElementById('setting-ai-difficulty') as HTMLSelectElement).value as any,
-      aiPersonality: (document.getElementById('setting-ai-personality') as HTMLSelectElement).value as any,
+      gameSpeed: (document.getElementById('setting-game-speed') as HTMLSelectElement).value as 'slow' | 'normal' | 'fast',
+      aiDifficulty: (document.getElementById('setting-ai-difficulty') as HTMLSelectElement).value as 'easy' | 'medium' | 'hard',
+      aiPersonality: (document.getElementById('setting-ai-personality') as HTMLSelectElement).value,
       showMoveHighlights: (document.getElementById('setting-move-highlights') as HTMLInputElement).checked,
       confirmEndTurn: (document.getElementById('setting-confirm-end') as HTMLInputElement).checked,
       musicEnabled: (document.getElementById('setting-music-enabled') as HTMLInputElement).checked,
@@ -1247,7 +1250,7 @@ class Game {
 
     // Apply AI difficulty and personality
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
-    this.aiController.setPersonality((settings.getSetting('aiPersonality') ?? 'default') as any);
+    this.aiController.setPersonality(settings.getSetting('aiPersonality') ?? 'default');
 
     this.hideSettings();
     this.hud.showToast('Settings saved!', 'success');
@@ -2131,21 +2134,4 @@ class Game {
   }
 }
 
-// Initialize game when DOM is ready
-document.addEventListener('DOMContentLoaded', async () => {
-  const game = new Game();
-  try {
-    await game.init();
-
-    // Expose game instance for debugging
-    (window as any).game = game;
-  } catch (error) {
-    console.error('Game failed to initialize:', error);
-    const crash = document.getElementById('crash-screen');
-    const detail = document.getElementById('crash-detail');
-    if (crash && detail) {
-      crash.style.display = 'flex';
-      detail.textContent = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    }
-  }
-});
+bootstrapGame(() => new Game());

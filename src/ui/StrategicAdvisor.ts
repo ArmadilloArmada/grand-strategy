@@ -41,7 +41,7 @@ export class StrategicAdvisor {
         <div class="advisor-row" data-type="opportunity"><span>Opportunity</span><strong>${this.escape(data.opportunityLine ?? '')}</strong></div>
         <div class="advisor-row" data-type="economy"><span>Economy</span><strong>${this.escape(data.economyLine ?? '')}</strong></div>
         <div class="advisor-next-action">
-          <span>Next</span>
+          <span>Next Step</span>
           <strong>${this.escape(coach.headline)}</strong>
           <small>${this.escape(coach.detail)}</small>
           <div class="advisor-actions">
@@ -49,7 +49,7 @@ export class StrategicAdvisor {
             ${coach.secondaryAction && coach.secondaryLabel ? this.renderActionButton(coach.secondaryAction, coach.secondaryLabel, coach.territoryId) : ''}
           </div>
         </div>
-        <div class="advisor-advice">${this.escape(data.mobilizationAdvice ?? '')}</div>
+        <div class="advisor-advice">${data.mobilizationAdvice ? `Recommended: ${this.escape(data.mobilizationAdvice)}` : ''}</div>
       </div>
     `;
 

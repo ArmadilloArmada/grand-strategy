@@ -32,7 +32,7 @@ describe('PhaseGuidance', () => {
   it('returns stable phase toast copy', () => {
     const { guidance } = makeGuidance();
 
-    expect(guidance.getPhaseToast('purchase')).toBe('Click Build to buy units');
+    expect(guidance.getPhaseToast('purchase')).toBe('Click Mobilize to buy units');
     expect(guidance.getPhaseToast('unknown')).toBeNull();
   });
 

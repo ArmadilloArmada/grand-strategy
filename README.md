@@ -45,6 +45,18 @@ npm run dev
 
 Open [http://localhost:19123](http://localhost:19123) in your browser.
 
+### Recommended First Game Preset
+
+For the smoothest first 10-minute experience:
+
+- **Map:** `Tutorial`
+- **Turn Style:** `Quick`
+- **Era:** `WWII`
+- **AI Difficulty:** `Normal`
+- **Advice panels:** leave enabled (`Phase Guidance`, `Strategic Advisor`, `Turn Recap`)
+
+This preset gives clear objective flow and faster turns while still showing the full move/attack/mobilize loop.
+
 ### Run as Desktop App
 
 ```bash
@@ -94,18 +106,40 @@ Configure repository secrets before enabling signed runs:
 - `CSC_LINK`, `CSC_KEY_PASSWORD`
 - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` (macOS notarization)
 
+### Release Smoke Checklist (Manual)
+
+Run before tagging a release candidate:
+
+1. `npm test -- --run`
+2. `npm run validate:maps`
+3. `npm run build`
+4. Launch `npm run dev` and verify:
+   - Main menu opens and starts a new game.
+   - HQ panel and top hub remain visible at common laptop sizes.
+   - Factory Hub opens, scrolls, and confirms orders.
+   - End Phase / End Turn flow works through at least one full turn.
+5. Launch `npm run dev:electron` and verify:
+   - App boots without crash screen.
+   - Window resize still keeps core controls usable.
+   - Save and load both succeed.
+
 ## Running Tests
 
 ```bash
 npm test
 ```
 
+## Performance Baseline
+
+See [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md) for telemetry setup, collection protocol, and target thresholds (`renderFrameMs`, `aiPhaseMs`, `aiTurnMs`).
+
 ## Project Structure
 
 ```text
 grand-strategy/
 |-- src/
-|   |-- main.ts              # Game entry point
+|   |-- main.ts              # Entry point (bootstraps app)
+|   |-- app/bootstrap.ts     # DOM-ready bootstrap and crash handling
 |   |-- engine/              # Core game logic
 |   |   |-- GameState.ts     # Central state and event bus
 |   |   |-- TurnManager.ts   # Turn and phase flow

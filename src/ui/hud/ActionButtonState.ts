@@ -92,3 +92,91 @@ export function getBuildButtonState(args: {
       : 'Not enough IPCs or all territories already mobilized',
   };
 }
+
+export function getStrategicBombButtonState(args: {
+  movementPhase: boolean;
+  combatPhase: boolean;
+  isHumanTurn: boolean;
+  hasBombers: boolean;
+}): { show: boolean; disabled: boolean } {
+  const { movementPhase, combatPhase, isHumanTurn, hasBombers } = args;
+  const show = (combatPhase || movementPhase) && isHumanTurn && hasBombers;
+  return { show, disabled: !show };
+}
+
+export function getFortifyButtonState(args: {
+  buildPhase: boolean;
+  isHumanTurn: boolean;
+  hasFortSystem: boolean;
+  isOwnedLandSelection: boolean;
+  isUnderFortCap: boolean;
+  canBuildFort: boolean;
+  upgradeCost: number | null;
+  nextFortLevel: number;
+}): { show: boolean; disabled: boolean; title?: string } {
+  const {
+    buildPhase,
+    isHumanTurn,
+    hasFortSystem,
+    isOwnedLandSelection,
+    isUnderFortCap,
+    canBuildFort,
+    upgradeCost,
+    nextFortLevel,
+  } = args;
+
+  const show = buildPhase && isHumanTurn && hasFortSystem;
+  const disabled = !(show && isOwnedLandSelection && isUnderFortCap && canBuildFort);
+  if (!show || !isOwnedLandSelection) return { show, disabled };
+
+  return {
+    show,
+    disabled,
+    title: upgradeCost !== null
+      ? `Build fortification for ${upgradeCost} IPCs (+${nextFortLevel} defense bonus)`
+      : 'Territory is fully fortified',
+  };
+}
+
+export function getNuclearButtonState(args: {
+  isHumanTurn: boolean;
+  hasTech: boolean;
+  readiness: number;
+  canLaunch: boolean;
+}): { show: boolean; disabled: boolean; title: string; labelHtml: string } {
+  const { isHumanTurn, hasTech, readiness, canLaunch } = args;
+  const show = isHumanTurn && (hasTech || readiness > 0);
+  if (canLaunch) {
+    return {
+      show,
+      disabled: false,
+      title: '☢️ Ready to launch! Click to select target.',
+      labelHtml: '☢️ Launch Nuke',
+    };
+  }
+
+  const barFill = `<span style="display:inline-block;width:${readiness}%;height:3px;background:#ef4444;border-radius:2px;vertical-align:middle;"></span><span style="display:inline-block;width:${100 - readiness}%;height:3px;background:#444;border-radius:2px;vertical-align:middle;"></span>`;
+  return {
+    show,
+    disabled: true,
+    title: `☢️ Nuclear readiness: ${readiness}% (need 100%)`,
+    labelHtml: `☢️ ${readiness}%<br><span style="display:inline-flex;width:100%;gap:1px;">${barFill}</span>`,
+  };
+}
+
+export function getEndPhaseButtonState(args: {
+  isEndPhase: boolean;
+  nextLabel: string;
+  isHumanTurn: boolean;
+  noPendingMoves: boolean;
+  noActiveCombat: boolean;
+  noSelection: boolean;
+}): { labelHtml: string; shouldPulse: boolean } {
+  const { isEndPhase, nextLabel, isHumanTurn, noPendingMoves, noActiveCombat, noSelection } = args;
+  return {
+    labelHtml: isEndPhase
+      ? '✓ End Turn <kbd class="kbd-hint">↵</kbd>'
+      : `➡️ ${nextLabel} <kbd class="kbd-hint">↵</kbd>`,
+    shouldPulse: isHumanTurn && noPendingMoves && noActiveCombat && noSelection,
+  };
+}

@@ -66,8 +66,8 @@ export class TurnRecapPanel {
       this.renderRow('Units mobilized', recap.unitsMobilized.toString()),
       this.renderRow('Income collected', `+${recap.income} IPC`),
       this.renderRow('Combat exchange', `${netExchange >= 0 ? '+' : ''}${netExchange}`),
-      data.nextDangerName ? this.renderRow('Next danger', data.nextDangerName, true) : '',
-      data.nextObjectiveTitle ? this.renderRow('Next objective', data.nextObjectiveTitle, true) : '',
+      data.nextDangerName ? this.renderRow('Next step: danger', data.nextDangerName, true) : '',
+      data.nextObjectiveTitle ? this.renderRow('Next step: objective', data.nextObjectiveTitle, true) : '',
     ];
 
     const factionColor = data.faction.colorLight || data.faction.color;

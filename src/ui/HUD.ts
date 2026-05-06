@@ -52,7 +52,16 @@ import { PhaseGuidance } from './PhaseGuidance';
 import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
 import { AbilityPanel } from './AbilityPanel';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
-import { getAttackButtonState, getBuildButtonState, getHudPhaseFlags, getMoveButtonState } from './hud/ActionButtonState';
+import {
+  getAttackButtonState,
+  getBuildButtonState,
+  getEndPhaseButtonState,
+  getFortifyButtonState,
+  getHudPhaseFlags,
+  getMoveButtonState,
+  getNuclearButtonState,
+  getStrategicBombButtonState,
+} from './hud/ActionButtonState';
 import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
 import { isAttackMovePhase, isMovementPhase } from './hud/PhaseHelpers';
 
@@ -2812,27 +2821,30 @@ export class HUD {
         }
         return false;
       })();
-      const showBomb = (combatPhase || movementPhase) && isHumanTurn && hasBombers;
-      bombBtn.classList.toggle('hidden', !showBomb);
-      bombBtn.disabled = !showBomb;
+      const bombState = getStrategicBombButtonState({ movementPhase, combatPhase, isHumanTurn, hasBombers });
+      bombBtn.classList.toggle('hidden', !bombState.show);
+      bombBtn.disabled = bombState.disabled;
     }
 
     // Fortify button — visible during purchase phase when own land territory is selected
     const fortifyBtn = document.getElementById('btn-fortify') as HTMLButtonElement | null;
     if (fortifyBtn) {
       const fort = this.state.systems.fortificationSystem;
-      const canFortify = buildPhase && isHumanTurn && fort !== undefined &&
-        territory != null && territory.isLand() && territory.owner === faction?.id &&
-        (territory.fortificationLevel ?? 0) < 2 && fort.canBuild(territory.id, faction?.id ?? '');
-      const showFortify = buildPhase && isHumanTurn && fort !== undefined;
-      fortifyBtn.classList.toggle('hidden', !showFortify);
-      fortifyBtn.disabled = !canFortify;
-      if (showFortify && territory?.owner === faction?.id && fort) {
-        const cost = fort.getUpgradeCost(territory?.id ?? '');
-        fortifyBtn.title = cost !== null
-          ? `Build fortification for ${cost} IPCs (+${(territory?.fortificationLevel ?? 0) + 1} defense bonus)`
-          : 'Territory is fully fortified';
-      }
+      const isOwnedLandSelection = Boolean(territory && territory.isLand() && territory.owner === faction?.id);
+      const nextFortLevel = (territory?.fortificationLevel ?? 0) + 1;
+      const fortState = getFortifyButtonState({
+        buildPhase,
+        isHumanTurn,
+        hasFortSystem: fort !== undefined,
+        isOwnedLandSelection,
+        isUnderFortCap: (territory?.fortificationLevel ?? 0) < 2,
+        canBuildFort: Boolean(fort && territory && fort.canBuild(territory.id, faction?.id ?? '')),
+        upgradeCost: fort && territory ? fort.getUpgradeCost(territory.id) : null,
+        nextFortLevel,
+      });
+      fortifyBtn.classList.toggle('hidden', !fortState.show);
+      fortifyBtn.disabled = fortState.disabled;
+      if (fortState.title) fortifyBtn.title = fortState.title;
     }
 
     // Nuclear button — visible once nuclear_program is researched; disabled until readiness = 100%
@@ -2841,35 +2853,26 @@ export class HUD {
       const nuclearSystem = this.state.systems.nuclearSystem;
       const hasTech = this.state.systems.technologyManager?.hasTech?.(faction.id, 'nuclear_program') ?? false;
       const readiness = Math.round(faction.nuclearReadiness ?? 0);
-      const showNuclear = isHumanTurn && (hasTech || readiness > 0);
-      nuclearBtn.classList.toggle('hidden', !showNuclear);
       const canLaunch = nuclearSystem?.canLaunch?.(faction.id) ?? false;
-      nuclearBtn.disabled = !canLaunch;
-      nuclearBtn.title = canLaunch
-        ? '☢️ Ready to launch! Click to select target.'
-        : `☢️ Nuclear readiness: ${readiness}% (need 100%)`;
-      if (canLaunch) {
-        nuclearBtn.innerHTML = '☢️ Launch Nuke';
-      } else {
-        const barFill = `<span style="display:inline-block;width:${readiness}%;height:3px;background:#ef4444;border-radius:2px;vertical-align:middle;"></span><span style="display:inline-block;width:${100 - readiness}%;height:3px;background:#444;border-radius:2px;vertical-align:middle;"></span>`;
-        nuclearBtn.innerHTML = `☢️ ${readiness}%<br><span style="display:inline-flex;width:100%;gap:1px;">${barFill}</span>`;
-      }
+      const nuclearState = getNuclearButtonState({ isHumanTurn, hasTech, readiness, canLaunch });
+      nuclearBtn.classList.toggle('hidden', !nuclearState.show);
+      nuclearBtn.disabled = nuclearState.disabled;
+      nuclearBtn.title = nuclearState.title;
+      nuclearBtn.innerHTML = nuclearState.labelHtml;
     }
 
     // End Phase button — show next phase name and keyboard hint
     if (endBtn) {
-      if (isEndPhase) {
-        endBtn.innerHTML = '✓ End Turn <kbd class="kbd-hint">↵</kbd>';
-      } else {
-        const nextLabel = this.getNextPhaseLabel(phaseStr);
-        endBtn.innerHTML = `➡️ ${nextLabel} <kbd class="kbd-hint">↵</kbd>`;
-      }
-      // Pulse the End Phase button when player appears idle — nothing is in progress
-      const noPendingMoves = this.state.pendingMoves.length === 0;
-      const noActiveCombat = !this.combatUI.getActiveCombat();
-      const noSelection    = !this.state.selectedTerritoryId;
-      const shouldPulse    = isHumanTurn && noPendingMoves && noActiveCombat && noSelection;
-      endBtn.classList.toggle('btn-end-phase-pulse', shouldPulse);
+      const endState = getEndPhaseButtonState({
+        isEndPhase,
+        nextLabel: this.getNextPhaseLabel(phaseStr),
+        isHumanTurn,
+        noPendingMoves: this.state.pendingMoves.length === 0,
+        noActiveCombat: !this.combatUI.getActiveCombat(),
+        noSelection: !this.state.selectedTerritoryId,
+      });
+      endBtn.innerHTML = endState.labelHtml;
+      endBtn.classList.toggle('btn-end-phase-pulse', endState.shouldPulse);
     }
 
     // Shortcut badge on Build button
