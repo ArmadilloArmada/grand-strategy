@@ -18,6 +18,7 @@ export interface ProductionCallbacks {
 
 export class ProductionUI {
   private selectedDeployZone: string | null = null;
+  private fhActiveDomain: 'land' | 'sea' | 'air' = 'land';
 
   constructor(
     private state: GameState,
@@ -26,6 +27,240 @@ export class ProductionUI {
     private mobilizationSystem: MobilizationSystem,
     private callbacks: ProductionCallbacks
   ) {}
+
+  // ==================== FACTORY HUB ====================
+
+  showFactoryHub(): void {
+    const modal = document.getElementById('factory-hub-tray');
+    if (!modal) return;
+    this.productionManager.clearQueue();
+    this.fhActiveDomain = 'land';
+    modal.classList.remove('hidden');
+    this.renderFactoryHub();
+    this.bindFactoryHubTabs();
+  }
+
+  closeFactoryHub(): void {
+    const modal = document.getElementById('factory-hub-tray');
+    if (modal) modal.classList.add('hidden');
+    this.productionManager.clearQueue();
+  }
+
+  private bindFactoryHubTabs(): void {
+    const modal = document.getElementById('factory-hub-tray');
+    if (!modal) return;
+    modal.querySelectorAll<HTMLButtonElement>('.fh-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.fhActiveDomain = tab.dataset.domain as 'land' | 'sea' | 'air';
+        modal.querySelectorAll('.fh-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.renderFactoryHubCatalog();
+      });
+    });
+  }
+
+  renderFactoryHub(): void {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const badge = document.getElementById('fh-faction-badge');
+    if (badge) {
+      badge.textContent = faction.name;
+      badge.style.background = faction.color + '33';
+      badge.style.borderColor = faction.color;
+      badge.style.color = faction.color;
+    }
+
+    this.updateFactoryHubBudget();
+    this.renderFactoryHubCatalog();
+    this.renderFactoryHubOrders();
+  }
+
+  private updateFactoryHubBudget(): void {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const total = faction.ipcs;
+    const spent = this.productionManager.getTotalPurchaseCost();
+    const remain = this.productionManager.getRemainingIPCs();
+    const pct = total > 0 ? Math.min(100, (spent / total) * 100) : 0;
+
+    const totalEl = document.getElementById('fh-ipc-total');
+    const spentEl = document.getElementById('fh-ipc-spent');
+    const remainEl = document.getElementById('fh-ipc-remain');
+    const fillEl = document.getElementById('fh-budget-fill') as HTMLElement | null;
+    const confirmBtn = document.getElementById('fh-btn-confirm') as HTMLButtonElement | null;
+    const capUsed = document.getElementById('fh-cap-used');
+    const capMax = document.getElementById('fh-cap-max');
+
+    if (totalEl) totalEl.textContent = String(total);
+    if (spentEl) spentEl.textContent = String(spent);
+    if (remainEl) remainEl.textContent = String(remain);
+    if (fillEl) {
+      fillEl.style.width = `${pct}%`;
+      fillEl.style.background = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e';
+    }
+    if (confirmBtn) confirmBtn.disabled = spent === 0;
+
+    const maxCap = this.productionManager.getMaxPurchaseCapacity();
+    const queued = this.productionManager.getTotalQueuedUnits();
+    const inReserve = this.productionManager.getReserveSystem().getReserveCount(
+      this.state.getCurrentFaction()?.id ?? ''
+    );
+    if (capUsed) capUsed.textContent = String(queued + inReserve);
+    if (capMax) capMax.textContent = String(maxCap);
+  }
+
+  private renderFactoryHubCatalog(): void {
+    const listEl = document.getElementById('fh-unit-list');
+    if (!listEl) return;
+
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const units = this.state.unitRegistry.getByDomain(this.fhActiveDomain)
+      .filter(u => !u.factionId || u.factionId === faction.id);
+
+    if (units.length === 0) {
+      listEl.innerHTML = `<p class="fh-empty-msg">No ${this.fhActiveDomain} units available</p>`;
+      return;
+    }
+
+    const queue = this.productionManager.getPurchaseQueue();
+    const remainIPCs = this.productionManager.getRemainingIPCs();
+
+    let html = '';
+    for (const unit of units) {
+      const icon = UNIT_ICONS[unit.id] || '⬜';
+      const queuedEntry = queue.find(q => q.unitTypeId === unit.id);
+      const queuedCount = queuedEntry ? queuedEntry.count : 0;
+      const canAffordOne = unit.cost <= remainIPCs;
+
+      html += `
+        <div class="fh-unit-card ${!canAffordOne && queuedCount === 0 ? 'fh-unit-unaffordable' : ''}">
+          <div class="fh-unit-icon">${icon}</div>
+          <div class="fh-unit-info">
+            <div class="fh-unit-name">${unit.name}</div>
+            <div class="fh-unit-stats">
+              ⚔️${unit.attack} 🛡️${unit.defense} 🚶${unit.movement}
+              <span class="fh-unit-cost">💰${unit.cost}</span>
+            </div>
+          </div>
+          <div class="fh-unit-controls">
+            <button class="fh-minus" data-unit="${unit.id}" ${queuedCount === 0 ? 'disabled' : ''}>−</button>
+            <span class="fh-count" id="fh-count-${unit.id}">${queuedCount}</span>
+            <button class="fh-plus" data-unit="${unit.id}" ${!canAffordOne ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      `;
+    }
+    listEl.innerHTML = html;
+
+    listEl.querySelectorAll<HTMLButtonElement>('.fh-plus:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitId = btn.dataset.unit!;
+        const result = this.productionManager.queueSimplePurchase(unitId, 1);
+        if (!result.success) {
+          this.callbacks.showToast(result.reason || 'Cannot add unit', 'info');
+        }
+        soundManager.play('click');
+        this.updateFactoryHubBudget();
+        this.renderFactoryHubCatalog();
+        this.renderFactoryHubOrders();
+      });
+    });
+
+    listEl.querySelectorAll<HTMLButtonElement>('.fh-minus:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitId = btn.dataset.unit!;
+        this.productionManager.removeFromQueue(unitId, 1);
+        soundManager.play('click');
+        this.updateFactoryHubBudget();
+        this.renderFactoryHubCatalog();
+        this.renderFactoryHubOrders();
+      });
+    });
+  }
+
+  private renderFactoryHubOrders(): void {
+    const listEl = document.getElementById('fh-order-list');
+    if (!listEl) return;
+
+    const queue = this.productionManager.getPurchaseQueue();
+    if (queue.length === 0) {
+      listEl.innerHTML = `<p class="fh-empty-msg">No units ordered yet.<br><span>Use + buttons to add units.</span></p>`;
+      return;
+    }
+
+    let html = '';
+    let totalCost = 0;
+    for (const order of queue) {
+      const unit = this.state.unitRegistry.get(order.unitTypeId);
+      if (!unit) continue;
+      const icon = UNIT_ICONS[order.unitTypeId] || '⬜';
+      const lineCost = unit.cost * order.count;
+      totalCost += lineCost;
+      html += `
+        <div class="fh-order-row">
+          <span class="fh-order-icon">${icon}</span>
+          <span class="fh-order-name">${unit.name}</span>
+          <span class="fh-order-qty">×${order.count}</span>
+          <span class="fh-order-cost">${lineCost} IPCs</span>
+          <button class="fh-order-remove" data-unit="${order.unitTypeId}" title="Remove all">✕</button>
+        </div>
+      `;
+    }
+    html += `<div class="fh-order-total">Total: ${totalCost} IPCs</div>`;
+    listEl.innerHTML = html;
+
+    listEl.querySelectorAll<HTMLButtonElement>('.fh-order-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitId = btn.dataset.unit!;
+        const q = this.productionManager.getPurchaseQueue();
+        const entry = q.find(e => e.unitTypeId === unitId);
+        if (entry) {
+          this.productionManager.removeFromQueue(unitId, entry.count);
+        }
+        soundManager.play('click');
+        this.updateFactoryHubBudget();
+        this.renderFactoryHubCatalog();
+        this.renderFactoryHubOrders();
+      });
+    });
+  }
+
+  confirmFactoryHubOrders(): void {
+    const queue = this.productionManager.getPurchaseQueue();
+    if (queue.length === 0) {
+      this.callbacks.showToast('No units ordered', 'info');
+      return;
+    }
+
+    const faction = this.state.getCurrentFaction();
+    const totalCost = this.productionManager.getTotalPurchaseCost();
+    const success = this.productionManager.confirmPurchases();
+
+    if (success) {
+      const summary = queue.map(o => {
+        const unit = this.state.unitRegistry.get(o.unitTypeId);
+        return `${o.count}× ${unit?.name ?? o.unitTypeId}`;
+      }).join(', ');
+
+      this.callbacks.showToast(`Ordered: ${summary} (${totalCost} IPCs)`, 'success');
+      soundManager.play('build');
+
+      if (faction) {
+        battleLog.logBuild(this.state.turnNumber, faction.name, faction.color,
+          `Purchase order confirmed: ${summary}`);
+        const ipcEl = document.getElementById('ipc-display');
+        if (ipcEl) ipcEl.textContent = `${faction.ipcs} IPCs`;
+      }
+
+      document.getElementById('factory-hub-tray')?.classList.add('hidden');
+    } else {
+      this.callbacks.showToast('Could not confirm orders — check IPC balance', 'error');
+    }
+  }
 
   // ==================== BUILD MODAL ====================
 

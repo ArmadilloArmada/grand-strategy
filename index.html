@@ -129,102 +129,124 @@
     
     <!-- HUD -->
     <div id="hud">
+
+      <!-- ═══ COMMAND RIBBON (top bar) ═══ -->
       <div id="turn-info">
-        <div class="turn-banner">
-          <span id="current-faction">-</span>
-          <span id="current-phase">-</span>
-          <span id="turn-number">Turn 1</span>
-          <span id="tension-badge" class="hidden" style="font-size:0.6rem;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,0.25);letter-spacing:0.04em;white-space:nowrap;font-family:sans-serif;"></span>
-          <span id="weather-badge" class="hidden" style="font-size:0.6rem;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,0.25);letter-spacing:0.04em;white-space:nowrap;font-family:sans-serif;" title="Current weather"></span>
-          <span id="turn-indicator" class="your-turn hidden">YOUR TURN</span>
-          <span id="save-indicator" class="save-indicator hidden" title="Game saved">💾 Saved</span>
+
+        <!-- Row 1: faction identity + phase pipeline + round/badges -->
+        <div class="ribbon-row ribbon-row-top">
+          <!-- Left zone: faction identity + treasury -->
+          <div class="ribbon-zone ribbon-left">
+            <div id="ribbon-faction-accent"></div>
+            <div class="ribbon-faction-info">
+              <span id="current-faction">—</span>
+              <div id="resources">
+                <span id="ipc-display">0 IPCs</span>
+              </div>
+            </div>
+            <span id="turn-indicator" class="your-turn hidden">YOUR TURN</span>
+            <span id="save-indicator" class="save-indicator hidden" title="Game saved">💾</span>
+          </div>
+
+          <!-- Center zone: phase pipeline -->
+          <div class="ribbon-zone ribbon-center">
+            <span id="current-phase" class="hidden">-</span>
+            <div id="phase-progress">
+              <div class="phase-step" data-phase="purchase" title="Purchase Units">
+                <span class="phase-icon">🛒</span>
+                <span class="phase-label">Buy</span>
+              </div>
+              <div class="phase-connector"></div>
+              <div class="phase-step" data-phase="combat_move" title="Combat Movement">
+                <span class="phase-icon">⚔️</span>
+                <span class="phase-label">Move</span>
+              </div>
+              <div class="phase-connector"></div>
+              <div class="phase-step" data-phase="combat" title="Resolve Combat">
+                <span class="phase-icon">🎲</span>
+                <span class="phase-label">Combat</span>
+              </div>
+              <div class="phase-connector"></div>
+              <div class="phase-step" data-phase="noncombat_move" title="Non-Combat Movement">
+                <span class="phase-icon">🚶</span>
+                <span class="phase-label">Reposition</span>
+              </div>
+              <div class="phase-connector"></div>
+              <div class="phase-step" data-phase="production" title="Place Units">
+                <span class="phase-icon">🏭</span>
+                <span class="phase-label">Build</span>
+              </div>
+              <div class="phase-connector"></div>
+              <div class="phase-step" data-phase="collect_income" title="Collect Income">
+                <span class="phase-icon">💰</span>
+                <span class="phase-label">Income</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right zone: round, turn order, badges -->
+          <div class="ribbon-zone ribbon-right">
+            <span id="turn-number" class="ribbon-round">Round 1</span>
+            <span id="tension-badge" class="hidden ribbon-badge"></span>
+            <span id="weather-badge" class="hidden ribbon-badge" title="Current weather"></span>
+            <div id="turn-order"></div>
+          </div>
         </div>
-        <!-- Phase Progress Bar -->
-        <div id="phase-progress">
-          <div class="phase-step" data-phase="purchase" title="Purchase Units">
-            <span class="phase-icon">🛒</span>
-            <span class="phase-label">Buy</span>
+
+        <!-- Row 2: action buttons (moved from bottom bar) -->
+        <div id="action-buttons" class="ribbon-row ribbon-row-actions" role="toolbar" aria-label="Game actions">
+          <!-- Left: phase actions -->
+          <div class="rba-group rba-left">
+            <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️ Undo</button>
+            <button id="btn-redo" disabled title="Redo" aria-label="Redo">↪️ Redo</button>
+            <div class="btn-separator"></div>
+            <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
+            <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
+            <button id="btn-strategic-bomb" disabled class="hidden" title="Strategic bombing" aria-label="Strategic bombing">💣 Bomb</button>
+            <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
+            <button id="btn-fortify" disabled class="hidden" title="Build fortification" aria-label="Fortify">🏰 Fortify</button>
           </div>
-          <div class="phase-connector"></div>
-          <div class="phase-step" data-phase="combat_move" title="Combat Movement">
-            <span class="phase-icon">⚔️</span>
-            <span class="phase-label">Move</span>
+          <!-- Center: context helper -->
+          <div class="rba-group rba-center">
+            <div id="context-helper" class="context-helper">
+              <span id="context-helper-text">Welcome! Select a territory to begin.</span>
+            </div>
           </div>
-          <div class="phase-connector"></div>
-          <div class="phase-step" data-phase="combat" title="Resolve Combat">
-            <span class="phase-icon">🎲</span>
-            <span class="phase-label">Combat</span>
-          </div>
-          <div class="phase-connector"></div>
-          <div class="phase-step" data-phase="noncombat_move" title="Non-Combat Movement">
-            <span class="phase-icon">🚶</span>
-            <span class="phase-label">Reposition</span>
-          </div>
-          <div class="phase-connector"></div>
-          <div class="phase-step" data-phase="production" title="Place Units">
-            <span class="phase-icon">🏭</span>
-            <span class="phase-label">Build</span>
-          </div>
-          <div class="phase-connector"></div>
-          <div class="phase-step" data-phase="collect_income" title="Collect Income">
-            <span class="phase-icon">💰</span>
-            <span class="phase-label">Income</span>
+          <!-- Right: End Phase + global commands -->
+          <div class="rba-group rba-right">
+            <button id="btn-end-phase" class="rba-end-btn" aria-label="End current phase">➡️ End Phase</button>
+            <div class="btn-separator"></div>
+            <button id="btn-research" title="Research technologies" aria-label="Research">🔬 Tech</button>
+            <button id="btn-diplomacy" title="Diplomatic relations" aria-label="Diplomacy">🤝 Diplo</button>
+            <button id="btn-espionage" title="Espionage operations" aria-label="Espionage">🕵️ Spy</button>
+            <button id="btn-nuclear" class="hidden" title="Launch nuclear strike" aria-label="Nuclear">☢️ Nuke</button>
+            <button id="btn-stats" title="View statistics" aria-label="Stats">📊 Stats</button>
+            <button id="btn-fog-toggle" title="Toggle fog of war" aria-label="Fog">🌫️ Fog</button>
+            <button id="btn-theme-toggle" title="Toggle theme" aria-label="Theme">🌓</button>
+            <div class="btn-separator"></div>
+            <button id="btn-menu" title="Main menu" aria-label="Menu">☰ Menu</button>
           </div>
         </div>
-        <div id="turn-order">
-          <!-- Turn order indicators populated by JS -->
-        </div>
+
       </div>
-      
-      <div id="resources">
-        <span id="ipc-display">0 IPCs</span>
-      </div>
-      
-      <div id="selection-info">
+
+      <!-- hidden legacy containers kept for JS compatibility -->
+      <div id="selection-info" class="hidden">
         <div id="territory-name">Select a Territory</div>
-        <div id="territory-details">
-          <p style="text-align: center; color: #666; font-style: italic;">
-            Click on any territory to view details and available units.
-          </p>
-        </div>
+        <div id="territory-details"></div>
       </div>
-      
-      <!-- Contextual Help Banner -->
-      <div id="context-helper" class="context-helper">
-        <span id="context-helper-text">Welcome! Select a territory to begin.</span>
-      </div>
-      
-      <div id="action-buttons" role="toolbar" aria-label="Game actions">
-        <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️ Undo</button>
-        <button id="btn-redo" disabled title="Redo" aria-label="Redo last undone phase">↪️ Redo</button>
-        <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
-        <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
-        <button id="btn-strategic-bomb" disabled class="hidden" title="Strategic bombing mission" aria-label="Strategic bombing">💣 Bomb Factory</button>
-        <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
-        <button id="btn-fortify" disabled class="hidden" title="Build or upgrade fortification (5 IPCs → earthworks, +8 IPCs → bunker)" aria-label="Build fortification">🏰 Fortify</button>
-        <div class="btn-separator"></div>
-        <button id="btn-research" class="utility-btn" title="Research technologies" aria-label="Research technologies">🔬 Tech</button>
-        <button id="btn-diplomacy" class="utility-btn" title="Diplomatic relations" aria-label="Diplomatic relations">🤝 Diplo</button>
-        <button id="btn-espionage" class="utility-btn" title="Espionage operations" aria-label="Espionage operations">🕵️ Spy</button>
-        <button id="btn-nuclear" class="utility-btn hidden" title="Launch nuclear strike (readiness must be 100%)" aria-label="Launch nuclear strike">☢️ Nuke</button>
-        <button id="btn-stats" class="utility-btn" title="View game statistics" aria-label="View game statistics">📊 Stats</button>
-        <button id="btn-fog-toggle" class="utility-btn" title="Toggle fog of war" aria-label="Toggle fog of war">🌫️ Fog</button>
-        <button id="btn-theme-toggle" class="utility-btn" title="Toggle dark / light theme" aria-label="Toggle theme">🌓</button>
-        <div class="btn-separator"></div>
-        <button id="btn-end-phase" aria-label="End current phase">➡️ End Phase</button>
-        <button id="btn-menu" title="Open main menu" aria-label="Open main menu">☰</button>
-      </div>
-      
-      <!-- Victory Progress Bar -->
+
+      <!-- Victory Progress — anchored bottom-right, above ops console -->
       <div id="victory-progress" class="victory-progress hidden">
         <div class="victory-progress-header">
           <span>Victory Progress</span>
-          <span id="victory-condition-text">Capture 2 enemy capitals</span>
+          <span id="victory-condition-text"></span>
         </div>
         <div id="victory-bars"></div>
       </div>
+
     </div>
-    
+
     <!-- War Tension Bar -->
     <!-- tension-bar-container kept for JS compatibility but display handled by #tension-badge in turn-banner -->
     <div id="tension-bar-container" class="hidden" aria-hidden="true">
@@ -1173,6 +1195,67 @@
       </div>
     </div>
     
+    <!-- Factory Hub Tray - slides up from bottom bar -->
+    <div id="factory-hub-tray" class="fh-tray hidden" role="dialog" aria-labelledby="factory-hub-title">
+      <div class="fh-content">
+        <!-- Header -->
+        <div class="fh-header">
+          <div class="fh-title-row">
+            <h2 id="factory-hub-title">🏭 Factory Hub</h2>
+            <div class="fh-faction-badge" id="fh-faction-badge"></div>
+          </div>
+          <div class="fh-budget-bar-wrap">
+            <div class="fh-budget-labels">
+              <span class="fh-budget-available"><span id="fh-ipc-total">0</span> IPCs available</span>
+              <span class="fh-budget-spent">Ordered: <span id="fh-ipc-spent">0</span> IPCs</span>
+              <span class="fh-budget-remain">Remaining: <span id="fh-ipc-remain">0</span> IPCs</span>
+            </div>
+            <div class="fh-budget-track">
+              <div class="fh-budget-fill" id="fh-budget-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Body: catalog left, orders right -->
+        <div class="fh-body">
+          <!-- Unit Catalog -->
+          <div class="fh-catalog">
+            <div class="fh-section-title">📋 Unit Roster</div>
+            <div class="fh-domain-tabs">
+              <button class="fh-tab active" data-domain="land">Land</button>
+              <button class="fh-tab" data-domain="sea">Sea</button>
+              <button class="fh-tab" data-domain="air">Air</button>
+            </div>
+            <div id="fh-unit-list" class="fh-unit-list"></div>
+          </div>
+
+          <!-- Divider -->
+          <div class="fh-divider"></div>
+
+          <!-- Order Sheet -->
+          <div class="fh-orders">
+            <div class="fh-section-title">📦 Pending Orders</div>
+            <div id="fh-order-list" class="fh-order-list">
+              <p class="fh-empty-msg">No units ordered yet.<br><span>Use + buttons to add units.</span></p>
+            </div>
+            <div class="fh-capacity-row" id="fh-capacity-row">
+              <span class="fh-cap-label">Deploy slots used:</span>
+              <span class="fh-cap-val" id="fh-cap-used">0</span>
+              <span class="fh-cap-sep">/</span>
+              <span class="fh-cap-max" id="fh-cap-max">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="fh-footer">
+          <button id="fh-btn-clear">🗑️ Clear</button>
+          <button id="fh-btn-close">✕ Cancel</button>
+          <button id="fh-btn-confirm" class="primary fh-confirm-btn" disabled>✓ Confirm Orders</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Deployment Modal (new phase) -->
     <div id="deployment-modal" class="modal hidden" role="dialog" aria-labelledby="deployment-modal-title">
       <div class="modal-content" style="max-width: 800px;">

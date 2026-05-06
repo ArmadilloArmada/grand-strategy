@@ -428,6 +428,7 @@ class Game {
     this.hud.objectiveSystem.reset();
     this.hud.objectiveSystem.setScenarioMap(mapId);
     factionAbilityManager.reset();
+    this.hud.isFirstTurnLoad = true;
 
     // Start the game
     this.turnManager.startGame();
@@ -1720,25 +1721,32 @@ class Game {
         turn: this.state.turnNumber.toString(),
         faction: faction.name,
       });
-      
+
+      // Show "YOUR TURN" banner only on real turn transitions, not on initial game load
+      if (!this.hud.isFirstTurnLoad) {
+        this.hud.showYourTurnBanner(faction.name, faction.colorLight ?? faction.color);
+      } else {
+        this.hud.isFirstTurnLoad = false;
+      }
+
       // Roll for random strategic event (human players only)
       const event = this.eventsSystem.rollForEvent(faction.id);
       if (event) {
         await this.showStrategicEvent(event, faction.id);
       }
-      
+
       // Low IPC warning in vs-ai when it's purchase phase
       if (this.hud.gameConfig.mode === 'vs-ai' && faction.ipcs < 10 && this.state.currentPhase === 'purchase') {
         soundManager.play('low_ipc');
       }
-      
+
       // Hot seat mode - show banner
       if (this.hud.gameConfig.mode === 'hotseat') {
         const humanFactions = this.hud.gameConfig.humanFactions ?? [];
         const playerNum = humanFactions.indexOf(faction.id) + 1;
         await this.hud.showHotSeatBanner(faction.name, faction.color, playerNum);
       }
-      
+
       // Update UI for human
       this.hud.updateTurnInfo();
       this.hud.updatePhaseInfo();

@@ -658,7 +658,16 @@ export class CombatUI {
         const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
         const actedCount = pu.count - readyCount;
         const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
-        attackerHtml += `<div>${icon} ${readyCount}× ${unitType.name}${actedText} <small style="color:#666">(Atk:${unitType.attack} Move:${unitType.movement})</small></div>`;
+        attackerHtml += `
+          <div class="unit-select-row">
+            <span>${icon} ${unitType.name}${actedText} <small style="color:#666">(Atk:${unitType.attack})</small></span>
+            <div class="unit-stepper">
+              <button type="button" class="stepper-dec" data-uid="${pu.unitTypeId}">−</button>
+              <input type="number" class="unit-count-input" data-unit-type-id="${pu.unitTypeId}"
+                value="${readyCount}" min="0" max="${readyCount}" style="width:3rem;text-align:center;">
+              <button type="button" class="stepper-inc" data-uid="${pu.unitTypeId}" data-max="${readyCount}">+</button>
+            </div>
+          </div>`;
         attackPower += readyCount * unitType.attack;
       }
     }
@@ -667,7 +676,22 @@ export class CombatUI {
       attackerHtml += `<div style="color:#059669;margin-top:0.5rem"><small>🎯 Artillery boosts ${boostedInfantry} infantry (+${boostedInfantry} attack)</small></div>`;
       attackPower += boostedInfantry;
     }
-    if (attackerUnitsEl) attackerUnitsEl.innerHTML = attackerHtml || '<em>No units</em>';
+    if (attackerUnitsEl) {
+      attackerUnitsEl.innerHTML = attackerHtml || '<em>No units</em>';
+      // Wire stepper buttons
+      attackerUnitsEl.querySelectorAll<HTMLButtonElement>('.stepper-dec').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
+          if (input) input.value = String(Math.max(0, Number(input.value) - 1));
+        });
+      });
+      attackerUnitsEl.querySelectorAll<HTMLButtonElement>('.stepper-inc').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
+          if (input) input.value = String(Math.min(Number(btn.dataset.max ?? 99), Number(input.value) + 1));
+        });
+      });
+    }
 
     const defenderUnitsEl = document.getElementById('preview-defender-units');
     let defensePower = 0;
@@ -885,23 +909,18 @@ export class CombatUI {
       return;
     }
 
-    // Keep modal open (in preview phase) while gathering unit counts
+    // Read unit counts from the inline steppers in the preview panel
+    const attackerUnitsEl = document.getElementById('preview-attacker-units');
     const attackingUnits: { unitTypeId: string; count: number; veteranCount?: number }[] = [];
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
         const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
         if (availableCount <= 0) continue;
-        const answer = prompt(`How many ${unitType.name} should attack?`, String(availableCount));
-        if (answer === null) {
-          this.closeBattlePreview();
-          this.callbacks.showToast('Attack cancelled', 'info');
-          return;
-        }
-        const parsed = Number(answer);
-        const count = Number.isFinite(parsed)
-          ? Math.max(0, Math.min(availableCount, Math.floor(parsed)))
-          : 0;
+        const input = attackerUnitsEl?.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
+        const count = input
+          ? Math.max(0, Math.min(availableCount, Math.floor(Number(input.value) || 0)))
+          : availableCount;
         if (count > 0) {
           attackingUnits.push({ unitTypeId: pu.unitTypeId, count, veteranCount: pu.veteranCount ?? 0 });
         }

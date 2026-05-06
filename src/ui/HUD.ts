@@ -99,9 +99,13 @@ export class HUD {
   private turnTimerInterval: ReturnType<typeof setInterval> | null = null;
   private turnTimerSeconds: number = 0;
 
+  // Suppress the "YOUR TURN" banner on the very first game load
+  public isFirstTurnLoad: boolean = true;
+
   setAISpeedCallback(cb: (multiplier: number) => void): void {
     this.aiSpeedCallback = cb;
   }
+
 
   // Game configuration
   public gameConfig: GameConfig = { ...defaultConfig };
@@ -316,6 +320,14 @@ export class HUD {
 
     // Build modal buttons (mobilization system - no confirm/queue buttons)
     document.getElementById('btn-cancel-build')?.addEventListener('click', () => this.productionUI.closeBuildModal());
+
+    // Factory Hub buttons
+    document.getElementById('fh-btn-close')?.addEventListener('click', () => this.productionUI.closeFactoryHub());
+    document.getElementById('fh-btn-clear')?.addEventListener('click', () => {
+      this.productionManager.clearQueue();
+      this.productionUI.renderFactoryHub();
+    });
+    document.getElementById('fh-btn-confirm')?.addEventListener('click', () => this.productionUI.confirmFactoryHubOrders());
 
     // Deployment modal buttons
     document.getElementById('btn-confirm-deploy')?.addEventListener('click', () => this.productionUI.onConfirmDeploy());
@@ -558,25 +570,10 @@ export class HUD {
   }
 
   private enhanceCommandBar(): void {
+    // The ops-console layout already has ACTIONS / COMMAND zone labels.
+    // No further DOM surgery needed — just mark as done.
     const bar = document.getElementById('action-buttons');
-    if (!bar || bar.dataset.enhanced === 'true') return;
-    bar.dataset.enhanced = 'true';
-    bar.classList.add('command-bar-enhanced');
-
-    const labels = [
-      { beforeId: 'btn-undo', text: 'Orders' },
-      { beforeId: 'btn-research', text: 'War Room' },
-      { beforeId: 'btn-end-phase', text: 'Turn' },
-    ];
-
-    for (const label of labels) {
-      const before = document.getElementById(label.beforeId);
-      if (!before || before.previousElementSibling?.classList.contains('command-group-label')) continue;
-      const el = document.createElement('span');
-      el.className = 'command-group-label';
-      el.textContent = label.text;
-      bar.insertBefore(el, before);
-    }
+    if (bar) bar.dataset.enhanced = 'true';
   }
 
   private setupWarRoomLayout(): void {
@@ -621,13 +618,7 @@ export class HUD {
       content?.appendChild(objectives);
     }
 
-    const victory = document.getElementById('victory-progress');
-    if (victory) {
-      victory.classList.add('war-room-section');
-      const headerTitle = victory.querySelector('.victory-progress-header span:first-child');
-      if (headerTitle) headerTitle.textContent = 'Victory';
-      content?.appendChild(victory);
-    }
+    // Victory progress now lives in the ops-console center zone — leave it there.
 
     const factions = document.getElementById('faction-panel');
     if (factions) {
@@ -785,6 +776,17 @@ export class HUD {
    * Setup territory hover tooltip
    */
   private setupTerritoryTooltip(): void {
+    // Hide all tooltips whenever any modal opens (class mutation: hidden removed)
+    const modalObserver = new MutationObserver(() => {
+      if (document.querySelector('.modal:not(.hidden)')) {
+        document.getElementById('territory-tooltip')?.classList.add('hidden');
+        document.getElementById('unit-tooltip')?.classList.add('hidden');
+      }
+    });
+    document.querySelectorAll('.modal').forEach(m => {
+      modalObserver.observe(m, { attributes: true, attributeFilter: ['class'] });
+    });
+
     this.renderer.setTerritoryHoverCallback((territoryId, clientX, clientY) => {
       const el = document.getElementById('territory-tooltip');
       const content = document.getElementById('territory-tooltip-content');
@@ -1493,6 +1495,17 @@ export class HUD {
     const isBuildPhase = ['purchase', 'production', 'build'].includes(phase);
     if (isBuildPhase && faction?.controlledBy === 'human') {
       this.updateMobilizationHighlights();
+      // Auto-open the deployment / mobilization modal so the player is
+      // immediately prompted to make strategic placement choices.
+      const reserves = this.productionManager.getCurrentReserves();
+      const hasReserves = reserves && reserves.length > 0;
+      if (hasReserves) {
+        // Has purchased units waiting in reserve — open deploy orders modal
+        this.showDeploymentModal();
+      } else {
+        // Open factory hub so player can plan their purchases
+        this.productionUI.showFactoryHub();
+      }
     } else {
       this.renderer.clearMobilizationTargets();
     }
@@ -1980,6 +1993,11 @@ export class HUD {
     const indicatorEl = document.getElementById('turn-indicator');
 
     if (turnEl) turnEl.textContent = `Round ${this.state.turnNumber}`;
+
+    // Drive the ribbon's left-edge colour accent from the current faction colour
+    const accentEl = document.getElementById('ribbon-faction-accent');
+    if (accentEl && faction) accentEl.style.background = faction.color;
+
     if (factionEl && faction) {
       factionEl.textContent = faction.name;
       factionEl.style.color = faction.colorLight || faction.color;
@@ -2054,7 +2072,6 @@ export class HUD {
         indicatorEl.classList.remove('turn-announce');
         void indicatorEl.offsetWidth;
         indicatorEl.className = 'your-turn turn-announce';
-        this.showYourTurnBanner(faction.name, faction.colorLight ?? faction.color);
       } else {
         indicatorEl.textContent = '🤖 AI PLAYING';
         indicatorEl.className = 'ai-turn';
@@ -2138,7 +2155,7 @@ export class HUD {
   /**
    * Show a sweeping full-screen "YOUR TURN" banner that auto-dismisses
    */
-  private showYourTurnBanner(factionName: string, color: string): void {
+  showYourTurnBanner(factionName: string, color: string): void {
     document.getElementById('your-turn-banner')?.remove();
     const banner = document.createElement('div');
     banner.id = 'your-turn-banner';
@@ -3082,7 +3099,7 @@ export class HUD {
    * Handle build button click
    */
   private onBuildClick(): void {
-    this.productionUI.showBuildModal();
+    this.productionUI.showFactoryHub();
   }
 
   private onFortifyClick(): void {
