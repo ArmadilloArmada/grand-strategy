@@ -52,8 +52,9 @@ import { PhaseGuidance } from './PhaseGuidance';
 import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
 import { AbilityPanel } from './AbilityPanel';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
+import { getAttackButtonState, getBuildButtonState, getHudPhaseFlags, getMoveButtonState } from './hud/ActionButtonState';
 import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
-import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase } from './hud/PhaseHelpers';
+import { isAttackMovePhase, isMovementPhase } from './hud/PhaseHelpers';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -2736,10 +2737,7 @@ export class HUD {
 
     // Determine which phases allow which actions based on turn style
     const phaseStr = phase as string;
-    const movementPhase = isMovementPhase(phaseStr);
-    const buildPhase = isBuildPhase(phaseStr);
-    const combatPhase = isCombatPhase(phaseStr);
-    const isEndPhase = ['collect_income', 'end'].includes(phaseStr);
+    const { movementPhase, buildPhase, combatPhase, endPhase: isEndPhase } = getHudPhaseFlags(phaseStr);
     const hasAttackTargets = movementPhase && this.validMoves.some(m => m.isAttack);
 
     // Move button - enabled during movement phases with owned territory selected that has available units
@@ -2747,41 +2745,29 @@ export class HUD {
       // Check for units that haven't acted yet this turn
       const hasAvailableUnits = territory && territory.owner === faction?.id && 
         territory.units.some(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
-      const canMove = movementPhase && isHumanTurn && hasAvailableUnits;
+      const moveState = getMoveButtonState({
+        movementPhase,
+        isHumanTurn,
+        hasAvailableUnits: Boolean(hasAvailableUnits),
+      });
+      const canMove = moveState.canMove;
       moveBtn.disabled = !canMove;
-      
-      if (canMove) {
-        moveBtn.innerHTML = '🚶 Move Units <kbd class="kbd-hint">M</kbd>';
-        moveBtn.title = 'Click a highlighted friendly/empty territory to move units';
-      } else {
-        moveBtn.innerHTML = '🚶 Move <kbd class="kbd-hint">M</kbd>';
-        moveBtn.title = movementPhase
-          ? 'Select one of your territories with ready units'
-          : 'Only available in movement phases';
-      }
+      moveBtn.innerHTML = moveState.labelHtml;
+      moveBtn.title = moveState.title;
     }
 
     // Attack button - opens battle preview when selected territory has attack targets
     if (attackBtn) {
-      if (movementPhase && isHumanTurn) {
-        attackBtn.innerHTML = hasAttackTargets
-          ? '⚔️ Attack Target <kbd class="kbd-hint">A</kbd>'
-          : '⚔️ Attack <kbd class="kbd-hint">A</kbd>';
-        attackBtn.disabled = !hasAttackTargets;
-        attackBtn.title = hasAttackTargets
-          ? 'Open battle preview for available attack target'
-          : 'Select your territory, then click an enemy territory to attack';
-      } else if (combatPhase) {
-        attackBtn.textContent = '⚔️ Resolve Combat';
-        attackBtn.disabled = this.state.pendingMoves.length === 0 || !isHumanTurn;
-        attackBtn.title = this.state.pendingMoves.length > 0
-          ? 'Resolve queued battles'
-          : 'No battles waiting';
-      } else {
-        attackBtn.innerHTML = '⚔️ Attack <kbd class="kbd-hint">A</kbd>';
-        attackBtn.disabled = true;
-        attackBtn.title = 'Only available in movement/combat phases';
-      }
+      const attackState = getAttackButtonState({
+        movementPhase,
+        combatPhase,
+        isHumanTurn,
+        hasAttackTargets,
+        pendingMoveCount: this.state.pendingMoves.length,
+      });
+      attackBtn.innerHTML = attackState.labelHtml;
+      attackBtn.disabled = attackState.disabled;
+      attackBtn.title = attackState.title;
     }
 
     // Phase-active class: highlight buttons relevant to the current phase
@@ -2802,21 +2788,14 @@ export class HUD {
       const mobilizeOptions = this.mobilizationSystem.getMobilizationOptions();
       const canMobilize = mobilizeOptions.some(o => o.canMobilize);
       
-      const canBuild = buildPhase && isHumanTurn;
-      buildBtn.disabled = !canBuild;
-      
-      // Update button tooltip with reason
-      if (!canBuild) {
-        if (!isHumanTurn) {
-          buildBtn.title = 'Wait for your turn';
-        } else if (!buildPhase) {
-          buildBtn.title = `Only available in ${turnStyle === 'quick' ? 'Build' : 'Purchase/Production'} phase`;
-        }
-      } else if (!canMobilize) {
-        buildBtn.title = 'Not enough IPCs or all territories already mobilized';
-      } else {
-        buildBtn.title = 'Mobilize forces at your territories (B)';
-      }
+      const buildState = getBuildButtonState({
+        buildPhase,
+        isHumanTurn,
+        canMobilize,
+        turnStyle,
+      });
+      buildBtn.disabled = !buildState.canBuild;
+      buildBtn.title = buildState.title;
     }
     
     // Strategic bombing button — visible only in combat/movement phases when bombers exist
