@@ -123,6 +123,30 @@ Run before tagging a release candidate:
    - Window resize still keeps core controls usable.
    - Save and load both succeed.
 
+### Steam Release Preflight
+
+Before a Steam upload, run:
+
+```bash
+npm run steam:preflight
+```
+
+This fails fast if:
+
+- Steam `AppID` is still the `480` placeholder.
+- Steam `DepotID` is still the `481` placeholder.
+- Required Steam build config files are missing.
+
+Upload flow:
+
+1. Set real IDs in:
+   - `steam/app_build.vdf`
+   - `steam/depot_build_win.vdf`
+2. Build unpacked Steam payload:
+   - `npm run pack:steam`
+3. Upload via SteamCMD helper:
+   - `scripts/steam-upload.bat`
+
 ## Running Tests
 
 ```bash
