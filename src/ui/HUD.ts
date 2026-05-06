@@ -322,6 +322,7 @@ export class HUD {
     document.getElementById('btn-cancel-build')?.addEventListener('click', () => this.productionUI.closeBuildModal());
 
     // Factory Hub buttons
+    document.getElementById('fh-btn-optimize')?.addEventListener('click', () => this.productionUI.optimizeFactoryHubOrders());
     document.getElementById('fh-btn-close')?.addEventListener('click', () => this.productionUI.closeFactoryHub());
     document.getElementById('fh-btn-clear')?.addEventListener('click', () => {
       this.productionManager.clearQueue();
@@ -632,8 +633,8 @@ export class HUD {
   }
 
   private setupHQLayout(): void {
-    // Skip on narrow viewports — elements stay as free-floating panels managed by DragManager
-    if (window.innerWidth <= 1080) return;
+    // Skip only on very narrow viewports; keep HQ Hub enabled on most laptop widths.
+    if (window.innerWidth <= 700) return;
     if (document.getElementById('hq-panel')) return;
 
     const panel = document.createElement('aside');
@@ -648,6 +649,12 @@ export class HUD {
     document.body.appendChild(panel);
 
     const content = panel.querySelector('#hq-content') as HTMLElement;
+
+    // MINIMAP — top of HQ panel, giving a tactical overview at all times
+    const minimap = document.getElementById('minimap-container');
+    if (minimap) {
+      content.appendChild(minimap);
+    }
 
     // RECAP SLOT — turn/phase recap cards render here instead of floating over screen
     const recapSlot = document.createElement('div');
@@ -716,18 +723,22 @@ export class HUD {
     const hqPanel = document.getElementById('hq-panel');
     const warRoom = document.getElementById('war-room-panel');
     const actions = document.getElementById('action-buttons');
-    const phase = document.getElementById('phase-progress');
+    const fhTray = document.getElementById('factory-hub-tray');
 
     const hqRect = hqPanel?.classList.contains('collapsed') ? null : hqPanel?.getBoundingClientRect();
     const warRoomRect = warRoom?.classList.contains('collapsed') ? null : warRoom?.getBoundingClientRect();
     const actionsRect = actions?.classList.contains('hidden') ? null : actions?.getBoundingClientRect();
-    const phaseRect = phase?.getBoundingClientRect();
+    const fhOpen = fhTray && !fhTray.classList.contains('hidden');
+
+    // Action bar is now at the TOP of the screen, so bottom inset comes from
+    // the factory hub tray (when open) or a small fixed clearance.
+    const bottomInset = fhOpen ? 150 : 64;
 
     return {
-      left: hqRect ? Math.ceil(hqRect.right + 24) : 48,
-      right: warRoomRect ? Math.ceil(window.innerWidth - warRoomRect.left + 24) : 48,
-      top: phaseRect ? Math.ceil(phaseRect.bottom + 32) : 110,
-      bottom: actionsRect ? Math.ceil(window.innerHeight - actionsRect.top + 36) : 96,
+      left:   hqRect      ? Math.ceil(hqRect.right + 24)                       : 48,
+      right:  warRoomRect ? Math.ceil(window.innerWidth - warRoomRect.left + 24): 48,
+      top:    actionsRect ? Math.ceil(actionsRect.bottom + 18)                  : 110,
+      bottom: bottomInset,
     };
   }
 
@@ -1609,13 +1620,6 @@ export class HUD {
     // Handle placement mode (placing purchased units)
     if (this.isPlacementMode) {
       this.handlePlacementClick(territoryId);
-      return;
-    }
-
-    // Handle Build phase - click on your territory to mobilize directly (no modal needed!)
-    const isBuildPhase = ['purchase', 'production', 'build'].includes(phase);
-    if (isBuildPhase && territory.owner === faction.id && faction.controlledBy === 'human' && territory.type !== 'sea') {
-      this.productionUI.handleMapMobilization(territoryId);
       return;
     }
 
@@ -3836,8 +3840,10 @@ export class HUD {
   }
 
   private maybeOfferTutorial(): void {
-    if (localStorage.getItem('grand_strategy_ever_played')) return;
-    localStorage.setItem('grand_strategy_ever_played', '1');
+    // Canonical first-run onboarding gate: offer once, through one path only.
+    if (localStorage.getItem('tutorial-seen') === 'true') return;
+    if (localStorage.getItem('tutorial-offered') === '1') return;
+    localStorage.setItem('tutorial-offered', '1');
 
     // First-time player: offer tutorial via a styled overlay dialog
     const overlay = document.createElement('div');
@@ -3877,7 +3883,11 @@ export class HUD {
       dismiss();
       this.showTutorial();
     });
-    document.getElementById('tutorial-offer-no')?.addEventListener('click', dismiss);
+    document.getElementById('tutorial-offer-no')?.addEventListener('click', () => {
+      // Skip should still count as first-run onboarding being handled.
+      localStorage.setItem('tutorial-seen', 'true');
+      dismiss();
+    });
   }
 
   // ==================== HOT SEAT ====================

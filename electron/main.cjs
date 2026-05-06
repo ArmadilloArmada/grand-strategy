@@ -24,8 +24,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1024,
-    minHeight: 768,
+    minWidth: 640,
+    minHeight: 480,
     title: 'Grand Strategy',
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     backgroundColor: '#1a4d2e',

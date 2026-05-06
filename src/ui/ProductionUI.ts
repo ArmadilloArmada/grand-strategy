@@ -31,18 +31,20 @@ export class ProductionUI {
   // ==================== FACTORY HUB ====================
 
   showFactoryHub(): void {
-    const modal = document.getElementById('factory-hub-tray');
-    if (!modal) return;
+    const tray = document.getElementById('factory-hub-tray');
+    if (!tray) return;
     this.productionManager.clearQueue();
     this.fhActiveDomain = 'land';
-    modal.classList.remove('hidden');
+    tray.classList.remove('hidden');
+    document.body.classList.add('fh-open');
     this.renderFactoryHub();
     this.bindFactoryHubTabs();
   }
 
   closeFactoryHub(): void {
-    const modal = document.getElementById('factory-hub-tray');
-    if (modal) modal.classList.add('hidden');
+    const tray = document.getElementById('factory-hub-tray');
+    if (tray) tray.classList.add('hidden');
+    document.body.classList.remove('fh-open');
     this.productionManager.clearQueue();
   }
 
@@ -114,6 +116,7 @@ export class ProductionUI {
   private renderFactoryHubCatalog(): void {
     const listEl = document.getElementById('fh-unit-list');
     if (!listEl) return;
+    this.ensureFactoryHubHorizontalScroll(listEl);
 
     const faction = this.state.getCurrentFaction();
     if (!faction) return;
@@ -135,9 +138,16 @@ export class ProductionUI {
       const queuedEntry = queue.find(q => q.unitTypeId === unit.id);
       const queuedCount = queuedEntry ? queuedEntry.count : 0;
       const canAffordOne = unit.cost <= remainIPCs;
+      const maxAffordable = unit.cost > 0 ? Math.floor(remainIPCs / unit.cost) : 0;
+
+      const cardClass = [
+        'fh-unit-card',
+        !canAffordOne && queuedCount === 0 ? 'fh-unit-unaffordable' : '',
+        queuedCount > 0 ? 'fh-unit-queued' : '',
+      ].filter(Boolean).join(' ');
 
       html += `
-        <div class="fh-unit-card ${!canAffordOne && queuedCount === 0 ? 'fh-unit-unaffordable' : ''}">
+        <div class="${cardClass}">
           <div class="fh-unit-icon">${icon}</div>
           <div class="fh-unit-info">
             <div class="fh-unit-name">${unit.name}</div>
@@ -150,6 +160,7 @@ export class ProductionUI {
             <button class="fh-minus" data-unit="${unit.id}" ${queuedCount === 0 ? 'disabled' : ''}>−</button>
             <span class="fh-count" id="fh-count-${unit.id}">${queuedCount}</span>
             <button class="fh-plus" data-unit="${unit.id}" ${!canAffordOne ? 'disabled' : ''}>+</button>
+            <button class="fh-max" data-unit="${unit.id}" data-max="${maxAffordable}" ${maxAffordable === 0 ? 'disabled' : ''} title="Buy max (${maxAffordable})">Max</button>
           </div>
         </div>
       `;
@@ -180,6 +191,34 @@ export class ProductionUI {
         this.renderFactoryHubOrders();
       });
     });
+
+    listEl.querySelectorAll<HTMLButtonElement>('.fh-max:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitId = btn.dataset.unit!;
+        const max = parseInt(btn.dataset.max ?? '0', 10);
+        for (let i = 0; i < max; i++) {
+          const result = this.productionManager.queueSimplePurchase(unitId, 1);
+          if (!result.success) break;
+        }
+        soundManager.play('click');
+        this.updateFactoryHubBudget();
+        this.renderFactoryHubCatalog();
+        this.renderFactoryHubOrders();
+      });
+    });
+  }
+
+  private ensureFactoryHubHorizontalScroll(listEl: HTMLElement): void {
+    if ((listEl as HTMLElement).dataset.scrollBound === '1') return;
+    (listEl as HTMLElement).dataset.scrollBound = '1';
+
+    // Convert vertical wheel gestures into horizontal strip scrolling.
+    listEl.addEventListener('wheel', (e) => {
+      const dominantDelta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (dominantDelta === 0) return;
+      listEl.scrollLeft += dominantDelta;
+      e.preventDefault();
+    }, { passive: false });
   }
 
   private renderFactoryHubOrders(): void {
@@ -229,6 +268,45 @@ export class ProductionUI {
     });
   }
 
+  optimizeFactoryHubOrders(): void {
+    this.productionManager.clearQueue();
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const units = this.state.unitRegistry.getByDomain(this.fhActiveDomain)
+      .filter(u => (!u.factionId || u.factionId === faction.id) && u.cost > 0)
+      .sort((a, b) => a.cost - b.cost);
+
+    if (units.length === 0) return;
+
+    // Round-robin through the 3 cheapest unit types for a balanced force.
+    // Falls back to cheapest when higher-cost units become unaffordable.
+    const palette = units.slice(0, Math.min(3, units.length));
+    let idx = 0;
+    for (let safety = 0; safety < 500; safety++) {
+      const remaining = this.productionManager.getRemainingIPCs();
+      if (remaining <= 0) break;
+      let bought = false;
+      for (let attempt = 0; attempt < palette.length; attempt++) {
+        const unit = palette[(idx + attempt) % palette.length];
+        if (unit.cost <= remaining) {
+          const result = this.productionManager.queueSimplePurchase(unit.id, 1);
+          if (result.success) {
+            idx = (idx + attempt + 1) % palette.length;
+            bought = true;
+            break;
+          }
+        }
+      }
+      if (!bought) break;
+    }
+
+    soundManager.play('click');
+    this.updateFactoryHubBudget();
+    this.renderFactoryHubCatalog();
+    this.renderFactoryHubOrders();
+  }
+
   confirmFactoryHubOrders(): void {
     const queue = this.productionManager.getPurchaseQueue();
     if (queue.length === 0) {
@@ -257,6 +335,7 @@ export class ProductionUI {
       }
 
       document.getElementById('factory-hub-tray')?.classList.add('hidden');
+      document.body.classList.remove('fh-open');
     } else {
       this.callbacks.showToast('Could not confirm orders — check IPC balance', 'error');
     }

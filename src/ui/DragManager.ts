@@ -31,11 +31,8 @@ type PanelPos = { left: number; top: number };
  * '.panel-grip' = inject a dedicated gripper (for all-button panels).
  */
 const HANDLE_SELECTORS: Record<string, string | undefined> = {
-  'turn-info':         '.turn-banner',
-  'resources':         undefined,
-  'action-buttons':    '.panel-grip',
+  // turn-info, action-buttons, resources anchored inside #top-hub — excluded from drag
   'faction-panel':     '#faction-panel-header',
-  'minimap-container': undefined,
   'zoom-controls':     undefined,
   'help-button':       undefined,
 };
@@ -49,23 +46,11 @@ const DEFAULTS: Record<string, (vw: number, vh: number, r: DOMRect) => PanelPos>
   // Top-left corner
   'help-button':       (_vw, _vh, _r) => ({ left: 16,                                top: 16 }),
 
-  // Top-center, flush against top edge
-  'turn-info':         (vw,  _vh, r)  => ({ left: Math.max(0, (vw - r.width) / 2),   top: 0 }),
-
-  // Top-right corner, 16 px inset
-  'resources':         (vw,  _vh, r)  => ({ left: vw - r.width - 16,                 top: 16 }),
-
-  // War Room content is managed by the panel layout; keep this static if reset touches it.
+  // War Room content is managed by the panel layout
   'faction-panel':     (vw,  _vh, r)  => ({ left: vw - r.width - 16,                 top: 112 }),
 
-  // Right column — above minimap, separated by 8 px
+  // Right column — above action bar, clear of War Room panel
   'zoom-controls':     (vw,  _vh,  r)  => ({ left: vw - 326 - r.width - 24, top: 118 }),
-
-  // Bottom-left, clear of the HQ panel (290 px wide at 12 px inset = ~302 px).
-  'minimap-container': (_vw, vh,  r)  => ({ left: 320, top: Math.max(140, vh - r.height - 80) }),
-
-  // Bottom-center, 16 px above the very bottom
-  'action-buttons':    (vw,  vh,  r)  => ({ left: Math.max(320, (vw - r.width) / 2), top: vh - r.height - 16 }),
 };
 
 export class DragManager {

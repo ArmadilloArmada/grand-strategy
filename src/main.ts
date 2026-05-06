@@ -534,12 +534,6 @@ class Game {
     // Hide main menu
     this.hideMainMenu();
 
-    // Show tutorial for new players
-    const tutorialSeen = localStorage.getItem('tutorial-seen') === 'true';
-    if (!tutorialSeen) {
-      this.hud.showTutorial();
-    }
-
   }
 
   /**

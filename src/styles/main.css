@@ -2,8 +2,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --ribbon-h: 96px;   /* Top bar: 52px ribbon + 44px action row */
-  --console-h: 0px;   /* No fixed bottom console — factory hub tray only */
+  --ribbon-h: clamp(40px, 4.06vw, 52px);     /* 52px @ ≥1280px, shrinks to 40px */
+  --actionbar-h: clamp(32px, 3.125vw, 40px); /* 40px @ ≥1280px, shrinks to 32px */
+  --topbar-h: calc(var(--ribbon-h) + var(--actionbar-h)); /* auto-derived */
+  --console-h: 0px;    /* No fixed bottom console */
 
   /* ==================== WCAG 2.1 AA Accessible Color Palette ==================== */
   /* All colors tested for minimum 4.5:1 contrast ratio against backgrounds */
@@ -230,7 +232,7 @@ body {
 
 #war-room-panel {
   position: fixed;
-  top: calc(var(--ribbon-h) + 0.5rem);
+  top: calc(var(--topbar-h) + 0.5rem);
   right: 1rem;
   bottom: 0.5rem;
   z-index: 230;
@@ -781,53 +783,61 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
-   COMMAND RIBBON  (top bar — two rows)
+   COMMAND RIBBON  (centered float, 52px)
    ══════════════════════════════════════════════════════════ */
 
 #turn-info {
   position: fixed !important;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(960px, calc(100vw - 700px)) !important;
   height: var(--ribbon-h) !important;
   display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
+  flex-direction: row !important;
+  align-items: center !important;
   gap: 0 !important;
-  transform: none !important;
   padding: 0 !important;
   background: rgba(8, 14, 20, 0.96);
   backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
   box-shadow: 0 2px 16px rgba(0,0,0,0.5);
   z-index: 320;
   animation: none !important;
   overflow: hidden;
 }
 
-/* Row 1: faction / phase pipeline / round */
-.ribbon-row-top {
-  height: 52px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
+/* ══════════════════════════════════════════════════════════
+   ACTION BAR  (matches ribbon width, sits flush below it)
+   ══════════════════════════════════════════════════════════ */
+
+#action-buttons {
+  position: fixed !important;
+  top: var(--ribbon-h) !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(960px, calc(100vw - 700px)) !important;
+  height: var(--actionbar-h) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 0 0.6rem !important;
+  background: rgba(6, 11, 18, 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  border-top: 1px solid rgba(255,255,255,0.06) !important;
+  border-bottom: 1px solid rgba(201,162,39,0.22) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45) !important;
+  z-index: 319 !important;
+  overflow: visible !important;
+  max-width: none !important;
+  border-radius: 0 0 8px 8px !important;
+  animation: none !important;
 }
 
-/* Row 2: action buttons */
-.ribbon-row-actions {
-  height: 44px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-shrink: 0;
-  background: rgba(4, 8, 14, 0.6);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding: 0 0.6rem;
-  gap: 0;
-}
-
-/* Action groups inside row 2 */
+/* Three action groups */
 .rba-group {
   display: flex;
   align-items: center;
@@ -837,7 +847,7 @@ body {
 
 .rba-left {
   flex-shrink: 0;
-  padding-right: 0.75rem;
+  padding-right: 0.6rem;
   border-right: 1px solid rgba(255,255,255,0.08);
 }
 
@@ -845,13 +855,13 @@ body {
   flex: 1;
   justify-content: center;
   min-width: 0;
-  padding: 0 0.75rem;
+  padding: 0 0.6rem;
   overflow: hidden;
 }
 
 .rba-right {
   flex-shrink: 0;
-  padding-left: 0.75rem;
+  padding-left: 0.6rem;
   border-left: 1px solid rgba(255,255,255,0.08);
 }
 
@@ -1949,14 +1959,17 @@ body.theme-dark #help-button {
 
 #toast-container {
   position: fixed;
-  top: 5rem;
-  right: 1rem;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.4rem;
   pointer-events: none;
-  max-width: 280px;
+  max-width: 380px;
+  width: max-content;
 }
 
 .toast {
@@ -2074,7 +2087,7 @@ body.theme-dark #help-button {
 
 .ai-activity-feed {
   position: fixed;
-  top: calc(var(--ribbon-h) + 0.5rem);
+  top: calc(var(--topbar-h) + 0.5rem);
   right: 1rem;
   width: min(360px, calc(100vw - 2rem));
   max-height: 40vh;
@@ -4284,10 +4297,10 @@ body.ai-feed-active #campaign-objectives-panel {
    GLOBAL POLISH IMPROVEMENTS
    ================================================================ */
 
-/* Toasts slide in from the right */
+/* Toasts slide in from below */
 @keyframes toastIn {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0);    }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 
 .toast {
@@ -6427,7 +6440,7 @@ body.theme-dark .panel-grip {
 
 #hq-panel {
   position: fixed;
-  top: calc(var(--ribbon-h) + 0.5rem);
+  top: calc(var(--topbar-h) + 0.5rem);
   left: 0.75rem;
   bottom: 0.5rem;
   z-index: 230;
@@ -6792,7 +6805,7 @@ body.theme-dark .panel-grip {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 700px) {
   #hq-panel { display: none; }
 }
 
@@ -6801,11 +6814,22 @@ body.theme-dark .panel-grip {
   width: 100% !important;
 }
 
-/* ==================== Factory Hub Tray (War Room theme) ==================== */
+/* When factory hub tray is open, shorten side panels so they don't hide behind it */
+.fh-open #hq-panel,
+.fh-open #war-room-panel {
+  bottom: calc(var(--fh-tray-h) + 0.5rem);
+  transition: bottom 0.22s ease;
+}
 
-/* --- shared dark panel tokens (mirrors War Room / HQ) --- */
+#hq-panel,
+#war-room-panel {
+  transition: bottom 0.22s ease;
+}
+
+/* ==================== Factory Hub Tray (slim single-strip) ==================== */
+
 :root {
-  --fh-bg:          rgba(8, 16, 32, 0.96);
+  --fh-bg:          rgba(8, 16, 32, 0.97);
   --fh-border:      rgba(201, 162, 39, 0.32);
   --fh-section-bg:  rgba(255,255,255,0.04);
   --fh-section-bd:  rgba(255,255,255,0.08);
@@ -6814,6 +6838,7 @@ body.theme-dark .panel-grip {
   --fh-gold:        #fbbf24;
   --fh-green:       #6ee7b7;
   --fh-red:         #fca5a5;
+  --fh-tray-h:      130px;
 }
 
 /* Tray container */
@@ -6822,14 +6847,14 @@ body.theme-dark .panel-grip {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 300px;
+  height: var(--fh-tray-h);
   background: var(--fh-bg);
   border-top: 2px solid var(--fh-border);
-  box-shadow: 0 -8px 32px rgba(0,0,0,0.55);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 -6px 28px rgba(0,0,0,0.55), 0 -1px 0 rgba(201,162,39,0.15);
+  backdrop-filter: blur(14px);
   z-index: 318;
   transform: translateY(100%);
-  transition: transform 0.22s ease;
+  transition: transform 0.2s ease;
   display: flex;
   flex-direction: column;
   color: var(--fh-text);
@@ -6846,48 +6871,96 @@ body.theme-dark .panel-grip {
   height: 100%;
 }
 
-/* Header */
+/* ── Header: title | faction badge | separator | domain tabs | separator | budget | close ── */
 .fh-header {
-  padding: 0.4rem 1rem 0.35rem;
-  border-bottom: 1px solid var(--fh-border);
-  background: rgba(201,162,39,0.06);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.85rem;
+  height: 36px;
+  border-bottom: 1px solid rgba(201,162,39,0.2);
+  background: rgba(201,162,39,0.05);
   flex-shrink: 0;
 }
 
-.fh-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
-}
-
-.fh-title-row h2 {
+.fh-header h2 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.78rem;
   font-family: 'Cinzel', serif;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--fh-gold);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Thin vertical separator in header */
+.fh-hdr-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.12);
+  flex-shrink: 0;
 }
 
 .fh-faction-badge {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 0.15rem 0.6rem;
+  padding: 0.08rem 0.5rem;
   border-radius: 20px;
   border: 1.5px solid;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   opacity: 0.9;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-/* Budget labels */
+/* Domain tabs — compact, inline in header */
+.fh-domain-tabs {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.fh-tab {
+  padding: 0.12rem 0.6rem;
+  height: 24px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--fh-muted);
+  transition: all 0.14s ease;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.fh-tab:hover { background: rgba(201,162,39,0.1); color: var(--fh-text); border-color: rgba(201,162,39,0.3); }
+.fh-tab.active {
+  background: rgba(201,162,39,0.16);
+  color: var(--fh-gold);
+  border-color: rgba(201,162,39,0.5);
+}
+
+/* Budget bar — takes remaining header space */
+.fh-budget-bar-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
 .fh-budget-labels {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
-  margin-bottom: 0.2rem;
+  gap: 0;
+  font-size: 0.66rem;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .fh-budget-available { font-weight: 700; color: var(--fh-text); }
@@ -6895,8 +6968,8 @@ body.theme-dark .panel-grip {
 .fh-budget-remain    { color: #6ee7b7; }
 
 .fh-budget-track {
-  height: 4px;
-  background: rgba(255,255,255,0.1);
+  height: 2px;
+  background: rgba(255,255,255,0.08);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -6909,294 +6982,738 @@ body.theme-dark .panel-grip {
   width: 0%;
 }
 
-/* Body */
-.fh-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-  flex-direction: row;
-}
-
-.fh-catalog {
-  flex: 1 1 55%;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--fh-section-bd);
-  overflow: hidden;
-}
-
-.fh-orders {
-  flex: 1 1 45%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.fh-section-title {
-  padding: 0.35rem 0.75rem;
+/* Optimize button in header */
+.fh-optimize-btn {
+  height: 26px;
+  padding: 0 0.6rem;
   font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fh-gold);
-  border-bottom: 1px solid var(--fh-section-bd);
-  background: rgba(255,255,255,0.02);
-  flex-shrink: 0;
-}
-
-/* Domain tabs */
-.fh-domain-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--fh-section-bd);
-  flex-shrink: 0;
-}
-
-.fh-tab {
-  flex: 1;
-  padding: 0.3rem 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  color: var(--fh-muted);
-  transition: all 0.15s ease;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  border-radius: 5px;
+  border: 1px solid rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.1);
+  color: #a5b4fc;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+  flex-shrink: 0;
 }
+.fh-optimize-btn:hover { background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.6); color: #c7d2fe; }
 
-.fh-tab:hover { background: rgba(201,162,39,0.06); color: var(--fh-text); }
-.fh-tab.active {
-  color: var(--fh-gold);
-  border-bottom-color: var(--fh-gold);
-  background: rgba(201,162,39,0.08);
-}
-
-/* Unit list */
-.fh-unit-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.4rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.fh-unit-list::-webkit-scrollbar { width: 4px; }
-.fh-unit-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
-.fh-unit-list::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 2px; }
-
-/* Unit card */
-.fh-unit-card {
+/* Close button in header */
+.fh-close-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: #e5e7eb;
+  font-size: 0.78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.14s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.55rem;
+  justify-content: center;
+}
+.fh-close-btn:hover { background: rgba(252,165,165,0.15); border-color: rgba(252,165,165,0.4); color: #fca5a5; }
+
+/* ── Unit scroll strip ── */
+.fh-unit-scroll {
+  display: flex;
+  flex-direction: row;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem 0.45rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201,162,39,0.3) transparent;
+  overscroll-behavior-x: contain;
+  cursor: ew-resize;
+  position: relative;
+  scroll-behavior: smooth;
+}
+
+.fh-unit-scroll::-webkit-scrollbar { height: 3px; }
+.fh-unit-scroll::-webkit-scrollbar-track { background: transparent; }
+.fh-unit-scroll::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 2px; }
+.fh-unit-scroll::-webkit-scrollbar-thumb:hover { background: rgba(201,162,39,0.55); }
+
+/* Unit card — horizontal layout */
+.fh-unit-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
   background: var(--fh-section-bg);
   border: 1px solid var(--fh-section-bd);
-  border-radius: 6px;
-  transition: all 0.15s ease;
+  border-radius: 7px;
+  transition: all 0.14s ease;
+  flex-shrink: 0;
+  min-width: 170px;
+  height: 52px;
 }
 
 .fh-unit-card:hover { background: rgba(201,162,39,0.1); border-color: rgba(201,162,39,0.4); }
-.fh-unit-unaffordable { opacity: 0.35; }
+.fh-unit-unaffordable { opacity: 0.32; }
+.fh-unit-card.fh-unit-queued {
+  background: rgba(110,231,183,0.07);
+  border-color: rgba(110,231,183,0.3);
+}
 
-.fh-unit-icon { font-size: 1.4rem; flex-shrink: 0; width: 1.8rem; text-align: center; }
+.fh-unit-icon { font-size: 1.35rem; flex-shrink: 0; width: 1.6rem; text-align: center; line-height: 1; }
 
 .fh-unit-info { flex: 1; min-width: 0; }
 
 .fh-unit-name {
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   color: var(--fh-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fh-unit-stats {
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   color: var(--fh-muted);
-  margin-top: 0.05rem;
+  margin-top: 0.08rem;
   display: flex;
-  gap: 0.4rem;
+  gap: 0.25rem;
   align-items: center;
+  white-space: nowrap;
 }
 
 .fh-unit-cost {
-  margin-left: auto;
   font-weight: 700;
   color: #fbbf24;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 /* +/- controls */
 .fh-unit-controls {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   flex-shrink: 0;
 }
 
 .fh-minus, .fh-plus {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 5px;
   border: 1px solid;
-  font-size: 1rem;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  font-weight: 700;
 }
 
-.fh-minus { background: rgba(252,165,165,0.1); border-color: rgba(252,165,165,0.3); color: #fca5a5; }
-.fh-minus:hover:not([disabled]) { background: rgba(252,165,165,0.22); }
-.fh-minus[disabled] { opacity: 0.25; cursor: not-allowed; }
+.fh-minus { background: rgba(252,165,165,0.08); border-color: rgba(252,165,165,0.28); color: #fca5a5; }
+.fh-minus:hover:not([disabled]) { background: rgba(252,165,165,0.2); }
+.fh-minus[disabled] { opacity: 0.22; cursor: not-allowed; }
 
-.fh-plus { background: rgba(110,231,183,0.1); border-color: rgba(110,231,183,0.3); color: #6ee7b7; }
-.fh-plus:hover:not([disabled]) { background: rgba(110,231,183,0.22); }
-.fh-plus[disabled] { opacity: 0.25; cursor: not-allowed; }
+.fh-plus { background: rgba(110,231,183,0.08); border-color: rgba(110,231,183,0.28); color: #6ee7b7; }
+.fh-plus:hover:not([disabled]) { background: rgba(110,231,183,0.2); }
+.fh-plus[disabled] { opacity: 0.22; cursor: not-allowed; }
+
+.fh-max {
+  padding: 0 6px; height: 24px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em;
+  border-radius: 4px; border: 1px solid rgba(251,191,36,0.35);
+  background: rgba(251,191,36,0.08); color: #fbbf24; cursor: pointer; white-space: nowrap;
+}
+.fh-max:hover:not([disabled]) { background: rgba(251,191,36,0.22); }
+.fh-max[disabled] { opacity: 0.22; cursor: not-allowed; }
 
 .fh-count {
-  min-width: 22px;
+  min-width: 20px;
   text-align: center;
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--fh-text);
 }
 
-/* Order list */
-.fh-order-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.4rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.fh-order-list::-webkit-scrollbar { width: 4px; }
-.fh-order-list::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 2px; }
-
-.fh-empty-msg {
-  text-align: center;
-  color: var(--fh-muted);
-  font-size: 0.8rem;
-  padding: 1.2rem 1rem;
-  line-height: 1.7;
-}
-.fh-empty-msg span { font-size: 0.72rem; opacity: 0.6; }
-
-.fh-order-row {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.55rem;
-  background: rgba(110,231,183,0.07);
-  border: 1px solid rgba(110,231,183,0.2);
-  border-radius: 6px;
-  font-size: 0.82rem;
-}
-
-.fh-order-icon { font-size: 1.1rem; flex-shrink: 0; }
-.fh-order-name { flex: 1; font-weight: 600; color: var(--fh-text); }
-.fh-order-qty  { color: var(--fh-muted); font-size: 0.75rem; }
-.fh-order-cost { font-weight: 700; color: #fbbf24; margin-left: auto; font-size: 0.75rem; }
-
-.fh-order-remove {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid rgba(252,165,165,0.35);
-  background: rgba(252,165,165,0.1);
-  color: #fca5a5;
-  font-size: 0.6rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-.fh-order-remove:hover { background: rgba(252,165,165,0.25); }
-
-.fh-order-total {
-  margin-top: 0.4rem;
-  padding: 0.35rem 0.55rem;
-  text-align: right;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--fh-gold);
-  border-top: 1px solid var(--fh-section-bd);
-}
-
-/* Capacity row */
-.fh-capacity-row {
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
-  color: var(--fh-muted);
-  border-top: 1px solid var(--fh-section-bd);
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex-shrink: 0;
-  background: rgba(255,255,255,0.02);
-}
-
-.fh-cap-label { flex: 1; }
-.fh-cap-val   { font-weight: 700; color: var(--fh-text); }
-.fh-cap-sep   { color: var(--fh-muted); }
-.fh-cap-max   { font-weight: 700; color: var(--fh-muted); }
-
-.fh-divider { display: none; }
-
-/* Footer */
+/* ── Footer: clear | capacity | confirm ── */
 .fh-footer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
-  border-top: 1px solid var(--fh-border);
-  background: rgba(201,162,39,0.04);
+  padding: 0 0.85rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.2);
   flex-shrink: 0;
+  height: 34px;
 }
 
-.fh-footer button:first-child { margin-right: auto; }
+.fh-capacity-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: var(--fh-muted);
+}
 
-/* Footer buttons — match War Room style */
+.fh-cap-label { }
+.fh-cap-val   { font-weight: 700; color: var(--fh-text); }
+.fh-cap-sep   { color: var(--fh-muted); }
+.fh-cap-max   { font-weight: 700; color: var(--fh-muted); }
+
+/* Footer buttons */
 .fh-footer button {
   font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 0.3rem 0.7rem;
+  padding: 0.22rem 0.6rem;
   background: rgba(255,255,255,0.05);
   color: var(--fh-text);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+  height: 26px;
+  display: flex;
+  align-items: center;
 }
 
-.fh-footer button:hover {
-  background: rgba(201,162,39,0.12);
-  border-color: rgba(201,162,39,0.5);
-}
+.fh-footer button:hover { background: rgba(201,162,39,0.12); border-color: rgba(201,162,39,0.45); }
 
 .fh-confirm-btn {
-  min-width: 130px;
   background: rgba(110,231,183,0.1) !important;
   border-color: rgba(110,231,183,0.35) !important;
   color: #6ee7b7 !important;
   font-weight: 700 !important;
+  padding: 0.22rem 1rem !important;
 }
 
 .fh-confirm-btn:hover:not(:disabled) {
   background: rgba(110,231,183,0.22) !important;
-  box-shadow: 0 0 10px rgba(110,231,183,0.2) !important;
+  box-shadow: 0 0 8px rgba(110,231,183,0.18) !important;
 }
 
 .fh-confirm-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.28;
   cursor: not-allowed;
 }
+
+/* Legacy selectors — kept so old JS references don't hard-error */
+.fh-divider        { display: none; }
+.fh-body           { display: none; }
+.fh-catalog        { display: none; }
+.fh-orders         { display: none; }
+.fh-section-title  { display: none; }
+.fh-unit-list      { display: none; }
+.fh-order-list     { display: none; }
+.fh-order-row      { display: none; }
+.fh-order-total    { display: none; }
+.fh-empty-msg      { display: none; }
+
+/* ==================== Layout Authority (Final Override) ====================
+   Comes last in cascade — defeats all earlier Cleanup Passes.
+   ========================================================================== */
+
+/* 1. Top Hub — single fixed container that holds ribbon + action bar */
+#top-hub {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  height: var(--topbar-h) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: rgba(8, 14, 20, 0.97) !important;
+  border-bottom: 2px solid rgba(201, 162, 39, 0.32) !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.55) !important;
+  backdrop-filter: blur(14px) !important;
+  z-index: 320 !important;
+}
+
+/* Ribbon row — static child of hub, no own fixed position */
+#turn-info {
+  position: static !important;
+  width: 100% !important;
+  height: var(--ribbon-h) !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(201,162,39,0.28) transparent !important;
+  background: none !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* 2. Phase progress: inline inside ribbon center zone (not floating) */
+#phase-progress {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  z-index: auto !important;
+  margin: 0 !important;
+  padding: 0.1rem 0.4rem !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+}
+
+/* 3. Turn order: inline inside ribbon right zone (not floating) */
+#turn-order {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  margin-top: 0 !important;
+}
+
+/* 4. Action bar row — static child of hub */
+#action-buttons {
+  position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  padding: 0 clamp(0.75rem, 1.8vw, 1.5rem) !important;
+  gap: clamp(0.15rem, 0.4vw, 0.35rem) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(201,162,39,0.28) transparent !important;
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  z-index: auto !important;
+}
+
+#action-buttons::-webkit-scrollbar { height: 4px; }
+#action-buttons::-webkit-scrollbar-track { background: transparent; }
+#action-buttons::-webkit-scrollbar-thumb {
+  background: rgba(201,162,39,0.35);
+  border-radius: 999px;
+}
+
+/* Compact mode: preserve core controls instead of clipping them away */
+@media (max-width: 760px) {
+  #turn-info #current-faction {
+    max-width: 120px !important;
+  }
+
+  #turn-info #turn-indicator,
+  #turn-info #save-indicator,
+  #turn-info .ribbon-badge {
+    display: none !important;
+  }
+
+  #action-buttons {
+    padding: 0 0.45rem !important;
+    gap: 0.2rem !important;
+  }
+
+  #action-buttons button {
+    font-size: 0.62rem !important;
+    padding: 0.12rem 0.34rem !important;
+  }
+
+  .victory-progress {
+    right: 0.5rem !important;
+    bottom: calc(var(--fh-tray-h) + 0.45rem) !important;
+    width: min(360px, calc(100vw - 1rem)) !important;
+    max-width: calc(100vw - 1rem) !important;
+  }
+
+  .fh-footer {
+    gap: 0.35rem !important;
+    padding: 0 0.45rem !important;
+  }
+
+  .fh-footer button {
+    font-size: 0.62rem !important;
+    padding: 0.16rem 0.4rem !important;
+    height: 24px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  #hq-panel {
+    display: none !important;
+  }
+
+  #turn-info #current-faction {
+    max-width: 84px !important;
+  }
+
+  .victory-progress {
+    left: 0.35rem !important;
+    right: 0.35rem !important;
+    width: auto !important;
+  }
+
+  .fh-capacity-row {
+    min-width: 0;
+    font-size: 0.62rem !important;
+    gap: 0.12rem !important;
+  }
+}
+
+/* 5. Context helper: static inside rba-center, no floating */
+.context-helper {
+  position: static !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+}
+
+/* 6. Separator bars inside action bar */
+#action-buttons .btn-separator {
+  width: 1px;
+  height: 22px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 0.25rem;
+  flex-shrink: 0;
+}
+
+/* 7. Tooltip: below side panels (z-index 230) so it never overlays HQ/War Room */
+.tooltip {
+  z-index: 222 !important;
+}
+
+/* 8. Phase step — horizontal pill, prominent in ribbon center */
+#turn-info .phase-step {
+  padding: clamp(0.18rem, 0.5vh, 0.28rem) clamp(0.5rem, 1.2vw, 0.9rem) !important;
+  gap: 0.3rem !important;
+  min-width: 0 !important;
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+#turn-info .phase-icon {
+  font-size: clamp(0.75rem, 1.3vw, 0.9rem) !important;
+  line-height: 1 !important;
+}
+
+/* Active phase label: clear readable text */
+#turn-info .phase-step.active .phase-label {
+  font-size: clamp(0.6rem, 1.05vw, 0.72rem) !important;
+}
+
+/* Center zone: vertically and horizontally centered */
+#turn-info .ribbon-center {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Inactive steps + connectors: hidden — ribbon only shows the current phase */
+#turn-info .phase-step:not(.active) {
+  display: none !important;
+}
+
+#turn-info .phase-connector {
+  display: none !important;
+}
+
+/* Active step: prominent pill showing current phase */
+#turn-info .phase-step.active .phase-label {
+  display: block !important;
+  font-size: 0.62rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: #fbbf24 !important;
+}
+
+/* Active step glow */
+#turn-info .phase-step.active {
+  background: rgba(201,162,39,0.15) !important;
+  box-shadow: 0 0 10px rgba(201,162,39,0.22) !important;
+  border-radius: 5px !important;
+}
+
+#turn-info .phase-connector {
+  width: 10px !important;
+  height: 1px !important;
+  background: rgba(255,255,255,0.12) !important;
+}
+
+#turn-info .phase-connector.completed {
+  background: rgba(110,231,183,0.5) !important;
+}
+
+/* 9. Ribbon side panels — start below the compound top bar */
+#hq-panel,
+#war-room-panel {
+  top: calc(var(--topbar-h) + 0.75rem) !important;
+}
+
+/* 10. Victory progress: slot it above factory tray when tray is open */
+.fh-open .victory-progress:not(.hidden) {
+  bottom: calc(var(--fh-tray-h) + 0.5rem) !important;
+  transition: bottom 0.22s ease !important;
+}
+
+/* 11. Minimap is now embedded in HQ panel — no bottom clearance needed */
+
+/* 12. Ribbon zone distribution — each third gets equal share of the full width */
+#turn-info .ribbon-left,
+#turn-info .ribbon-center,
+#turn-info .ribbon-right {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+#turn-info .ribbon-right {
+  justify-content: flex-end !important;
+  gap: clamp(0.4rem, 1vw, 0.75rem) !important;
+  padding-right: clamp(0.5rem, 1.5vw, 1.25rem) !important;
+}
+/* Turn order: colored dot pills, hide text label */
+#turn-info .turn-order-item span {
+  display: none !important;
+}
+#turn-info .turn-order-item {
+  width: clamp(8px, 1vw, 12px) !important;
+  height: clamp(8px, 1vw, 12px) !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  min-width: 0 !important;
+  gap: 0 !important;
+}
+/* Round label */
+#turn-info #turn-number {
+  font-size: clamp(0.65rem, 1.15vw, 0.8rem) !important;
+  letter-spacing: 0.04em !important;
+  white-space: nowrap !important;
+}
+/* Skirmish/tension badge: small, muted */
+#turn-info .ribbon-badge,
+#turn-info #tension-badge {
+  font-size: clamp(0.55rem, 0.9vw, 0.65rem) !important;
+  opacity: 0.72 !important;
+  white-space: nowrap !important;
+}
+
+/* 13. Minimap embedded in HQ panel */
+#hq-panel #minimap-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 140px !important;
+  bottom: auto !important;
+  right: auto !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  animation: none !important;
+  flex-shrink: 0 !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(201,162,39,0.25) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35) !important;
+  overflow: hidden !important;
+  margin-bottom: 0.4rem !important;
+  background: rgba(0,0,0,0.4) !important;
+}
+
+/* When minimap is inside HQ, the fh-open transition doesn't apply to it */
+.fh-open #hq-panel #minimap-container {
+  bottom: auto !important;
+  transition: none !important;
+}
+
+/* 14. Ribbon-left: single horizontal row — faction accent | name · IPC · YOUR TURN */
+#turn-info .ribbon-left {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  padding-left: 0 !important;
+  overflow: hidden !important;
+}
+/* Faction colour stripe — restore as left edge accent */
+#turn-info #ribbon-faction-accent {
+  display: block !important;
+  width: 3px !important;
+  height: 100% !important;
+  flex-shrink: 0 !important;
+  margin-right: clamp(0.4rem, 0.8vw, 0.7rem) !important;
+}
+/* Faction name + IPC in a single compact column */
+#turn-info .ribbon-faction-info {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+}
+#turn-info #current-faction {
+  font-size: clamp(0.6rem, 1.1vw, 0.78rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  color: #e5e7eb !important;
+}
+#turn-info #ipc-display {
+  font-size: clamp(0.55rem, 0.95vw, 0.68rem) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  color: #c9a227 !important;
+  white-space: nowrap !important;
+}
+/* YOUR TURN badge — inline pill after faction info */
+#turn-info #turn-indicator {
+  margin-left: clamp(0.3rem, 0.7vw, 0.6rem) !important;
+  font-size: clamp(0.48rem, 0.85vw, 0.58rem) !important;
+  padding: 2px clamp(4px, 0.6vw, 8px) !important;
+  border-radius: 4px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+/* Save indicator — small icon inline */
+#turn-info #save-indicator {
+  margin-left: 0.3rem !important;
+  font-size: 0.7rem !important;
+  flex-shrink: 0 !important;
+}
+/* IPC rate (income/turn) — keep hidden, too much detail for ribbon */
+#turn-info .ipc-rate {
+  display: none !important;
+}
+
+/* 15. Hide kbd shortcut hints in action bar buttons (visual noise) */
+#action-buttons kbd,
+#action-buttons .kbd-hint {
+  display: none !important;
+}
+
+/* Narrow viewport: shrink side panels first instead of hiding immediately */
+@media (max-width: 1080px) {
+  #hq-panel {
+    left: 0.5rem !important;
+    width: min(250px, 32vw) !important;
+  }
+
+  #war-room-panel {
+    right: 0.5rem !important;
+    width: min(280px, 36vw) !important;
+  }
+}
+
+/* Hide War Room only on very narrow widths */
+@media (max-width: 700px) {
+  #war-room-panel { display: none !important; }
+}
+
+/* Keep zoom controls clear of HQ/War Room while shrinking */
+@media (max-width: 1080px) {
+  #zoom-controls {
+    left: auto !important;
+    top: calc(var(--topbar-h) + 0.65rem) !important;
+    right: calc(0.5rem + min(280px, 36vw) + 10px) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  #zoom-controls {
+    right: 0.75rem !important;
+  }
+}
+
+/* ══ TOP HUB — comprehensive button layout ══════════════════════════════════ */
+
+/* All action bar buttons: shared base sizing */
+#action-buttons button {
+  font-size: clamp(0.62rem, 1.15vw, 0.74rem) !important;
+  padding: clamp(0.12rem, 0.4vw, 0.28rem) clamp(0.3rem, 0.8vw, 0.6rem) !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+/* #btn-undo shows dynamic text ("Back" / "Undo Move" etc.) — NOT icon-only */
+#action-buttons #btn-undo {
+  width: auto !important;
+  min-width: 0 !important;
+  padding: clamp(0.12rem, 0.4vw, 0.28rem) clamp(0.4rem, 0.9vw, 0.7rem) !important;
+  font-weight: 600 !important;
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  color: #e5e7eb !important;
+  border-radius: 5px !important;
+}
+
+/* Icon-only utility buttons: emoji-square style */
+/* redo stays icon-only (JS never overwrites it with long text) */
+#action-buttons #btn-redo      .btn-label,
+#action-buttons #btn-research  .btn-label,
+#action-buttons #btn-diplomacy .btn-label,
+#action-buttons #btn-espionage .btn-label,
+#action-buttons #btn-stats     .btn-label,
+#action-buttons #btn-fog-toggle .btn-label { display: none !important; }
+
+#action-buttons #btn-redo,
+#action-buttons #btn-research,
+#action-buttons #btn-diplomacy,
+#action-buttons #btn-espionage,
+#action-buttons #btn-stats,
+#action-buttons #btn-fog-toggle,
+#action-buttons #btn-theme-toggle {
+  width:  clamp(22px, 2.2vw, 28px) !important;
+  height: clamp(22px, 2.2vw, 28px) !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  font-size: clamp(0.72rem, 1.4vw, 0.9rem) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid rgba(255,255,255,0.13) !important;
+  color: #e5e7eb !important;
+  border-radius: 5px !important;
+}
+
+/* End Phase: prominent right-side primary button */
+#action-buttons #btn-end-phase {
+  font-size: clamp(0.62rem, 1.2vw, 0.76rem) !important;
+  padding: clamp(0.14rem, 0.45vw, 0.3rem) clamp(0.5rem, 1.2vw, 0.9rem) !important;
+}
+
