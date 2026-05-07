@@ -13,10 +13,10 @@ export class MoraleSystem {
    * Increases weariness for factions at war, recovers for those at peace.
    */
   tickAll(): void {
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.isDefeated) continue;
 
-      const allFactions = this.state.factionRegistry.getAll();
+      const allFactions = this.state.factionRegistry.getActiveIncludingDefeated();
       const enemies = allFactions.filter(
         f => f.id !== faction.id && !f.isDefeated &&
              this.state.diplomacyManager.getRelation(faction.id, f.id) === 'war'
@@ -91,7 +91,7 @@ export class MoraleSystem {
 
   serialize(): Record<string, { warWeariness: number; morale: number }> {
     const out: Record<string, { warWeariness: number; morale: number }> = {};
-    for (const f of this.state.factionRegistry.getAll()) {
+    for (const f of this.state.factionRegistry.getActiveIncludingDefeated()) {
       out[f.id] = { warWeariness: f.warWeariness, morale: f.morale };
     }
     return out;

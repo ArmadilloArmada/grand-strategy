@@ -152,7 +152,7 @@ export class AIController {
       id: u.id, attack: u.attack, defense: u.defense,
       movement: u.movement, cost: u.cost, domain: u.domain,
     }));
-    const factions = this.state.factionRegistry.getAll().map(f => ({
+    const factions = this.state.factionRegistry.getActiveIncludingDefeated().map(f => ({
       id: f.id, ipcs: f.ipcs, capital: f.capital, isDefeated: f.isDefeated,
     }));
     const territories = Array.from(this.state.territories.values()).map(t => ({
@@ -302,7 +302,7 @@ export class AIController {
       }
     }
 
-    const others = this.state.factionRegistry.getAll().filter(f => f.id !== faction.id && !f.isDefeated);
+    const others = this.state.factionRegistry.getActive().filter(f => f.id !== faction.id);
 
     // When losing badly, seek a non-aggression pact with the strongest enemy
     if ((isLosing || borderThreat > 35) && Math.random() < 0.25 + Math.min(0.25, borderThreat / 200)) {
@@ -381,7 +381,7 @@ export class AIController {
     const actionChance = 0.20 + this.personality.aggression * 0.35 + this.personality.economy * 0.15;
     if (Math.random() > actionChance) return;
 
-    const enemies = this.state.factionRegistry.getAll().filter(f =>
+    const enemies = this.state.factionRegistry.getActive().filter(f =>
       f.id !== faction.id && !f.isDefeated && faction.isEnemyOf(f.id)
     );
     if (enemies.length === 0) return;
@@ -567,7 +567,7 @@ export class AIController {
     const ourCapital = this.state.territories.get(faction.capital);
     if (ourCapital?.adjacentTo.includes(territory.id)) value += 50;
 
-    for (const other of this.state.factionRegistry.getAll()) {
+    for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.isEnemyOf(other.id) && territory.id === other.capital) value += 150;
     }
 
@@ -579,7 +579,7 @@ export class AIController {
 
     if (adjacentFriendly === 0 && territory.owner !== faction.id) value -= 30;
 
-    for (const other of this.state.factionRegistry.getAll()) {
+    for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (!faction.isEnemyOf(other.id)) continue;
       const ec = this.state.territories.get(other.capital);
       if (ec?.adjacentTo.includes(territory.id)) value += 60;

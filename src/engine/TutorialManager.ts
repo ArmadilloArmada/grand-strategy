@@ -227,7 +227,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'victory_types',
         title: 'Victory Types',
-        message: 'Capitals: Capture 3 enemy capitals. Domination: Control 75% of all territories. Economic: Accumulate 500 total IPCs earned. Elimination: Last faction standing. Victory type is set before the game starts.',
+        message: 'Capitals: Capture the configured number of enemy capitals. Domination: Control the configured territory share. Economic: Reach the configured IPC target. Elimination: Last active faction standing. Victory settings are chosen before the match starts.',
         position: 'center',
         action: 'any',
       },

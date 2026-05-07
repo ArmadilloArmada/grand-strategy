@@ -152,7 +152,7 @@ export interface GameStateSnapshot {
   currentFactionId: string;
   currentPhase: GamePhase;
   territories: (TerritoryData & { units: PlacedUnit[] })[];
-  factions: (FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string; warWeariness?: number; morale?: number; nuclearReadiness?: number; betrayalCooldown?: number })[];
+  factions: (FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string; warWeariness?: number; morale?: number; nuclearReadiness?: number; betrayalCooldown?: number; isActive?: boolean })[];
   pendingMoves: PendingMove[];
   purchaseOrders: PurchaseOrder[];
   diplomacy?: unknown;
@@ -443,6 +443,9 @@ export class GameState {
         if (fData.morale !== undefined) faction.morale = fData.morale;
         if (fData.nuclearReadiness !== undefined) faction.nuclearReadiness = fData.nuclearReadiness;
         if (fData.betrayalCooldown !== undefined) faction.betrayalCooldown = fData.betrayalCooldown;
+        // Backward compatibility: pre-active-set saves omit isActive, so treat
+        // every faction in the snapshot as active. New saves persist the flag.
+        faction.isActive = fData.isActive ?? true;
       }
     }
 

@@ -426,6 +426,24 @@
               Hold Ctrl/Cmd to select multiple factions
             </p>
           </div>
+          <div class="setting-row">
+            <label for="ai-opponent-count">AI Opponents</label>
+            <select id="ai-opponent-count">
+              <option value="all" selected>All available</option>
+              <option value="1">1 opponent</option>
+              <option value="2">2 opponents</option>
+              <option value="3">3 opponents</option>
+              <option value="4">4 opponents</option>
+              <option value="5">5 opponents</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="ai-opponents">Opponent Factions</label>
+            <select id="ai-opponents" multiple size="4" style="width: 100%;"></select>
+          </div>
+          <p style="font-size: 0.8rem; color: #666; margin-top: 0.35rem;">
+            Hold Ctrl/Cmd to pick which factions appear as opponents. The count above caps how many become active.
+          </p>
         </div>
         
         <div class="settings-section">

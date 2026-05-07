@@ -117,8 +117,9 @@ export class CombatResolver {
       if (fb.movementBonus)        bonuses.movementBonus        += fb.movementBonus;
     }
 
-    // Eastern Coalition: home territory defense bonus (distinctive faction trait)
-    if (factionId === 'eastern_coalition' && !isAttacker && territory?.originalOwner === factionId) {
+    // Home-defense trait: any faction with an infantry defense specialty gets
+    // +1 while defending its original territory (avoids hardcoding faction IDs).
+    if ((faction.bonuses?.infantryDefenseBonus ?? 0) > 0 && !isAttacker && territory?.originalOwner === factionId) {
       bonuses.defenseBonus += 1;
     }
 

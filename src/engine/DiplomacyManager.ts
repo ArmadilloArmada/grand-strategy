@@ -107,7 +107,7 @@ export class DiplomacyManager {
    */
   getTradeIncome(factionId: string): number {
     let total = 0;
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.id === factionId) continue;
       const info = this.getTradeDealInfo(factionId, faction.id);
       if (info) total += info.ipcPerTurn;
@@ -120,7 +120,7 @@ export class DiplomacyManager {
    */
   getAllianceCombatBonus(attackingFactionId: string, _territoryId: string): number {
     // Check if any ally also has units attacking the same territory
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.id === attackingFactionId) continue;
       if (this.hasAlliance(attackingFactionId, faction.id)) {
         return 1; // +1 attack when fighting alongside an ally
@@ -306,7 +306,7 @@ export class DiplomacyManager {
     this.pendingProposals = this.pendingProposals.filter(p => turn - p.proposedAt < 3);
 
     // Decrement betrayal cooldowns
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.betrayalCooldown > 0) faction.betrayalCooldown--;
     }
   }
@@ -321,7 +321,7 @@ export class DiplomacyManager {
     tradeDeal: TradeDealInfo | null;
   }> {
     const result = [];
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.id === factionId) continue;
       result.push({
         otherId: faction.id,

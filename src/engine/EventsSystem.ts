@@ -827,7 +827,7 @@ export class EventsSystem {
       }
 
       case 'intel_reveal': {
-        const enemies = this.state.factionRegistry.getAll().filter(
+        const enemies = this.state.factionRegistry.getActive().filter(
           f => f.id !== factionId && !f.isDefeated
         );
         if (enemies.length > 0) {

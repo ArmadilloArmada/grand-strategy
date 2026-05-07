@@ -91,7 +91,7 @@ export class DiplomacyUI {
     if (!currentFaction) return;
 
     const isHuman = currentFaction.controlledBy === 'human';
-    const factions = this.state.factionRegistry.getAll().filter(f => f.id !== currentFaction.id && !f.isDefeated);
+    const factions = this.state.factionRegistry.getActive().filter(f => f.id !== currentFaction.id);
 
     if (factions.length === 0) {
       container.innerHTML = '<p style="color:#888;">No other factions.</p>';

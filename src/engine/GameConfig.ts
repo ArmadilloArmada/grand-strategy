@@ -82,7 +82,21 @@ export interface GameConfig {
   // Game mode
   mode: GameMode;
   humanFactions: string[]; // Faction IDs controlled by humans
-  
+  /**
+   * AI opponent faction IDs explicitly chosen at New Game setup. When
+   * `aiOpponentCount` is smaller than the list, only the first N are used.
+   * Undefined = "all map factions minus humans" (legacy behavior).
+   */
+  aiOpponents?: string[];
+  /** Maximum number of AI opponents to activate. 0 / undefined = no cap. */
+  aiOpponentCount?: number;
+  /**
+   * Resolved set of faction IDs participating in the current game session
+   * (humans + their allies + chosen opponents, capped by aiOpponentCount).
+   * Computed in startNewGame; undefined on old saves means "all".
+   */
+  activeFactionIds?: string[];
+
   // Turn style
   turnStyle: TurnStyle;
   
@@ -110,7 +124,10 @@ export const defaultConfig: GameConfig = {
   unitEra: 'wwii',
   mode: 'vs-ai',
   humanFactions: ['atlantic_alliance'],
-  
+  aiOpponents: undefined,
+  aiOpponentCount: 0,
+  activeFactionIds: undefined,
+
   turnStyle: 'classic',
   
   victoryType: 'capitals',
@@ -135,12 +152,14 @@ export const defaultConfig: GameConfig = {
 export function checkVictory(
   config: GameConfig,
   state: {
-    factionRegistry: { getAll: () => any[] };
+    factionRegistry: { getAll: () => any[]; getActive?: () => any[]; getActiveIncludingDefeated?: () => any[] };
     territories: Map<string, any>;
     turnNumber: number;
   }
 ): { winner: string | null; reason: string } {
-  const factions = state.factionRegistry.getAll().filter(f => !f.isDefeated);
+  const factions = state.factionRegistry.getActive
+    ? state.factionRegistry.getActive()
+    : state.factionRegistry.getAll().filter((f: any) => !f.isDefeated);
   
   // Only one faction left = winner
   if (factions.length === 1) {
@@ -152,7 +171,9 @@ export function checkVictory(
     case 'capitals': {
       for (const faction of factions) {
         let capturedCapitals = 0;
-        for (const other of state.factionRegistry.getAll()) {
+        for (const other of (state.factionRegistry.getActiveIncludingDefeated
+          ? state.factionRegistry.getActiveIncludingDefeated()
+          : state.factionRegistry.getAll())) {
           if (other.id === faction.id) continue;
           const capitalTerritory = state.territories.get(other.capital);
           if (capitalTerritory && capitalTerritory.owner === faction.id) {

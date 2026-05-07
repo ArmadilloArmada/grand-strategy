@@ -44,7 +44,7 @@ export class TurnManager {
   }
 
   startGame(): void {
-    const factions = this.state.factionRegistry.getInTurnOrder();
+    const factions = this.state.factionRegistry.getActive();
     if (factions.length === 0) throw new Error("No factions registered");
 
     this.state.turnNumber = 1;
@@ -85,7 +85,7 @@ export class TurnManager {
   }
 
   private advanceFaction(): void {
-    const factions = this.state.factionRegistry.getInTurnOrder();
+    const factions = this.state.factionRegistry.getActive();
     const currentIndex = factions.findIndex(f => f.id === this.state.currentFactionId);
 
     this.state.emit("turn_end", {
@@ -242,7 +242,7 @@ export class TurnManager {
 
   private checkVictoryProximity(): void {
     const rules = this.state.rules;
-    const factions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
+    const factions = this.state.factionRegistry.getActive();
     const warningKey = (fId: string) => `${this.state.turnNumber}-${fId}`;
 
     for (const faction of factions) {
@@ -252,7 +252,7 @@ export class TurnManager {
 
       if (rules.victoryType === 'capital') {
         let caps = 0;
-        for (const other of this.state.factionRegistry.getAll()) {
+        for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
           if (faction.isEnemyOf(other.id) &&
               this.state.territories.get(other.capital)?.owner === faction.id) caps++;
         }
@@ -286,7 +286,7 @@ export class TurnManager {
   }
 
   private checkSurrenders(): void {
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.isDefeated) continue;
       if (faction.warWeariness >= 100) {
         faction.defeat();
@@ -302,13 +302,13 @@ export class TurnManager {
 
   checkVictory(): Faction | null {
     const rules = this.state.rules;
-    const factions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
+    const factions = this.state.factionRegistry.getActive();
 
     switch (rules.victoryType) {
       case "capital": {
         for (const faction of factions) {
           let capitalsControlled = 0;
-          for (const other of this.state.factionRegistry.getAll()) {
+          for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
             if (faction.isEnemyOf(other.id)) {
               const capitalTerritory = this.state.territories.get(other.capital);
               if (capitalTerritory?.owner === faction.id) capitalsControlled++;

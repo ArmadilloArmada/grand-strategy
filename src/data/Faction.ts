@@ -46,6 +46,12 @@ export class Faction {
   public ipcs: number;
   public isDefeated: boolean = false;
   public controlledBy: 'human' | 'ai' = 'human';
+  /**
+   * Whether this faction is participating in the current game session.
+   * Defaults to true so existing saves and tests behave as before; the New Game
+   * setup pass marks unselected map factions as inactive.
+   */
+  public isActive: boolean = true;
 
   // Runtime state for new features
   public warWeariness: number = 0;      // 0–100: increases each turn at war
@@ -118,7 +124,7 @@ export class Faction {
   /**
    * Serialize for save/load
    */
-  serialize(): FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string; warWeariness: number; morale: number; nuclearReadiness: number; betrayalCooldown: number } {
+  serialize(): FactionData & { ipcs: number; isDefeated: boolean; controlledBy: string; warWeariness: number; morale: number; nuclearReadiness: number; betrayalCooldown: number; isActive: boolean } {
     return {
       id: this.id,
       name: this.name,
@@ -137,6 +143,7 @@ export class Faction {
       morale: this.morale,
       nuclearReadiness: this.nuclearReadiness,
       betrayalCooldown: this.betrayalCooldown,
+      isActive: this.isActive,
     };
   }
 }
@@ -187,9 +194,38 @@ export class FactionRegistry {
   }
 
   /**
-   * Load faction definitions from data array
+   * Get factions actually participating in the current game session.
+   * This is the canonical helper UI should use for faction lists, dots, rows, etc.
+   * Excludes both defeated factions and factions marked inactive at New Game setup.
+   */
+  getActive(): Faction[] {
+    return this.getInTurnOrder().filter(f => f.isActive);
+  }
+
+  /**
+   * Like getActive() but keeps defeated factions, for screens that show
+   * the full participant scoreboard (Victory, Stats).
+   */
+  getActiveIncludingDefeated(): Faction[] {
+    return this.getAll()
+      .filter(f => f.isActive)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+  }
+
+  /**
+   * Drop every registered faction. Called between games so a previous map's
+   * factions never leak into the new one (showed up as ghost turn-order dots).
+   */
+  clear(): void {
+    this.factions.clear();
+  }
+
+  /**
+   * Load faction definitions from data array. Replaces any existing entries
+   * so consecutive `loadFromData` calls do not stack stale factions.
    */
   loadFromData(factionDefs: FactionData[]): void {
+    this.clear();
     for (const def of factionDefs) {
       this.register(def);
     }

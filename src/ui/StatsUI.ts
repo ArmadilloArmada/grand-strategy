@@ -91,7 +91,7 @@ export class StatsUI {
 
     const moraleEl = document.getElementById('stats-morale');
     if (moraleEl) {
-      const allFactions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
+      const allFactions = this.state.factionRegistry.getActive();
       moraleEl.innerHTML = allFactions.map(f => {
         const morale = f.morale ?? (100 - (f.warWeariness ?? 0));
         const ww = f.warWeariness ?? 0;

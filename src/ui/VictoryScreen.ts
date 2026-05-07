@@ -34,7 +34,8 @@ export class VictoryScreen {
     const humanFactionIds = new Set(config.humanFactions ?? []);
     const isPlayerVictory = humanFactionIds.has(data.winner) || faction?.controlledBy === 'human';
 
-    const factionIds = this.state.factionRegistry.getAll().map(f => f.id);
+    // Persistent stats only count factions that actually played in this game
+    const factionIds = this.state.factionRegistry.getActiveIncludingDefeated().map(f => f.id);
     if (factionIds.length > 0) {
       const durationMin = Math.max(0, (Date.now() - config.startTime) / 60000);
       const killsByFaction: Record<string, number> = {};
@@ -54,11 +55,11 @@ export class VictoryScreen {
       });
     }
 
-    const humanFaction = this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human');
+    const humanFaction = this.state.factionRegistry.getActiveIncludingDefeated().find(f => f.controlledBy === 'human');
     if (humanFaction) {
       const playerTerritories = this.state.getTerritoriesOwnedBy(humanFaction.id).length;
       const maxEnemyTerritories = Math.max(
-        ...this.state.factionRegistry.getAll()
+        ...this.state.factionRegistry.getActiveIncludingDefeated()
           .filter(f => f.id !== humanFaction.id)
           .map(f => this.state.getTerritoriesOwnedBy(f.id).length),
         0
@@ -85,7 +86,9 @@ export class VictoryScreen {
 
     const stats = this.calculateGameStats();
 
-    const allFactions = this.state.factionRegistry.getAll();
+    // Scoreboard shows every participant (including defeated ones) but excludes
+    // map factions that were not selected for this game.
+    const allFactions = this.state.factionRegistry.getActiveIncludingDefeated();
     const factionRows = allFactions
       .map(f => {
         const territories = this.state.getTerritoriesOwnedBy(f.id).length;
@@ -373,7 +376,7 @@ export class VictoryScreen {
     unitsProduced: number;
     enemiesDestroyed: number;
   } {
-    const humanFaction = this.state.factionRegistry.getAll().find(f => f.controlledBy === 'human');
+    const humanFaction = this.state.factionRegistry.getActiveIncludingDefeated().find(f => f.controlledBy === 'human');
     const territories = humanFaction ? this.state.getTerritoriesOwnedBy(humanFaction.id) : [];
     const fStats = humanFaction ? statisticsManager.getFactionStats(humanFaction.id) : undefined;
 

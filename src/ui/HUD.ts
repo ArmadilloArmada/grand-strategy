@@ -112,6 +112,9 @@ export class HUD {
   private turnTimerInterval: ReturnType<typeof setInterval> | null = null;
   private turnTimerSeconds: number = 0;
 
+  /** Debounce timer so HQ panel can be created after viewport crosses the narrow threshold. */
+  private hqLayoutResizeDebounce: ReturnType<typeof setTimeout> | null = null;
+
   // Suppress the "YOUR TURN" banner on the very first game load
   public isFirstTurnLoad: boolean = true;
 
@@ -306,6 +309,15 @@ export class HUD {
     this.enhanceCommandBar();
     this.setupWarRoomLayout();
     this.setupHQLayout();
+    this.syncToastContainerDock();
+    // HQ is skipped when innerWidth ≤700; if the window later widens, create the panel then.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.ensureHQLayoutIfNeeded();
+        this.syncToastContainerDock();
+      });
+    });
+    window.addEventListener('resize', () => this.scheduleHQLayoutEnsure());
     document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
     document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
@@ -514,6 +526,8 @@ export class HUD {
     if (factionSelect) {
       const updateFactionCard = () => {
         this.updateFactionInfoCard(factionSelect.value);
+        // Player choice affects which factions populate the opponent picker.
+        this.refreshSetupFactionOptions();
         this.updateSetupSummary();
       };
       factionSelect.addEventListener('change', updateFactionCard);
@@ -524,6 +538,8 @@ export class HUD {
       'map-select',
       'preset-hold10',
       'human-factions',
+      'ai-opponent-count',
+      'ai-opponents',
       'victory-capitals',
       'victory-domination',
       'victory-economic',
@@ -610,6 +626,14 @@ export class HUD {
     advisor.classList.add('war-room-section', 'hidden');
     content?.appendChild(advisor);
 
+    // Victory widget was fixed bottom-right and drew over this same column; keep it in-flow here.
+    const victory = document.getElementById('victory-progress');
+    if (victory && content) {
+      victory.removeAttribute('style');
+      victory.classList.add('war-room-section');
+      content.appendChild(victory);
+    }
+
     const objectives = document.getElementById('objectives-panel');
     if (objectives) {
       objectives.removeAttribute('style');
@@ -632,8 +656,6 @@ export class HUD {
       content?.appendChild(objectives);
     }
 
-    // Victory progress now lives in the ops-console center zone — leave it there.
-
     const factions = document.getElementById('faction-panel');
     if (factions) {
       factions.classList.add('war-room-section');
@@ -643,6 +665,68 @@ export class HUD {
     panel.querySelector('#btn-toggle-war-room')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
     });
+  }
+
+  private scheduleHQLayoutEnsure(): void {
+    if (this.hqLayoutResizeDebounce) clearTimeout(this.hqLayoutResizeDebounce);
+    this.hqLayoutResizeDebounce = setTimeout(() => {
+      this.hqLayoutResizeDebounce = null;
+      this.ensureHQLayoutIfNeeded();
+      this.syncToastContainerDock();
+    }, 150);
+  }
+
+  /**
+   * Park #toast-container inside the HQ column when the sidebar is active so alerts
+   * do not cover the map; on narrow widths or before HQ exists, keep it on body.
+   * Placed just above the Battle Log so messages stay in view while scrolling HQ.
+   */
+  private syncToastContainerDock(): void {
+    const tray = document.getElementById('toast-container');
+    if (!tray) return;
+
+    const wideEnough = window.innerWidth > 700;
+    const hqContent = document.getElementById('hq-content');
+
+    if (wideEnough && hqContent) {
+      tray.classList.add('toast-container--hq');
+      const battleLog = document.getElementById('battle-log-panel');
+      const dockedAboveBattleLog =
+        battleLog?.parentElement === hqContent &&
+        tray.parentElement === hqContent &&
+        tray.nextElementSibling === battleLog;
+      if (battleLog?.parentElement === hqContent) {
+        if (!dockedAboveBattleLog) {
+          hqContent.insertBefore(tray, battleLog);
+        }
+      } else {
+        const minimap = document.getElementById('minimap-container');
+        const anchor =
+          minimap?.parentElement === hqContent ? minimap.nextSibling : hqContent.firstChild;
+        const dockedAfterMinimap =
+          tray.parentElement === hqContent && tray.previousElementSibling === minimap;
+        if (!dockedAfterMinimap) {
+          hqContent.insertBefore(tray, anchor);
+        }
+      }
+    } else {
+      tray.classList.remove('toast-container--hq');
+      if (tray.parentElement !== document.body) {
+        document.body.appendChild(tray);
+      }
+    }
+  }
+
+  /**
+   * Create the left HQ sidebar once the viewport is wide enough, if it was skipped at init
+   * (e.g. devtools docked, small Electron window, or late layout).
+   */
+  private ensureHQLayoutIfNeeded(): void {
+    if (window.innerWidth <= 700) return;
+    if (document.getElementById('hq-panel')) return;
+    this.setupHQLayout();
+    this.updateHQHeader();
+    this.fitMapToCommandLayout();
   }
 
   private setupHQLayout(): void {
@@ -714,6 +798,8 @@ export class HUD {
       panel.classList.toggle('collapsed');
       soundManager.play('click');
     });
+
+    this.syncToastContainerDock();
   }
 
   fitMapToCommandLayout(): void {
@@ -1851,11 +1937,7 @@ export class HUD {
    * Show toast notification
    */
   showToast(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
-    if (type === 'error') {
-      toastManager.show(message, type);
-    } else {
-      battleLog.notify(this.state.turnNumber, message);
-    }
+    toastManager.show(message, type);
   }
   
   /**
@@ -2191,7 +2273,7 @@ export class HUD {
     if (!container || !barsEl) return;
     
     const rules = this.state.rules;
-    const factions = this.state.factionRegistry.getAll().filter(f => !f.isDefeated);
+    const factions = this.state.factionRegistry.getActive();
     
     // Determine victory condition text
     let conditionText = '';
@@ -2225,7 +2307,8 @@ export class HUD {
       switch (rules.victoryType) {
         case 'capital': {
           let capitalsControlled = 0;
-          for (const other of this.state.factionRegistry.getAll()) {
+          // Only count capitals belonging to factions actually in this game.
+          for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
             if (faction.isEnemyOf(other.id)) {
               const capitalTerritory = this.state.territories.get(other.capital);
               if (capitalTerritory?.owner === faction.id) capitalsControlled++;
@@ -3220,7 +3303,8 @@ export class HUD {
     const container = document.getElementById('turn-order');
     if (!container) return;
 
-    const factions = this.state.factionRegistry.getInTurnOrder();
+    // Only show factions actually playing this game (active + alive).
+    const factions = this.state.factionRegistry.getActive();
     const currentId = this.state.currentFactionId;
     const currentIdx = factions.findIndex(f => f.id === currentId);
 
@@ -3252,7 +3336,8 @@ export class HUD {
     const container = document.getElementById('faction-panel-content');
     if (!container) return;
 
-    const factions = this.state.factionRegistry.getInTurnOrder();
+    // Mirror turn-order: scoreboard only shows participants in the current game.
+    const factions = this.state.factionRegistry.getActive();
     const currentId = this.state.currentFactionId;
 
     // Pre-compute max values for relative bar widths
@@ -3498,6 +3583,10 @@ export class HUD {
     const fogOfWar = (document.getElementById('fog-of-war') as HTMLInputElement)?.checked ?? true;
     const autoSave = (document.getElementById('auto-save') as HTMLInputElement)?.checked ?? true;
 
+    const setupFactions = this.getSetupFactionsForMap(mapId);
+    const playableSetupFactions = setupFactions.filter(f => f.isPlayable);
+    const fallbackHumanFaction = playableSetupFactions[0]?.id ?? setupFactions[0]?.id ?? 'atlantic_alliance';
+
     // Get human factions for hot seat
     const humanFactions: string[] = [];
     if (mode === 'hotseat') {
@@ -3514,14 +3603,37 @@ export class HUD {
       }
     } else {
       const playerFactionSelect = document.getElementById('player-faction') as HTMLSelectElement;
-      const playerFaction = playerFactionSelect?.value || 'atlantic_alliance';
+      const playerFaction = playerFactionSelect?.value || fallbackHumanFaction;
       if (playerFaction === 'random') {
-        const playable = this.getSetupFactionsForMap(mapId).filter(f => f.isPlayable).map(f => f.id);
-        humanFactions.push(playable[Math.floor(Math.random() * playable.length)] || 'atlantic_alliance');
+        const playable = playableSetupFactions.map(f => f.id);
+        humanFactions.push(playable[Math.floor(Math.random() * playable.length)] || fallbackHumanFaction);
       } else {
         humanFactions.push(playerFaction);
       }
     }
+
+    // AI opponents picker + count selector → resolved opponent IDs
+    const opponentSelect = document.getElementById('ai-opponents') as HTMLSelectElement | null;
+    const opponentCountSelect = document.getElementById('ai-opponent-count') as HTMLSelectElement | null;
+    const allCandidateOpponents = playableSetupFactions
+      .filter(f => !humanFactions.includes(f.id))
+      .map(f => f.id);
+    const pickedOpponents = opponentSelect
+      ? Array.from(opponentSelect.selectedOptions).map(o => o.value).filter(id => allCandidateOpponents.includes(id))
+      : allCandidateOpponents.slice();
+    const effectivePickedOpponents = pickedOpponents.length > 0 ? pickedOpponents : allCandidateOpponents.slice();
+    const countRaw = opponentCountSelect?.value ?? 'all';
+    const opponentCap = countRaw === 'all' ? effectivePickedOpponents.length : Math.max(1, Math.min(parseInt(countRaw) || effectivePickedOpponents.length, effectivePickedOpponents.length));
+    const aiOpponents = effectivePickedOpponents.slice(0, opponentCap);
+
+    // Active set = humans + their declared allies + chosen AI opponents
+    const activeIds = new Set<string>(humanFactions);
+    for (const humanId of humanFactions) {
+      const human = setupFactions.find(f => f.id === humanId);
+      for (const ally of human?.allies ?? []) activeIds.add(ally);
+    }
+    for (const id of aiOpponents) activeIds.add(id);
+    const activeFactionIds = Array.from(activeIds);
 
     // Update game config
     this.gameConfig = {
@@ -3530,6 +3642,9 @@ export class HUD {
       unitEra,
       mode: mode as 'vs-ai' | 'hotseat',
       humanFactions,
+      aiOpponents,
+      aiOpponentCount: countRaw === 'all' ? 0 : opponentCap,
+      activeFactionIds,
       turnStyle: turnStyle as TurnStyle,
       victoryType: victoryType as VictoryType,
       capitalsToWin,
@@ -3541,9 +3656,10 @@ export class HUD {
       startTime: Date.now(),
     };
 
-    // Update faction controllers for hot seat
+    // Update faction controllers and active flag for the new game
     for (const faction of this.state.factionRegistry.getAll()) {
       faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
+      faction.isActive = activeIds.has(faction.id);
     }
 
     this.hideNewGameModal();
@@ -3605,8 +3721,11 @@ export class HUD {
     const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
     const playerSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
     const hotseatSelect = document.getElementById('human-factions') as HTMLSelectElement | null;
+    const opponentSelect = document.getElementById('ai-opponents') as HTMLSelectElement | null;
+    const opponentCount = document.getElementById('ai-opponent-count') as HTMLSelectElement | null;
     const previousPlayer = playerSelect?.value;
     const previousHotseat = new Set(Array.from(hotseatSelect?.selectedOptions ?? []).map(o => o.value));
+    const previousOpponents = new Set(Array.from(opponentSelect?.selectedOptions ?? []).map(o => o.value));
 
     if (playerSelect) {
       playerSelect.innerHTML = [
@@ -3622,6 +3741,36 @@ export class HUD {
       hotseatSelect.innerHTML = playable
         .map((f, index) => `<option value="${this.escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`)
         .join('');
+    }
+
+    if (opponentSelect) {
+      // Opponents = playable factions minus the current player; default selected = all of them.
+      const playerFactionId = playerSelect?.value;
+      const opponents = playable.filter(f => f.id !== playerFactionId);
+      opponentSelect.innerHTML = opponents
+        .map(f => {
+          const wasSelected = previousOpponents.has(f.id);
+          const selected = previousOpponents.size === 0 || wasSelected ? ' selected' : '';
+          return `<option value="${this.escapeHtml(f.id)}"${selected}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`;
+        })
+        .join('');
+      // Hide the picker entirely when there are no opponents to choose from.
+      opponentSelect.parentElement?.classList.toggle('hidden', opponents.length === 0);
+    }
+
+    if (opponentCount) {
+      const playerFactionId = playerSelect?.value;
+      const maxOpponents = playable.filter(f => f.id !== playerFactionId).length;
+      const previousValue = opponentCount.value || 'all';
+      const optionsHtml = ['<option value="all">All available</option>'];
+      for (let i = 1; i <= maxOpponents; i++) {
+        optionsHtml.push(`<option value="${i}">${i} opponent${i === 1 ? '' : 's'}</option>`);
+      }
+      opponentCount.innerHTML = optionsHtml.join('');
+      opponentCount.value = previousValue === 'all' || parseInt(previousValue) <= maxOpponents
+        ? previousValue
+        : 'all';
+      opponentCount.parentElement?.classList.toggle('hidden', maxOpponents === 0);
     }
   }
 
@@ -4036,8 +4185,8 @@ export class HUD {
     const phase = this.state.currentPhase;
     const isMovementPhase = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
     const isBuildPhase = ['purchase', 'production', 'build'].includes(phase);
-    const atWar = this.state.factionRegistry.getAll().some(
-      f => f.id !== faction.id && !f.isDefeated && faction.isEnemyOf(f.id)
+    const atWar = this.state.factionRegistry.getActive().some(
+      f => f.id !== faction.id && faction.isEnemyOf(f.id)
     );
 
     type MenuItem = { label: string; action: () => void; disabled?: boolean };
@@ -4145,8 +4294,8 @@ export class HUD {
       return;
     }
 
-    const enemies = this.state.factionRegistry.getAll().filter(
-      f => f.id !== faction.id && !f.isDefeated &&
+    const enemies = this.state.factionRegistry.getActive().filter(
+      f => f.id !== faction.id &&
            this.state.diplomacyManager.getRelation(faction.id, f.id) === 'war'
     );
 
@@ -4739,11 +4888,11 @@ export class HUD {
             <span style="font-size:0.7rem;color:#c9a227;">${rewardStr}</span>
           </div>
           <div style="font-size:0.7rem;color:#aaa;margin-bottom:4px;">${obj.description}</div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="flex:1;background:#333;border-radius:4px;height:5px;">
-              <div style="width:${pct}%;background:#22c55e;border-radius:4px;height:5px;transition:width 0.3s;"></div>
+          <div class="objective-card-footer">
+            <div class="objective-card-track">
+              <div class="objective-card-track-fill" style="width:${pct}%;"></div>
             </div>
-            <span style="font-size:0.65rem;color:${remaining <= 1 ? '#ef4444' : '#888'};">${remaining}t left</span>
+            <span class="objective-card-deadline" style="color:${remaining <= 1 ? '#ef4444' : '#888'};">${remaining} turns left</span>
           </div>
         </div>
       `;

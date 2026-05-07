@@ -27,7 +27,7 @@ export class NuclearSystem {
     const techManager = this.state.systems.technologyManager;
     if (!techManager) return;
 
-    for (const faction of this.state.factionRegistry.getAll()) {
+    for (const faction of this.state.factionRegistry.getActiveIncludingDefeated()) {
       if (faction.isDefeated) continue;
       if (techManager.hasTech?.(faction.id, 'nuclear_program')) {
         const uraniumCount = Array.from(this.state.territories.values())
@@ -99,7 +99,7 @@ export class NuclearSystem {
     // Worsen AI grudges: all other factions gain +40 grudge against attacker
     const aiController = this.state.systems.aiController;
     if (aiController?.recordGrievance) {
-      for (const f of this.state.factionRegistry.getAll()) {
+      for (const f of this.state.factionRegistry.getActiveIncludingDefeated()) {
         if (f.id !== factionId && !f.isDefeated) {
           aiController.recordGrievance(factionId, f.id, 40);
         }

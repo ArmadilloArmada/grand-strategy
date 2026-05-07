@@ -218,7 +218,7 @@ export const SCENARIOS: ScenarioData[] = [
     briefing:
       '1942. The world is ablaze. Germany drives into Russia, Japan expands across Asia, and the United States has just entered the war. ' +
       'The fate of civilization hangs in the balance.\n\n' +
-      'Capture 3 enemy capitals to win. This is the definitive grand strategy experience — every decision matters.',
+      'Capture the required number of enemy capitals to win. This is the definitive grand strategy experience — every decision matters.',
     humanFactions: ['allies'],
     factions: [
       { factionId: 'allies',  controlledBy: 'human', startingIPCs: 60 },

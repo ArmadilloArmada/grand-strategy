@@ -43,6 +43,8 @@ function isElectronWithMods(): boolean {
 export class ModManager {
   private mods: Map<string, LoadedMod> = new Map();
   private storageKey = 'grand_strategy_mods_config';
+  private gameInProgress: boolean = false;
+  private activeFactionIds: string[] = [];
 
   constructor() {
     this.loadConfig();
@@ -298,12 +300,49 @@ export class ModManager {
         if (existingIndex >= 0) {
           factions[existingIndex] = { ...factions[existingIndex], ...faction };
         } else {
+          // Policy: refuse brand-new faction registrations during an active game.
+          // Mid-session faction additions desync turn order and diplomacy caches.
+          if (this.gameInProgress) {
+            console.warn(
+              `[ModManager] Skipping mid-game faction registration "${faction.id}" from mod "${mod.manifest.id}". ` +
+              'Start a new game to apply new faction IDs.'
+            );
+            continue;
+          }
           factions.push(faction);
         }
       }
     }
     
     return factions;
+  }
+
+  /**
+   * Set runtime game context so mod hot-reloads can enforce safe faction policy.
+   */
+  setRuntimeContext(gameInProgress: boolean, activeFactionIds: string[]): void {
+    this.gameInProgress = gameInProgress;
+    this.activeFactionIds = [...activeFactionIds];
+  }
+
+  /**
+   * Recompute active faction IDs after a hot-reload using the currently merged set.
+   * Keeps only factions that still exist and preserves prior ordering.
+   */
+  recomputeActiveFactionIds(mergedFactions: Array<{ id: string }>, humanFactionIds: string[]): string[] {
+    const mergedIds = new Set(mergedFactions.map(f => f.id));
+    const next: string[] = [];
+    for (const id of this.activeFactionIds) {
+      if (mergedIds.has(id) && !next.includes(id)) next.push(id);
+    }
+    for (const humanId of humanFactionIds) {
+      if (mergedIds.has(humanId) && !next.includes(humanId)) next.push(humanId);
+    }
+    if (next.length === 0) {
+      // Backward-safe fallback: if previous active set is unavailable, keep all merged factions active.
+      return mergedFactions.map(f => f.id);
+    }
+    return next;
   }
   
   /**

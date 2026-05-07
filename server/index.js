@@ -174,6 +174,7 @@ function handleCreateLobby(player, message) {
     status: 'waiting',
     currentTurn: 0,
     players: [{ id: player.id, name: player.name, isHost: true, isReady: false, faction: null, connected: true }],
+    activeFactionIds: [],
     turnOrder: [],
     currentFactionIndex: 0,
     gameStateVersion: 0,
@@ -308,7 +309,14 @@ function handleStartGame(player) {
   if (lobby.idleTimeoutHandle) { clearTimeout(lobby.idleTimeoutHandle); lobby.idleTimeoutHandle = null; }
 
   lobby.status = 'playing';
-  lobby.turnOrder = lobby.players.map(p => p.faction ?? p.id);
+  const selectedFactionIds = lobby.players.map(p => p.faction).filter(Boolean);
+  const configuredActive = Array.isArray(lobby.gameConfig?.activeFactionIds)
+    ? lobby.gameConfig.activeFactionIds.filter(id => selectedFactionIds.includes(id))
+    : [];
+  lobby.activeFactionIds = configuredActive.length > 0 ? configuredActive : selectedFactionIds;
+  lobby.turnOrder = lobby.activeFactionIds.length > 0
+    ? [...lobby.activeFactionIds]
+    : lobby.players.map(p => p.faction ?? p.id);
   lobby.currentFactionIndex = 0;
   lobby.gameStateVersion = 0;
   lobby.actionLog = [];

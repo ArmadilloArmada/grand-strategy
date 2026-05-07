@@ -44,7 +44,7 @@ import { bootstrapGame } from './app/bootstrap';
 // Export managers for external access
 export { campaignManager, replayManager };
 
-// Import game data - Full world map with 4 factions
+// Import game data - default world data bundle
 import unitsData from '../assets/units/full-units.json';
 import wwiUnitsData from '../assets/units/wwi-units.json';
 import wwiiUnitsData from '../assets/units/wwii-units.json';
@@ -410,10 +410,24 @@ class Game {
     const humanFactions = normalizeHumanFactions(this.hud.gameConfig.humanFactions, mapFactions);
     this.hud.gameConfig.humanFactions = humanFactions;
     this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWin(this.hud.gameConfig.capitalsToWin, mapFactions);
-    
+
+    // Resolve the active set for this game session.
+    // - If the New Game modal supplied an explicit list, honor it.
+    // - Otherwise (legacy / scripted starts) fall back to "every map faction is active".
+    const configuredActive = this.hud.gameConfig.activeFactionIds;
+    const activeIds = new Set<string>(
+      configuredActive && configuredActive.length > 0
+        ? configuredActive
+        : factions.map(f => f.id)
+    );
+    // Humans are always active even if missing from the list (defensive).
+    for (const id of humanFactions) activeIds.add(id);
+    this.hud.gameConfig.activeFactionIds = Array.from(activeIds);
+
     for (const faction of factions) {
       // Check if this faction should be human controlled
       faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
+      faction.isActive = activeIds.has(faction.id);
     }
 
     // Apply current difficulty and personality
@@ -422,9 +436,6 @@ class Game {
 
     // Set turn style from config
     this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
-
-    // Fit map to screen
-    this.renderer.fitToScreen();
 
     // Reset dynamic feature systems for fresh game
     this.hud.tensionSystem.reset();
@@ -466,8 +477,9 @@ class Game {
       islandHoppingTurns: new Map(),
     };
 
-    // Start replay recording
-    const recordFactions = this.state.factionRegistry.getAll().map(f => f.id);
+    // Start replay recording. Replay metadata only includes factions that
+    // actually participated, matching what the in-game UI shows.
+    const recordFactions = this.state.factionRegistry.getActiveIncludingDefeated().map(f => f.id);
     replayManager.startRecording(JSON.stringify({ mapId, turn: 0 }), mapId, recordFactions);
 
     // Set Steam Rich Presence
@@ -536,6 +548,7 @@ class Game {
 
     // Hide main menu
     this.hideMainMenu();
+    this.scheduleFitMapToCommandLayout();
 
   }
 
@@ -549,11 +562,10 @@ class Game {
     }
 
     if (this.saveManager.loadAutoSave()) {
-      this.renderer.fitToScreen();
-      this.renderer.render();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
+      this.scheduleFitMapToCommandLayout();
       this.hud.showToast('Game loaded!', 'success');
       return true;
     }
@@ -578,10 +590,10 @@ class Game {
 
   private quickLoadWithFeedback(): void {
     if (this.saveManager.quickLoad()) {
-      this.renderer.render();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
+      this.scheduleFitMapToCommandLayout();
       this.hud.showToast('Quick loaded!', 'success');
     } else {
       this.hud.showToast('No valid quick save found', 'info');
@@ -765,10 +777,15 @@ class Game {
             this.hideMainMenu();
 
             const missionMap = getMapById(mission.mapId);
+            const missionMapEntry = getMapEntry(mission.mapId);
             if (!missionMap) {
               this.hud.showToast(`Map not found: ${mission.mapId}`, 'info');
               return;
             }
+            const missionFactions = missionMapEntry?.factions ?? [];
+            const missionFaction = missionFactions.some(f => f.id === mission.faction)
+              ? mission.faction
+              : (missionFactions.find(f => f.isPlayable)?.id ?? missionFactions[0]?.id ?? mission.faction);
 
             // Store active campaign state
             this.activeCampaignId = campaignId;
@@ -785,7 +802,7 @@ class Game {
               ...this.hud.gameConfig,
               mapId: mission.mapId,
               mode: 'vs-ai',
-              humanFactions: [mission.faction],
+              humanFactions: [missionFaction],
               turnStyle: 'classic',
               victoryType: 'capitals',
               turnLimit: 50,
@@ -1108,13 +1125,12 @@ class Game {
         e.stopPropagation();
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
         if (this.saveManager.loadFromSlot(slotId)) {
-          this.renderer.fitToScreen();
-          this.renderer.render();
           this.hud.updateTurnInfo();
           this.isGameStarted = true;
           this.hideSaveLoadModal();
           this.hideGameMenu();
           this.hideMainMenu();
+          this.scheduleFitMapToCommandLayout();
           this.hud.showToast('Game loaded!', 'success');
         } else {
           this.hud.showToast('Could not load save slot', 'error');
@@ -1582,6 +1598,11 @@ class Game {
 
   private resetViewAndPanels(): void {
     dragManager.resetLayoutInPlace();
+    this.scheduleFitMapToCommandLayout();
+  }
+
+  /** Same map framing as the in-game UI reset / zoom-fit (sidebars + action bar insets). */
+  private scheduleFitMapToCommandLayout(): void {
     requestAnimationFrame(() => this.hud.fitMapToCommandLayout());
   }
 

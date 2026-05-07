@@ -88,6 +88,11 @@ export function applyFactionAbility(
 
   const abilityState = state.systems.abilityState;
 
+  if (abilityId.startsWith('war_funding_')) {
+    faction.addIPCs(8);
+    return '+8 IPC emergency grant received.';
+  }
+
   switch (abilityId) {
     case 'marshall_plan': {
       faction.addIPCs(15);
@@ -138,7 +143,9 @@ export class FactionAbilityManager {
   }
 
   getAbilityForFaction(factionId: string): FactionAbility | undefined {
-    return FACTION_ABILITIES.find(a => a.factionId === factionId);
+    const predefined = FACTION_ABILITIES.find(a => a.factionId === factionId);
+    if (predefined) return predefined;
+    return this.getGenericAbility(factionId);
   }
 
   isReady(factionId: string, currentTurn: number): boolean {
@@ -181,6 +188,24 @@ export class FactionAbilityManager {
       const data = JSON.parse(raw) as Record<string, AbilityCooldownState>;
       for (const [k, v] of Object.entries(data)) this.cooldowns.set(k, v);
     } catch {}
+  }
+
+  /**
+   * Fallback for custom/mod factions that do not ship with a bespoke ability.
+   * Keeps the ability button functional without hardcoding specific faction IDs.
+   */
+  private getGenericAbility(factionId: string): FactionAbility | undefined {
+    if (!factionId) return undefined;
+    return {
+      id: `war_funding_${factionId}`,
+      factionId,
+      name: 'War Funding',
+      description: 'Spend 10 IPCs to receive an immediate 8 IPC emergency grant.',
+      flavorText: 'Convert civilian industry into short-term war output.',
+      cost: 10,
+      cooldownTurns: 5,
+      needsTarget: false,
+    };
   }
 }
 
