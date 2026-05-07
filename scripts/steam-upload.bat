@@ -8,12 +8,13 @@ REM Prerequisites:
 REM   1. Download steamcmd from https://developer.valvesoftware.com/wiki/SteamCMD
 REM   2. Set STEAMCMD_PATH below to the folder containing steamcmd.exe
 REM   3. Set your real App/Depot IDs in steam\app_build.vdf and steam\depot_build_win.vdf
+REM      Then run: npm run steam:sync-appid   (updates steam\steam_appid.txt to match AppID)
 REM   4. Run preflight check (called automatically): npm run steam:preflight
 REM   5. Run:  npm run pack:steam   to build release\win-unpacked\
 REM ============================================================
 
-set STEAMCMD_PATH=C:\steamcmd
-set STEAM_USER=your_steamworks_username
+if not defined STEAMCMD_PATH set STEAMCMD_PATH=C:\steamcmd
+if not defined STEAM_USER set STEAM_USER=your_steamworks_username
 
 REM Path to app_build.vdf (relative to this script)
 set VDF_PATH=%~dp0..\steam\app_build.vdf

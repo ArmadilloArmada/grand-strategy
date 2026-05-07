@@ -2,8 +2,14 @@
   "appId": "com.grandstrategy.game",
   "productName": "Grand Strategy",
   "directories": {
-    "output": "release/steam"
+    "output": "release"
   },
+  "extraFiles": [
+    {
+      "from": "steam/steam_appid.txt",
+      "to": "."
+    }
+  ],
   "files": [
     "dist/**/*",
     "electron/**/*",

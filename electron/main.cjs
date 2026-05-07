@@ -5,9 +5,26 @@ const fs = require('fs');
 // Keep a global reference of the window object
 let mainWindow = null;
 
-// Steam integration is optional; App ID 480 is Spacewar, useful only for dev smoke tests.
-// Set STEAM_APP_ID to the real Steamworks App ID for release builds.
-const STEAM_APP_ID = Number(process.env.STEAM_APP_ID ?? 480);
+// Steam App ID: STEAM_APP_ID env (CI/dev), else steam_appid.txt beside the .exe (pack:steam),
+// else 480 (Spacewar) for local smoke tests only.
+function resolveSteamAppId() {
+  const fromEnv = process.env.STEAM_APP_ID;
+  if (fromEnv != null && String(fromEnv).trim() !== '' && !Number.isNaN(Number(fromEnv))) {
+    return Number(fromEnv);
+  }
+  if (app.isPackaged) {
+    try {
+      const besideExe = path.join(path.dirname(process.execPath), 'steam_appid.txt');
+      if (fs.existsSync(besideExe)) {
+        const n = Number(fs.readFileSync(besideExe, 'utf8').trim());
+        if (!Number.isNaN(n) && n > 0) return n;
+      }
+    } catch (_) { /* ignore */ }
+  }
+  return 480;
+}
+
+const STEAM_APP_ID = resolveSteamAppId();
 let steamworks = null;
 try {
   const steamworksJs = require('steamworks.js');

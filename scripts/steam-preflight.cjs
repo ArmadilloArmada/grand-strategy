@@ -43,6 +43,15 @@ function main() {
   ensurePathExists('electron-builder-steam.json', 'Steam builder config');
   ensurePathExists('steam/app_build.vdf', 'Steam app build VDF');
   ensurePathExists('steam/depot_build_win.vdf', 'Steam depot build VDF');
+  ensurePathExists('steam/steam_appid.txt', 'steam_appid.txt (must match AppID; copied next to exe)');
+
+  const appIdFile = readText('steam/steam_appid.txt').trim().split(/\r?\n/)[0]?.trim();
+  ensurePositiveNumeric(appIdFile, 'steam_appid.txt (first line)');
+  if (appIdFile !== appId) {
+    throw new Error(
+      `steam/steam_appid.txt (${appIdFile}) must match AppID in steam/app_build.vdf (${appId}).`
+    );
+  }
 
   console.log('Steam preflight OK');
   console.log(`- AppID: ${appId}`);

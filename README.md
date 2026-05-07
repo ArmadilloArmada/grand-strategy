@@ -135,6 +135,7 @@ This fails fast if:
 
 - Steam `AppID` is still the `480` placeholder.
 - Steam `DepotID` is still the `481` placeholder.
+- `steam/steam_appid.txt` does not match `AppID` in `steam/app_build.vdf`.
 - Required Steam build config files are missing.
 
 Upload flow:
@@ -142,10 +143,14 @@ Upload flow:
 1. Set real IDs in:
    - `steam/app_build.vdf`
    - `steam/depot_build_win.vdf`
-2. Build unpacked Steam payload:
+2. Run **`npm run steam:sync-appid`** so `steam/steam_appid.txt` matches the VDF `AppID` (packaging copies it next to the `.exe` for Steamworks).
+3. Run **`npm run steam:preflight`** again.
+4. Build unpacked Steam payload:
    - `npm run pack:steam`
-3. Upload via SteamCMD helper:
-   - `scripts/steam-upload.bat`
+5. Upload via SteamCMD helper:
+   - `scripts/steam-upload.bat` (optional: set env vars `STEAMCMD_PATH` and `STEAM_USER` instead of editing the batch file)
+
+**CI:** Manual workflow **Build & Test** on GitHub builds the same Steam payload (`pack:steam`) and uploads artifact **`grand-strategy-steam-win-unpacked`** (`release/win-unpacked/`) for smoke tests or SteamCMD upload from a trusted machine.
 
 ## Running Tests
 

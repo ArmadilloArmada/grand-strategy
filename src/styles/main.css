@@ -276,7 +276,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.7rem;
 }
 
@@ -1972,6 +1975,47 @@ body.theme-dark #help-button {
   width: max-content;
 }
 
+/* Docked inside #hq-content above Battle Log (HUD.syncToastContainerDock) */
+#toast-container.toast-container--hq {
+  position: sticky;
+  bottom: 0.45rem;
+  inset: auto;
+  left: auto;
+  transform: none;
+  z-index: 6;
+  max-width: 100%;
+  width: 100%;
+  align-items: stretch;
+  margin: 0.35rem 0 0.5rem;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+#hq-panel #toast-container.toast-container--hq .toast {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(248, 250, 252, 0.96);
+  color: #0f172a;
+  border-color: rgba(201, 162, 39, 0.45);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+#hq-panel #toast-container.toast-container--hq .toast.success {
+  background: rgba(236, 253, 245, 0.96);
+  color: #14532d;
+}
+
+#hq-panel #toast-container.toast-container--hq .toast.error {
+  background: rgba(254, 242, 242, 0.96);
+  color: #7f1d1d;
+}
+
+#hq-panel #toast-container.toast-container--hq .toast.tip {
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.9), rgba(248, 250, 252, 0.98));
+  color: #422006;
+}
+
 .toast {
   padding: 0.55rem 0.9rem;
   background: var(--panel-bg);
@@ -2492,6 +2536,7 @@ body.ai-feed-active #campaign-objectives-panel {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
   transition: max-height 0.25s ease;
   max-height: 220px;
 }
@@ -2507,10 +2552,15 @@ body.ai-feed-active #campaign-objectives-panel {
   background: rgba(0, 0, 0, 0.05);
   border-bottom: 1px solid var(--panel-border);
   flex-shrink: 0;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 #blog-filter-text {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 0;
+  box-sizing: border-box;
   background: rgba(0,0,0,0.06);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
@@ -2525,11 +2575,15 @@ body.ai-feed-active #campaign-objectives-panel {
 }
 
 #blog-filter-type {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(7.25rem, 40%);
+  box-sizing: border-box;
   background: rgba(0,0,0,0.06);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   color: var(--text-muted);
-  padding: 3px 4px;
+  padding: 3px 1.35rem 3px 6px;
   font-size: 0.72rem;
   cursor: pointer;
 }
@@ -5751,10 +5805,59 @@ body.theme-dark .panel-grip {
 #war-room-panel #objectives-panel {
   background: rgba(13, 38, 24, 0.52);
   border-color: rgba(34, 197, 94, 0.18);
+  flex-shrink: 0;
+  min-height: 0;
+  max-height: min(42vh, 380px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#war-room-panel #objectives-panel > .war-room-section-title {
+  flex-shrink: 0;
+}
+
+#war-room-panel #objectives-panel #objectives-list.war-room-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
 }
 
 #war-room-panel .objective-card {
   padding: 0.1rem 0;
+  min-width: 0;
+}
+
+#war-room-panel .objective-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  margin-top: 0.2rem;
+}
+
+#war-room-panel .objective-card-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+}
+
+#war-room-panel .objective-card-track-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #22c55e;
+  transition: width 0.3s ease;
+}
+
+#war-room-panel .objective-card-deadline {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  white-space: nowrap;
 }
 
 #war-room-panel #victory-progress {
@@ -5762,6 +5865,11 @@ body.theme-dark .panel-grip {
   background: rgba(255,255,255,0.045);
   border-color: rgba(255,255,255,0.08);
   font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+#war-room-panel #strategic-advisor-panel:not(.hidden) {
+  flex-shrink: 0;
 }
 
 #war-room-panel .victory-progress-header {
@@ -5774,7 +5882,8 @@ body.theme-dark .panel-grip {
 #war-room-panel #faction-panel {
   background: rgba(255,255,255,0.045);
   border-color: rgba(255,255,255,0.08);
-  overflow: hidden;
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 #war-room-panel #faction-panel-header {
@@ -5788,7 +5897,9 @@ body.theme-dark .panel-grip {
 }
 
 #war-room-panel #faction-panel-content {
-  max-height: none;
+  max-height: min(32vh, 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem 0 0;
 }
 
@@ -5905,6 +6016,8 @@ body.theme-dark .panel-grip {
 #war-room-content {
   gap: 0.55rem;
   padding: 0.6rem;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #war-room-panel .war-room-section,
@@ -6627,6 +6740,7 @@ body.theme-dark .panel-grip {
 
 #hq-panel #battle-log-content {
   max-height: none;
+  min-width: 0;
 }
 
 #hq-panel #battle-log-panel:not(.collapsed) #battle-log-content {
