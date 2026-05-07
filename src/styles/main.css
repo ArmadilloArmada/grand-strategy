@@ -2419,6 +2419,8 @@ body.ai-feed-active #campaign-objectives-panel {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
   padding: 1rem;
   background: rgba(0,0,0,0.06);
   border: 2px solid var(--wood-light);
@@ -2459,12 +2461,41 @@ body.ai-feed-active #campaign-objectives-panel {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  flex: 0 1 15.5rem;
+  min-width: 0;
+  align-items: center;
   justify-content: flex-end;
 }
 
 .save-slot-actions button {
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.6rem;
   font-size: 0.85rem;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-slot-actions .btn-slot-delete {
+  width: 2.1rem;
+  min-width: 2.1rem;
+  padding: 0.45rem !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .save-slot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .save-slot-actions {
+    width: 100%;
+    flex-basis: auto;
+    justify-content: flex-start;
+  }
 }
 
 /* ==================== Battle Log Panel ==================== */
@@ -7800,15 +7831,13 @@ body.theme-dark .panel-grip {
 #action-buttons #btn-research  .btn-label,
 #action-buttons #btn-diplomacy .btn-label,
 #action-buttons #btn-espionage .btn-label,
-#action-buttons #btn-stats     .btn-label,
-#action-buttons #btn-fog-toggle .btn-label { display: none !important; }
+#action-buttons #btn-stats     .btn-label { display: none !important; }
 
 #action-buttons #btn-redo,
 #action-buttons #btn-research,
 #action-buttons #btn-diplomacy,
 #action-buttons #btn-espionage,
 #action-buttons #btn-stats,
-#action-buttons #btn-fog-toggle,
 #action-buttons #btn-theme-toggle {
   width:  clamp(22px, 2.2vw, 28px) !important;
   height: clamp(22px, 2.2vw, 28px) !important;
@@ -7823,6 +7852,18 @@ body.theme-dark .panel-grip {
   border: 1px solid rgba(255,255,255,0.13) !important;
   color: #e5e7eb !important;
   border-radius: 5px !important;
+}
+
+/* Keep icon utility buttons readable in both light and dark themes. */
+body:not(.theme-dark) #action-buttons #btn-theme-toggle {
+  background: rgba(0, 0, 0, 0.07) !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+  color: #1f2937 !important;
+}
+body:not(.theme-dark) #action-buttons #btn-theme-toggle:hover:not(:disabled) {
+  background: rgba(212, 160, 23, 0.16) !important;
+  border-color: rgba(184, 134, 11, 0.5) !important;
+  color: #111827 !important;
 }
 
 /* End Phase: prominent right-side primary button */
