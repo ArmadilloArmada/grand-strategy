@@ -43,7 +43,7 @@ describe('PhaseGuidance', () => {
     expect(guidance.getFirstTurnTip(2, 'combat_move')).toBeNull();
   });
 
-  it('updates context helper for AI turns', () => {
+  it('hides context helper for AI turns', () => {
     const { state, guidance } = makeGuidance();
     document.body.innerHTML = `
       <div id="context-helper" class="context-helper">
@@ -64,8 +64,8 @@ describe('PhaseGuidance', () => {
     });
 
     expect(tip).toBeNull();
-    expect(document.getElementById('context-helper')?.className).toContain('hint');
-    expect(document.getElementById('context-helper-text')?.textContent).toBe('Atlantic Alliance is taking their turn...');
+    expect(document.getElementById('context-helper')?.className).toContain('hidden');
+    expect(document.getElementById('context-helper-text')?.textContent).toBe('');
   });
 
   it('surfaces combat guidance when battles are pending', () => {

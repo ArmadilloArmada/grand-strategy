@@ -100,8 +100,10 @@ export class PhaseGuidance {
     let className = 'context-helper';
 
     if (!isHumanTurn) {
-      className += ' hint';
-      return { text: `${faction?.name || 'AI'} is taking their turn...`, className };
+      // AI turns already use the dedicated top activity banner.
+      // Hide the bottom helper to avoid duplicate status messaging.
+      className += ' hidden';
+      return { text: '', className };
     }
 
     if (isBuildPhase) {

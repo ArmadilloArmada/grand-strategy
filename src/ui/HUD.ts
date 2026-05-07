@@ -375,7 +375,6 @@ export class HUD {
     (window as any).__hudInstance = this;
 
     // Fog of war toggle
-    document.getElementById('btn-fog-toggle')?.addEventListener('click', () => this.toggleFogOfWar());
 
     // Espionage
     document.getElementById('btn-espionage')?.addEventListener('click', () => this.showEspionageModal());
@@ -3679,16 +3678,6 @@ export class HUD {
 
     // Emit game started event
     this.events.emit('gameStarted', { config: this.gameConfig });
-
-    // Initialize FOW button visual state to match config
-    const fogBtn = document.getElementById('btn-fog-toggle');
-    if (fogBtn) {
-      const on = this.gameConfig.fogOfWar;
-      fogBtn.style.opacity = on ? '1' : '0.45';
-      fogBtn.style.borderColor = on ? 'rgba(99, 179, 237, 0.7)' : '';
-      fogBtn.style.boxShadow = on ? '0 0 8px rgba(99, 179, 237, 0.35)' : '';
-      fogBtn.title = on ? 'Fog of war ON — scouts reveal adjacent tiles. Click to disable.' : 'Fog of war OFF — click to enable';
-    }
 
     this.showToast('Game started!', 'success');
     this.maybeOfferTutorial();
