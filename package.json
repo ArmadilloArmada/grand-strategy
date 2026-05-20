@@ -9,6 +9,8 @@
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:19123 && node electron/launch.cjs\"",
     "generate-icons": "node scripts/generate-icons.cjs",
     "validate:maps": "node scripts/validate-maps.js",
+    "generate:mega-map": "node scripts/generate-mega-world-map.cjs",
+    "release:check": "npm test -- --run && npm run validate:maps && npm run build",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",

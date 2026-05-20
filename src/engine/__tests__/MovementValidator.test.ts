@@ -174,6 +174,38 @@ describe('MovementValidator', () => {
       expect(nonCombatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
     });
 
+    it('allows transport movement using capacity on adjacent friendly coastal', () => {
+      state.unitRegistry.register({
+        ...state.unitRegistry.get('infantry')!.serialize(),
+        requiredTransport: true,
+      });
+      state.unitRegistry.register({
+        id: 'transport',
+        name: 'Transport',
+        attack: 0,
+        defense: 0,
+        movement: 2,
+        cost: 8,
+        domain: 'sea',
+        hitPoints: 1,
+        canBlitz: false,
+        canBombard: false,
+        canStrategicBomb: false,
+        transportCapacity: 2,
+        requiredTransport: false,
+      });
+
+      const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
+      const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
+      island.units.push({ unitTypeId: 'transport', count: 1 });
+      state.territories.set('island', island);
+      state.territories.set('sea1', sea);
+      (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
+
+      const combatMoves = validator.getValidMoves('infantry', 'a', true);
+      expect(combatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
+    });
+
     it('does not use transport routes through enemy-controlled seas', () => {
       state.unitRegistry.register({
         ...state.unitRegistry.get('infantry')!.serialize(),

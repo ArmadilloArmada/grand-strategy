@@ -666,9 +666,12 @@ export class ProductionUI {
             const icon = UNIT_ICONS[reserve.unitTypeId] || '⬜';
             const domain = unit?.domain || 'land';
 
-            const canDeploy = (domain === 'sea' && selectedZone.territory.type === 'sea') ||
-                              (domain !== 'sea' && selectedZone.territory.type !== 'sea') ||
-                              (domain === 'air');
+            // Sea units may deploy to sea zones or coastal ports (zones are never pure sea in practice).
+            const canDeploy =
+              (domain === 'sea' &&
+                (selectedZone.territory.type === 'sea' || selectedZone.territory.type === 'coastal')) ||
+              (domain !== 'sea' && selectedZone.territory.type !== 'sea') ||
+              domain === 'air';
 
             if (!canDeploy) continue;
 

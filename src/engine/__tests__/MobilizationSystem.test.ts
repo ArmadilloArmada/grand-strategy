@@ -106,7 +106,7 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
     expect(opt.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
   });
 
-  it('coastal territory with sea access includes destroyer', () => {
+  it('coastal territory with sea access includes destroyer and transport', () => {
     const state = buildState();
     const sea = makeTerritory('sea1', null, { type: 'sea' as any, production: 0 });
     const coastal = makeTerritory('coast1', 'player', {
@@ -117,6 +117,7 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
       adjacentTo: ['sea1'],
     });
     state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'transport', cost: 8, domain: 'sea' as any, transportCapacity: 2, attack: 0, defense: 0 }));
     state.territories.set('sea1', sea);
     state.territories.set('coast1', coastal);
 
@@ -124,6 +125,35 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
     const opt = sys.getTerritoryMobilization(coastal);
     expect(opt.type).toBe('coastal');
     expect(opt.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(opt.units.some(u => u.unitTypeId === 'transport')).toBe(true);
+  });
+
+  it('coastal mobilization places naval units in adjacent sea', () => {
+    const state = buildState();
+    const sea = makeTerritory('sea1', null, {
+      type: 'sea' as any,
+      production: 0,
+      adjacentTo: ['coast1'],
+    });
+    const coastal = makeTerritory('coast1', 'player', {
+      type: 'coastal' as any,
+      production: 2,
+      hasFactory: false,
+      isCapital: false,
+      adjacentTo: ['sea1'],
+    });
+    state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'transport', cost: 8, domain: 'sea' as any, transportCapacity: 2, attack: 0, defense: 0 }));
+    state.territories.set('sea1', sea);
+    state.territories.set('coast1', coastal);
+
+    const sys = new MobilizationSystem(state);
+    sys.mobilize('coast1');
+
+    expect(sea.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(sea.units.some(u => u.unitTypeId === 'transport')).toBe(true);
+    expect(coastal.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
+    expect(coastal.units.some(u => u.unitTypeId === 'destroyer')).toBe(false);
   });
 
   it('canMobilize is false when faction lacks IPCs', () => {

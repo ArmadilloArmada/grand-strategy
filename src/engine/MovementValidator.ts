@@ -257,15 +257,29 @@ export class MovementValidator {
   }
 
   /**
-   * Get total transport capacity in a sea zone owned by the current faction
+   * Get total transport capacity for amphibious moves through a sea zone:
+   * transports in the sea, plus transports on friendly coastal tiles touching that sea.
    */
   private getTransportCapacity(seaZoneId: string): number {
     const seaZone = this.state.territories.get(seaZoneId);
     if (!seaZone) return 0;
-    return seaZone.units.reduce((sum, pu) => {
+    let sum = seaZone.units.reduce((acc, pu) => {
       const ut = this.state.unitRegistry.get(pu.unitTypeId);
-      return sum + (ut ? ut.transportCapacity * pu.count : 0);
+      return acc + (ut ? ut.transportCapacity * pu.count : 0);
     }, 0);
+
+    const currentFaction = this.state.getCurrentFaction();
+    if (!currentFaction) return sum;
+
+    for (const adjId of seaZone.adjacentTo) {
+      const t = this.state.territories.get(adjId);
+      if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
+      sum += t.units.reduce((acc, pu) => {
+        const ut = this.state.unitRegistry.get(pu.unitTypeId);
+        return acc + (ut ? ut.transportCapacity * pu.count : 0);
+      }, 0);
+    }
+    return sum;
   }
 
   /**
@@ -295,12 +309,26 @@ export class MovementValidator {
     for (const seaId of fromTerritory.adjacentTo) {
       const seaZone = this.state.territories.get(seaId);
       if (!seaZone || seaZone.type !== 'sea') continue;
-      const hasFriendlyFleet = seaZone.units.some(pu => {
+      const hasFriendlyFleetInSea = seaZone.units.some(pu => {
         const unitType = this.state.unitRegistry.get(pu.unitTypeId);
         return !!unitType && unitType.domain === 'sea' && pu.count > 0;
       });
+      let hasFriendlyFleetNear = hasFriendlyFleetInSea;
+      if (!hasFriendlyFleetNear) {
+        for (const adjId of seaZone.adjacentTo) {
+          const t = this.state.territories.get(adjId);
+          if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
+          if (t.units.some(pu => {
+            const ut = this.state.unitRegistry.get(pu.unitTypeId);
+            return !!ut && ut.domain === 'sea' && pu.count > 0;
+          })) {
+            hasFriendlyFleetNear = true;
+            break;
+          }
+        }
+      }
       const isFriendlySea = seaZone.owner === null || seaZone.owner === currentFaction.id;
-      if (!isFriendlySea || !hasFriendlyFleet) continue;
+      if (!isFriendlySea || !hasFriendlyFleetNear) continue;
 
       const capacity = this.getAvailableTransportCapacity(seaId);
       if (capacity <= 0) continue;

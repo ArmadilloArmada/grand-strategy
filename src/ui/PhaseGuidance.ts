@@ -178,7 +178,7 @@ export class PhaseGuidance {
           for (const move of this.movementValidator.getValidMoves(pu.unitTypeId, territory.id, allowAttacks)) {
             if (move.isAttack) attackIds.add(move.territoryId);
             else targetIds.add(move.territoryId);
-            if (move.viaTransport) transportIds.add(move.territoryId);
+            if (move.viaTransport) transportIds.add(move.viaTransport);
           }
         }
         const moveCount = targetIds.size;
@@ -187,7 +187,7 @@ export class PhaseGuidance {
         const targetText = attackCount > 0
           ? `${moveCount} move target${moveCount !== 1 ? 's' : ''}, ${attackCount} attack target${attackCount !== 1 ? 's' : ''}`
           : `${moveCount} move target${moveCount !== 1 ? 's' : ''}`;
-        const transportText = transportCount > 0 ? `, ${transportCount} via transport` : '';
+        const transportText = transportCount > 0 ? `, ${transportCount} amphib route${transportCount !== 1 ? 's' : ''}` : '';
         return {
           text: `${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText})`,
           className,

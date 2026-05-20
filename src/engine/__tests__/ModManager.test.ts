@@ -2,7 +2,7 @@
  * ModManager tests
  * Uses localStorage (jsdom) — no Electron API needed for these tests.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ModManager, ModManifest } from '../ModManager';
 
 function makeManifest(id: string, overrides: Partial<ModManifest> = {}): ModManifest {
@@ -224,6 +224,14 @@ describe('ModManager — exportMod', () => {
 });
 
 describe('ModManager — installModFromJSON (browser path)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('installs a mod from JSON string in localStorage context', async () => {
     const mm = makeManager();
     const modData = {

@@ -5,7 +5,7 @@
  * Each territory type spawns different units:
  * - Factories: Tanks, Artillery, Mech Infantry
  * - Capital: Mixed forces (Infantry, Tanks, Fighters)
- * - Coastal: Naval units (Destroyers, Transports) + Infantry
+ * - Coastal: Naval units (Destroyer, Transport) + Infantry (naval spawns in adjacent sea)
  * - Regular Land: Infantry
  * - Sea Zones: Cannot be mobilized
  */
@@ -90,7 +90,7 @@ export class MobilizationSystem {
       ];
     } else if (territory.type === 'coastal') {
       type = 'coastal';
-      cost = 8;
+      cost = 10;
       // Check if adjacent to sea - if so, can produce naval
       const hasSeaAccess = territory.adjacentTo.some(adjId => {
         const adj = this.state.territories.get(adjId);
@@ -100,7 +100,8 @@ export class MobilizationSystem {
       if (hasSeaAccess) {
         units = [
           { unitTypeId: 'infantry', count: 2 },
-          { unitTypeId: 'destroyer', count: 1 }
+          { unitTypeId: 'destroyer', count: 1 },
+          { unitTypeId: 'transport', count: 1 },
         ];
       } else {
         units = [
@@ -217,11 +218,18 @@ export class MobilizationSystem {
     // Deduct IPCs
     faction.spendIPCs(option.cost);
 
-    // Spawn units at the territory
+    // Spawn land units on this territory; sea-domain units go into an adjacent sea zone
+    // (MovementValidator counts lift capacity in sea tiles — coastal-only naval never enabled amphib moves.)
+    const navalSpawnSeaId =
+      option.type === 'coastal' ? this.getCoastalMobilizationSeaId(territory) : null;
+
     for (const unit of option.units) {
-      territory.addUnits(unit.unitTypeId, unit.count);
-      // Mark newly spawned units as having acted (can't move this turn)
-      territory.markUnitsActed(unit.unitTypeId, unit.count);
+      const ut = this.state.unitRegistry.get(unit.unitTypeId);
+      const spawnId = navalSpawnSeaId && ut?.domain === 'sea' ? navalSpawnSeaId : territoryId;
+      const spawnTerritory = this.state.territories.get(spawnId);
+      if (!spawnTerritory) continue;
+      spawnTerritory.addUnits(unit.unitTypeId, unit.count);
+      spawnTerritory.markUnitsActed(unit.unitTypeId, unit.count);
     }
 
     // Mark territory as mobilized this turn
@@ -274,6 +282,15 @@ export class MobilizationSystem {
    */
   undoMobilize(territoryId: string): void {
     this.mobilizedThisTurn.delete(territoryId);
+  }
+
+  /** Deterministic adjacent sea for spawning naval units from a coastal mobilization. */
+  private getCoastalMobilizationSeaId(territory: Territory): string | null {
+    if (territory.type !== 'coastal') return null;
+    const seas = territory.adjacentTo
+      .filter(id => this.state.territories.get(id)?.type === 'sea')
+      .sort();
+    return seas[0] ?? null;
   }
 
   /**

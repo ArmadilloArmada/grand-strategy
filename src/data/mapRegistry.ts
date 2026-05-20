@@ -2,9 +2,10 @@
  * Map registry - central list of available maps.
  *
  * To add a new map:
- * 1. Create assets/maps/your-map.json (same format as world-map.json or tutorial-map.json).
- * 2. In main.ts: import the JSON and call registerMap('your_map_id', 'Display Name', importedData).
- * 3. In index.html: add <option value="your_map_id">Display Name</option> to the #map-select dropdown.
+ * 1. Create assets/maps/your-map.json (same format as grid-world-map.json or tutorial-map.json).
+ * 2. For a finer global grid, run `npm run generate:mega-map` (see scripts/generate-mega-world-map.cjs).
+ * 3. In main.ts: import the JSON and call registerMap('your_map_id', 'Display Name', importedData).
+ * 4. In index.html: add <option value="your_map_id">Display Name</option> to the #map-select dropdown (optional; New Game modal rebuilds from registry).
  */
 
 import type { MapData } from '../loaders/MapLoader';

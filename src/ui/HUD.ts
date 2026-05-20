@@ -2561,10 +2561,20 @@ export class HUD {
     }
 
     if (territory.type === 'sea') {
-      const transports = territory.units.reduce((sum, unit) => {
-        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
-        return sum + (unitType?.transportCapacity ?? 0) * unit.count;
-      }, 0);
+      const sumTransportCapacity = (t: import('../data/Territory').Territory): number =>
+        t.units.reduce((sum, unit) => {
+          const unitType = this.state.unitRegistry.get(unit.unitTypeId);
+          return sum + (unitType?.transportCapacity ?? 0) * unit.count;
+        }, 0);
+
+      let transports = sumTransportCapacity(territory);
+      if (faction) {
+        for (const adjId of territory.adjacentTo) {
+          const t = this.state.territories.get(adjId);
+          if (!t || t.type !== 'coastal' || t.owner !== faction.id) continue;
+          transports += sumTransportCapacity(t);
+        }
+      }
       const adjacentCoasts = territory.adjacentTo
         .map(id => this.state.territories.get(id))
         .filter(t => t?.isLand())
@@ -3689,7 +3699,7 @@ export class HUD {
     return this.state.factionRegistry.getAll().map(f => f.serialize());
   }
 
-  private getSelectedSetupMap(): { id: string; name: string; data?: MapData; factions: FactionData[] } {
+  private getSelectedSetupMap(): { id: string; name: string; data?: MapData; factions: FactionData[]; description?: string } {
     const mapSelect = document.getElementById('map-select') as HTMLSelectElement | null;
     const id = mapSelect?.value ?? this.gameConfig.mapId ?? 'grid';
     const entry = getMapEntry(id);
@@ -3698,6 +3708,7 @@ export class HUD {
       name: entry?.name ?? mapSelect?.selectedOptions[0]?.textContent?.trim() ?? 'Selected map',
       data: entry?.data,
       factions: this.getSetupFactionsForMap(id),
+      description: entry?.description,
     };
   }
 
@@ -3767,7 +3778,7 @@ export class HUD {
     const card = document.getElementById('map-info-card');
     if (!card) return;
 
-    const { name, data, factions } = this.getSelectedSetupMap();
+    const { name, data, factions, description } = this.getSelectedSetupMap();
     if (!data) {
       card.classList.add('hidden');
       return;
@@ -3780,11 +3791,19 @@ export class HUD {
     const startingUnits = (data.startingUnits ?? []).reduce((sum, s) => sum + s.units.reduce((inner, u) => inner + u.count, 0), 0);
     const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
     const navalTag = sea > 0 || coastal > 0 ? 'Naval routes' : 'Land focused';
-    const sizeTag = data.territories.length >= 80 ? 'Large map' : data.territories.length >= 40 ? 'Medium map' : 'Small map';
+    const sizeTag =
+      data.territories.length >= 400
+        ? 'Very large map (fine grid)'
+        : data.territories.length >= 80
+          ? 'Large map'
+          : data.territories.length >= 40
+            ? 'Medium map'
+            : 'Small map';
 
     card.classList.remove('hidden');
     card.innerHTML = `
       <div class="map-info-title">${this.escapeHtml(name)}</div>
+      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${this.escapeHtml(description)}</div>` : ''}
       <div class="map-info-tags">
         <span>${this.escapeHtml(sizeTag)}</span>
         <span>${this.escapeHtml(navalTag)}</span>

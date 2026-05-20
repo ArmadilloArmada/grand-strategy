@@ -124,6 +124,26 @@ describe('ReserveSystem — queueDeployment', () => {
     const result = reserves.queueDeployment('infantry', 'enemy_land', 1);
     expect(result.success).toBe(false);
   });
+
+  it('allows deploying sea units to a coastal territory', () => {
+    const state = new GameState();
+    state.factionRegistry.register(makeFactionData('player', { capital: 'port', allies: [], startingIPCs: 30 }));
+    state.unitRegistry.register(makeUnitData({ id: 'transport', domain: 'sea' as any, transportCapacity: 2, attack: 0, defense: 0 }));
+
+    const port = makeTerritory('port', 'player', {
+      type: 'coastal' as any,
+      isCapital: true,
+      production: 2,
+      adjacentTo: [],
+    });
+    state.territories.set('port', port);
+    state.currentFactionId = 'player';
+
+    const reserves = new ReserveSystem(state);
+    reserves.addToReserve('player', 'transport', 1);
+    const result = reserves.queueDeployment('transport', 'port', 1);
+    expect(result.success).toBe(true);
+  });
 });
 
 // ── executeDeployments ────────────────────────────────────────────────────────

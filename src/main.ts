@@ -51,6 +51,7 @@ import wwiiUnitsData from '../assets/units/wwii-units.json';
 import coldwarUnitsData from '../assets/units/coldwar-units.json';
 import modernUnitsData from '../assets/units/modern-units.json';
 import factionsData from '../assets/factions/world-factions.json';
+import worldFactionsMegaData from '../assets/factions/world-factions-mega.json';
 
 // Unit era registry
 type UnitEraEntry = { name: string; description: string; data: UnitTypeData[] };
@@ -71,6 +72,7 @@ import _gridSkirmishData from '../assets/maps/grid-skirmish.json';
 import _gridMediterraneanData from '../assets/maps/grid-mediterranean.json';
 import _gridArcticData from '../assets/maps/grid-arctic.json';
 import _gridArchipelagoData from '../assets/maps/grid-archipelago.json';
+import _gridWorldMapMega from '../assets/maps/grid-world-map-mega.json';
 import { registerMap, getMapEntry, getMapById } from './data/mapRegistry';
 import { EUROPE_FACTIONS, PACIFIC_FACTIONS, AMERICAS_FACTIONS, AFRICA_FACTIONS, EASTERN_FRONT_FACTIONS, SKIRMISH_FACTIONS, MEDITERRANEAN_FACTIONS, ARCTIC_FACTIONS, ARCHIPELAGO_FACTIONS, TUTORIAL_FACTIONS } from './data/mapFactions';
 import type { MapData } from './loaders/MapLoader';
@@ -85,6 +87,7 @@ const gridSkirmishData = _gridSkirmishData as unknown as MapData;
 const gridMediterraneanData = _gridMediterraneanData as unknown as MapData;
 const gridArcticData = _gridArcticData as unknown as MapData;
 const gridArchipelagoData = _gridArchipelagoData as unknown as MapData;
+const gridWorldMapMega = _gridWorldMapMega as unknown as MapData;
 
 /**
  * Main Game class - orchestrates all systems
@@ -143,6 +146,13 @@ class Game {
   async init(): Promise<void> {
     // Register available maps — themed maps supply their own faction definitions
     registerMap('grid', 'World at War (Grid)', gridMapData, undefined, factionsData as import('./data/Faction').FactionData[]);
+    registerMap(
+      'grid-mega',
+      'World at War — Fine Grid (Grid)',
+      gridWorldMapMega,
+      'Same geography as the default world map, split into 25×25 tiles (768 territories).',
+      worldFactionsMegaData as import('./data/Faction').FactionData[],
+    );
     registerMap('tutorial', 'Tutorial', tutorialMapData, undefined, TUTORIAL_FACTIONS);
     registerMap('grid-europe',        'European Theater (Grid)',   gridEuropeData,       undefined, EUROPE_FACTIONS);
     registerMap('grid-pacific',       'Pacific Ring (Grid)',       gridPacificData,      undefined, PACIFIC_FACTIONS);
