@@ -90,6 +90,9 @@ export interface GameConfig {
   aiOpponents?: string[];
   /** Maximum number of AI opponents to activate. 0 / undefined = no cap. */
   aiOpponentCount?: number;
+  /** Match-scoped AI tuning chosen from New Game setup. */
+  aiDifficulty?: 'easy' | 'medium' | 'hard';
+  aiPersonality?: string;
   /**
    * Resolved set of faction IDs participating in the current game session
    * (humans + their allies + chosen opponents, capped by aiOpponentCount).
@@ -110,6 +113,7 @@ export interface GameConfig {
   // Options
   fogOfWar: boolean;
   autoSave: boolean;
+  simpleMode: boolean;
   phaseTimerSeconds: number; // 0 = disabled; max seconds per phase (human only)
   
   // Tracking
@@ -126,6 +130,8 @@ export const defaultConfig: GameConfig = {
   humanFactions: ['atlantic_alliance'],
   aiOpponents: undefined,
   aiOpponentCount: 0,
+  aiDifficulty: 'medium',
+  aiPersonality: 'default',
   activeFactionIds: undefined,
 
   turnStyle: 'classic',
@@ -138,6 +144,7 @@ export const defaultConfig: GameConfig = {
   
   fogOfWar: true,
   autoSave: true,
+  simpleMode: true,
   phaseTimerSeconds: 0,
   
   startTime: Date.now(),
@@ -239,4 +246,3 @@ export function checkVictory(
   
   return { winner: null, reason: '' };
 }
-

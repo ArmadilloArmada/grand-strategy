@@ -75,4 +75,17 @@ describe('ObjectiveSystem scenario openings', () => {
     expect(routeObjective?.condition.type).toBe('hold_territory');
     expect(routeObjective?.condition.territoryId).toBe('supply_port');
   });
+
+  it('adds a production-hub objective on mega/global maps', () => {
+    const state = makeObjectiveState();
+    const objectives = new ObjectiveSystem(state);
+    objectives.setScenarioMap('grid-mega');
+
+    objectives.ensureOpeningObjectives('blue');
+
+    const hubObjective = objectives.getActive('blue').find(obj => obj.title === 'Seize a Production Hub');
+    expect(hubObjective).toBeDefined();
+    expect(hubObjective?.condition.type).toBe('capture_territory');
+    expect(hubObjective?.condition.territoryId).toBe('island_port');
+  });
 });

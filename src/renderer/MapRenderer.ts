@@ -715,14 +715,14 @@ export class MapRenderer {
       this.ctx.lineWidth = 1;
       this.ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
 
-      // NATO unit symbol + count
+      // Role sprite + count
       const primaryUnit = territory.units.reduce((max, pu) => pu.count > max.count ? pu : max, territory.units[0]);
       const primaryType = primaryUnit ? this.state.unitRegistry.get(primaryUnit.unitTypeId) : null;
 
       if (primaryType && w >= 18 && h >= 14) {
-        // Symbol in upper ~55% of counter, count in lower strip
+        // Sprite in upper ~62% of counter, count in lower strip
         const symCy = y + h * 0.40;
-        this.drawNATOSymbol(cx, symCy, w * 0.54, h * 0.38, primaryType.domain ?? 'land', primaryUnit.unitTypeId);
+        this.drawUnitSprite(cx, symCy, w * 0.64, h * 0.46, primaryType.domain ?? 'land', primaryUnit.unitTypeId, factionColor);
         const countSize = Math.max(7, Math.min(10, h * 0.36));
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${countSize}px "Courier New", monospace`;
@@ -758,16 +758,17 @@ export class MapRenderer {
       const unitCount = territory.getTotalUnitCount();
       const markerY = unitCount > 0 ? cy - 24 : cy;
 
-      // Capital: drawn 5-pointed star
+      // Capital: command flag token
       if (territory.isCapital) {
-        const sx = unitCount > 0 ? cx - 14 : cx - 10;
-        this.drawStar(sx, markerY, 8, '#f5c842', '#2a1808');
+        const sx = unitCount > 0 ? cx - 16 : cx - 10;
+        const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+        this.drawCapitalSprite(sx, markerY, faction?.color ?? '#f5c842');
       }
 
-      // Factory: small drawn industry symbol (rectangle + chimney)
+      // Factory: industrial token
       if (territory.hasFactory) {
-        const fx = unitCount > 0 ? cx + 10 : cx + 8;
-        this.drawFactorySymbol(fx, markerY, '#888888', '#2a1808');
+        const fx = unitCount > 0 ? cx + 12 : cx + 8;
+        this.drawFactorySprite(fx, markerY, territory.owner ? '#9ca3af' : '#7a7468');
       }
 
       // Fortification badge: small tower symbol based on level
@@ -840,66 +841,188 @@ export class MapRenderer {
     this.ctx.restore();
   }
 
-  /** Draw a NATO wargame counter symbol inside the unit token upper zone. */
-  private drawNATOSymbol(cx: number, cy: number, w: number, h: number, domain: string, unitTypeId: string): void {
+  /** Draw a tiny role sprite inside the unit token upper zone. */
+  private drawUnitSprite(cx: number, cy: number, w: number, h: number, domain: string, unitTypeId: string, factionColor: string): void {
+    const id = unitTypeId.toLowerCase();
+    if (domain === 'air') {
+      this.drawAircraftSprite(cx, cy, w, h, id, factionColor);
+    } else if (domain === 'sea') {
+      this.drawShipSprite(cx, cy, w, h, id, factionColor);
+    } else if (id.includes('armor') || id.includes('tank') || id.includes('panzer') || id.includes('mech')) {
+      this.drawTankSprite(cx, cy, w, h, factionColor);
+    } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
+      this.drawArtillerySprite(cx, cy, w, h, factionColor);
+    } else if (id.includes('anti_air') || id.includes('antiair') || id.includes('_aa') || id.includes('flak')) {
+      this.drawAASprite(cx, cy, w, h, factionColor);
+    } else {
+      this.drawInfantrySprite(cx, cy, w, h, factionColor);
+    }
+  }
+
+  private drawInfantrySprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
     const ctx = this.ctx;
+    const r = Math.max(1.6, Math.min(w, h) * 0.18);
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 1;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    const hw = w * 0.5;
-    const hh = h * 0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillStyle = this.lightenColor(factionColor, 34);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx - w * 0.17, cy - h * 0.18, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.15, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.16, cy + h * 0.20);
+    ctx.moveTo(cx - w * 0.02, cy - h * 0.10);
+    ctx.lineTo(cx + w * 0.34, cy - h * 0.32);
+    ctx.moveTo(cx + w * 0.18, cy - h * 0.22);
+    ctx.lineTo(cx + w * 0.42, cy - h * 0.36);
+    ctx.stroke();
+    ctx.restore();
+  }
 
-    if (domain === 'air') {
+  private drawTankSprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 26);
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = 1.1;
+    this.roundRect(cx - w * 0.42, cy - h * 0.16, w * 0.72, h * 0.34, h * 0.12);
+    ctx.fill();
+    ctx.stroke();
+    this.roundRect(cx - w * 0.18, cy - h * 0.30, w * 0.32, h * 0.24, h * 0.08);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + w * 0.10, cy - h * 0.20);
+    ctx.lineTo(cx + w * 0.44, cy - h * 0.34);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    for (let i = 0; i < 3; i++) {
       ctx.beginPath();
-      ctx.moveTo(cx, cy - hh);
-      ctx.lineTo(cx + hw, cy + hh);
-      ctx.lineTo(cx - hw, cy + hh);
-      ctx.closePath();
-      ctx.globalAlpha = 0.75;
+      ctx.arc(cx - w * 0.28 + i * w * 0.22, cy + h * 0.10, Math.max(1, h * 0.08), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawArtillerySprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = this.lightenColor(factionColor, 30);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.34, cy + h * 0.20);
+    ctx.lineTo(cx + w * 0.34, cy - h * 0.24);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx - w * 0.22, cy + h * 0.22, Math.max(1.5, h * 0.16), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + w * 0.12, cy + h * 0.08, Math.max(1, h * 0.10), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawAASprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = this.lightenColor(factionColor, 30);
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + h * 0.30);
+    ctx.lineTo(cx, cy - h * 0.34);
+    ctx.moveTo(cx - w * 0.30, cy - h * 0.05);
+    ctx.lineTo(cx, cy - h * 0.34);
+    ctx.lineTo(cx + w * 0.30, cy - h * 0.05);
+    ctx.moveTo(cx - w * 0.22, cy + h * 0.30);
+    ctx.lineTo(cx + w * 0.22, cy + h * 0.30);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private roundRect(x: number, y: number, w: number, h: number, r: number): void {
+    const ctx = this.ctx;
+    const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  private drawAircraftSprite(cx: number, cy: number, w: number, h: number, unitTypeId: string, factionColor: string): void {
+    const ctx = this.ctx;
+    const bomber = unitTypeId.includes('bomber') || unitTypeId.includes('heavy');
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 34);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + w * 0.44, cy);
+    ctx.lineTo(cx - w * 0.12, cy - h * 0.16);
+    ctx.lineTo(cx - w * 0.40, cy - h * (bomber ? 0.34 : 0.24));
+    ctx.lineTo(cx - w * 0.28, cy);
+    ctx.lineTo(cx - w * 0.40, cy + h * (bomber ? 0.34 : 0.24));
+    ctx.lineTo(cx - w * 0.12, cy + h * 0.16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (bomber) {
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.05, cy - h * 0.14);
+      ctx.lineTo(cx + w * 0.10, cy + h * 0.14);
       ctx.stroke();
-    } else if (domain === 'sea') {
-      ctx.globalAlpha = 0.75;
+    }
+    ctx.restore();
+  }
+
+  private drawShipSprite(cx: number, cy: number, w: number, h: number, unitTypeId: string, factionColor: string): void {
+    const ctx = this.ctx;
+    const submarine = unitTypeId.includes('sub');
+    const carrier = unitTypeId.includes('carrier');
+    const transport = unitTypeId.includes('transport');
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 28);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+    if (submarine) {
       ctx.beginPath();
-      ctx.arc(cx, cy + hh * 0.25, hw * 0.85, Math.PI, 0, false);
+      ctx.ellipse(cx, cy + h * 0.04, w * 0.42, h * 0.24, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(cx, cy + hh * 0.25);
-      ctx.lineTo(cx, cy - hh);
+      ctx.moveTo(cx - w * 0.04, cy - h * 0.18);
+      ctx.lineTo(cx - w * 0.04, cy - h * 0.36);
+      ctx.lineTo(cx + w * 0.08, cy - h * 0.36);
       ctx.stroke();
     } else {
-      const id = unitTypeId.toLowerCase();
-      ctx.globalAlpha = 0.75;
-      if (id.includes('armor') || id.includes('tank') || id.includes('panzer')) {
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.44, cy - h * 0.04);
+      ctx.lineTo(cx + w * 0.34, cy - h * 0.04);
+      ctx.lineTo(cx + w * 0.18, cy + h * 0.26);
+      ctx.lineTo(cx - w * 0.34, cy + h * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      const deckW = carrier ? w * 0.42 : transport ? w * 0.28 : w * 0.20;
+      ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.28, deckW, h * 0.16);
+      if (!transport) {
         ctx.beginPath();
-        ctx.ellipse(cx, cy, hw * 0.82, hh * 0.5, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, Math.min(hw, hh) * 0.72, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fill();
-      } else if (id.includes('anti_air') || id.includes('antiair') || id.includes('_aa') || id.includes('flak')) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - hh);
-        ctx.lineTo(cx, cy + hh * 0.45);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(cx - hw * 0.52, cy - hh * 0.28);
-        ctx.lineTo(cx, cy - hh);
-        ctx.lineTo(cx + hw * 0.52, cy - hh * 0.28);
-        ctx.stroke();
-      } else {
-        // Infantry default: X cross
-        ctx.beginPath();
-        ctx.moveTo(cx - hw, cy - hh);
-        ctx.lineTo(cx + hw, cy + hh);
-        ctx.moveTo(cx + hw, cy - hh);
-        ctx.lineTo(cx - hw, cy + hh);
+        ctx.moveTo(cx + w * 0.10, cy - h * 0.14);
+        ctx.lineTo(cx + w * 0.34, cy - h * 0.24);
         ctx.stroke();
       }
     }
@@ -1018,19 +1141,71 @@ export class MapRenderer {
     this.ctx.restore();
   }
 
-  /** Draw a small factory/industry symbol at (cx, cy). */
-  private drawFactorySymbol(cx: number, cy: number, fill: string, stroke: string): void {
-    this.ctx.save();
-    this.ctx.fillStyle = fill;
-    this.ctx.strokeStyle = stroke;
-    this.ctx.lineWidth = 0.8;
-    // Main building body
-    this.ctx.fillRect(cx - 5, cy - 3, 10, 7);
-    this.ctx.strokeRect(cx - 5, cy - 3, 10, 7);
-    // Chimney
-    this.ctx.fillRect(cx - 2, cy - 7, 3, 5);
-    this.ctx.strokeRect(cx - 2, cy - 7, 3, 5);
-    this.ctx.restore();
+  private drawCapitalSprite(cx: number, cy: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#1f2937';
+    ctx.strokeStyle = '#f5c842';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, cy + 5);
+    ctx.lineTo(cx - 3.5, cy - 6);
+    ctx.stroke();
+
+    ctx.fillStyle = this.lightenColor(factionColor, 28);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx - 2.5, cy - 6);
+    ctx.lineTo(cx + 6, cy - 4);
+    ctx.lineTo(cx + 4, cy + 1);
+    ctx.lineTo(cx - 2.5, cy - 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    this.drawStar(cx - 4.8, cy + 3.2, 3.5, '#f5c842', '#2a1808');
+    ctx.restore();
+  }
+
+  private drawFactorySprite(cx: number, cy: number, fill: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#111827';
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1;
+    this.roundRect(cx - 10, cy - 8, 20, 16, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = '#273142';
+    ctx.lineWidth = 0.8;
+    ctx.fillRect(cx - 7, cy - 1, 14, 7);
+    ctx.strokeRect(cx - 7, cy - 1, 14, 7);
+    ctx.fillRect(cx - 5, cy - 6, 3, 6);
+    ctx.strokeRect(cx - 5, cy - 6, 3, 6);
+    ctx.fillRect(cx + 1, cy - 8, 3, 8);
+    ctx.strokeRect(cx + 1, cy - 8, 3, 8);
+
+    ctx.fillStyle = 'rgba(229,231,235,0.85)';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(cx - 5 + i * 4, cy + 1.5, 2, 2);
+    }
+    ctx.restore();
   }
 
   /**

@@ -85,6 +85,7 @@ export class VictoryScreen {
     this.showVictoryFlash(faction?.color ?? '#ffd700', isPlayerVictory);
 
     const stats = this.calculateGameStats();
+    const commanderRating = this.getCommanderRating(isPlayerVictory, stats);
 
     // Scoreboard shows every participant (including defeated ones) but excludes
     // map factions that were not selected for this game.
@@ -174,6 +175,12 @@ export class VictoryScreen {
         <p style="font-size: 0.9rem; font-style: italic; color: ${faction?.color ?? 'var(--text-muted)'}; margin-bottom: 1.25rem; opacity: 0.85;">
           "${this.getVictoryFlavorText(data.winner, isPlayerVictory)}"
         </p>
+
+        <div style="background: linear-gradient(135deg, rgba(184,134,11,0.18), rgba(0,0,0,0.04)); border: 1px solid rgba(184,134,11,0.28); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;">Commander Rating</div>
+          <div style="font-size: 2.2rem; font-weight: 800; color: ${faction?.color ?? '#b8860b'}; line-height: 1.1;">${commanderRating.grade}</div>
+          <div style="font-size: 0.92rem; color: var(--text-primary);">${commanderRating.label}</div>
+        </div>
 
         <div style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; text-align: left;">
           <h3 style="text-align: center; margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Final Standings</h3>
@@ -388,5 +395,28 @@ export class VictoryScreen {
       unitsProduced: fStats?.unitsProduced ?? 0,
       enemiesDestroyed: fStats?.unitsKilled ?? 0,
     };
+  }
+
+  private getCommanderRating(
+    isPlayerVictory: boolean,
+    stats: ReturnType<VictoryScreen['calculateGameStats']>
+  ): { grade: string; label: string } {
+    if (!isPlayerVictory) {
+      if (stats.enemiesDestroyed >= 20 || stats.territoriesControlled >= 8) {
+        return { grade: 'C+', label: 'Defiant stand. The campaign was costly, not quiet.' };
+      }
+      return { grade: 'D', label: 'Command lost. Rebuild the opening plan and try again.' };
+    }
+
+    if (stats.turns <= 8 && stats.enemiesDestroyed >= 20) {
+      return { grade: 'S', label: 'Decisive victory. Fast pressure, clean finish.' };
+    }
+    if (stats.turns <= 14) {
+      return { grade: 'A', label: 'Strong command. You converted tempo into control.' };
+    }
+    if (stats.totalIncome >= 150 || stats.unitsProduced >= 20) {
+      return { grade: 'B+', label: 'Industrial win. The war machine did its work.' };
+    }
+    return { grade: 'B', label: 'Victory secured. Room to sharpen the next campaign.' };
   }
 }

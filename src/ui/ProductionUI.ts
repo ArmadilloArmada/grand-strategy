@@ -9,6 +9,55 @@ import { MobilizationSystem, MobilizationOption } from '../engine/MobilizationSy
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
+
+type QuickBuildPlanId = 'balanced' | 'defend' | 'attack' | 'naval' | 'air';
+
+interface QuickBuildPlan {
+  id: QuickBuildPlanId;
+  label: string;
+  unitPriority: string[];
+  fallbackDomains: Array<'land' | 'sea' | 'air'>;
+  summary: string;
+}
+
+const QUICK_BUILD_PLANS: Record<QuickBuildPlanId, QuickBuildPlan> = {
+  balanced: {
+    id: 'balanced',
+    label: 'Balanced',
+    unitPriority: ['infantry', 'artillery', 'tank', 'fighter'],
+    fallbackDomains: ['land', 'air'],
+    summary: 'mixes cheap defenders, armor, and air cover',
+  },
+  defend: {
+    id: 'defend',
+    label: 'Defend',
+    unitPriority: ['infantry', 'artillery', 'anti_air', 'fighter'],
+    fallbackDomains: ['land', 'air'],
+    summary: 'stacks efficient defense on threatened fronts',
+  },
+  attack: {
+    id: 'attack',
+    label: 'Attack',
+    unitPriority: ['tank', 'artillery', 'fighter', 'bomber', 'infantry'],
+    fallbackDomains: ['land', 'air'],
+    summary: 'buys mobile power for next-turn attacks',
+  },
+  naval: {
+    id: 'naval',
+    label: 'Naval',
+    unitPriority: ['destroyer', 'transport', 'submarine', 'carrier', 'battleship', 'fighter'],
+    fallbackDomains: ['sea', 'air'],
+    summary: 'builds sea control and transport capacity',
+  },
+  air: {
+    id: 'air',
+    label: 'Air',
+    unitPriority: ['fighter', 'bomber', 'infantry'],
+    fallbackDomains: ['air', 'land'],
+    summary: 'prioritizes flexible strike and defense coverage',
+  },
+};
+
 export interface ProductionCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
   updateMobilizationHighlights(): void;
@@ -19,6 +68,7 @@ export interface ProductionCallbacks {
 export class ProductionUI {
   private selectedDeployZone: string | null = null;
   private fhActiveDomain: 'land' | 'sea' | 'air' = 'land';
+  private activeQuickPlan: QuickBuildPlanId = 'balanced';
 
   constructor(
     private state: GameState,
@@ -30,7 +80,7 @@ export class ProductionUI {
 
   // ==================== FACTORY HUB ====================
 
-  showFactoryHub(): void {
+  showFactoryHub(defaultPlan?: QuickBuildPlanId): void {
     const tray = document.getElementById('factory-hub-tray');
     if (!tray) return;
     this.productionManager.clearQueue();
@@ -39,6 +89,9 @@ export class ProductionUI {
     document.body.classList.add('fh-open');
     this.renderFactoryHub();
     this.bindFactoryHubTabs();
+    if (defaultPlan) {
+      this.applyQuickBuildPlan(defaultPlan);
+    }
   }
 
   closeFactoryHub(): void {
@@ -76,6 +129,105 @@ export class ProductionUI {
     this.updateFactoryHubBudget();
     this.renderFactoryHubCatalog();
     this.renderFactoryHubOrders();
+    this.bindQuickBuildPlans();
+    this.renderQuickBuildSummary();
+  }
+
+  private bindQuickBuildPlans(): void {
+    const tray = document.getElementById('factory-hub-tray');
+    if (!tray || tray.dataset.quickBuildBound === '1') return;
+    tray.dataset.quickBuildBound = '1';
+
+    tray.querySelectorAll<HTMLButtonElement>('.fh-plan').forEach(button => {
+      button.addEventListener('click', () => {
+        const planId = button.dataset.plan as QuickBuildPlanId | undefined;
+        if (!planId || !QUICK_BUILD_PLANS[planId]) return;
+        this.applyQuickBuildPlan(planId);
+      });
+    });
+  }
+
+  applyQuickBuildPlan(planId: QuickBuildPlanId): void {
+    const plan = QUICK_BUILD_PLANS[planId];
+    const faction = this.state.getCurrentFaction();
+    if (!plan || !faction) return;
+
+    this.activeQuickPlan = planId;
+    this.productionManager.clearQueue();
+
+    const affordableUnits = this.getQuickBuildCandidates(plan, faction.id);
+    if (affordableUnits.length === 0) {
+      this.callbacks.showToast('No compatible units available for this plan', 'info');
+      this.renderFactoryHub();
+      return;
+    }
+
+    let priorityIndex = 0;
+    for (let safety = 0; safety < 500; safety++) {
+      const remaining = this.productionManager.getRemainingIPCs();
+      if (remaining <= 0) break;
+      let bought = false;
+
+      for (let attempts = 0; attempts < affordableUnits.length; attempts++) {
+        const unit = affordableUnits[(priorityIndex + attempts) % affordableUnits.length];
+        if (unit.cost > remaining) continue;
+        const result = this.productionManager.queueSimplePurchase(unit.id, 1);
+        if (result.success) {
+          priorityIndex = (priorityIndex + attempts + 1) % affordableUnits.length;
+          bought = true;
+          break;
+        }
+      }
+
+      if (!bought) break;
+    }
+
+    soundManager.play('click');
+    this.renderFactoryHub();
+  }
+
+  private getQuickBuildCandidates(plan: QuickBuildPlan, factionId: string): Array<{ id: string; cost: number; name?: string; domain?: string }> {
+    const units = this.state.unitRegistry.getAll()
+      .filter((unit: any) => (!unit.factionId || unit.factionId === factionId) && unit.cost > 0);
+    const byId = new Map(units.map((unit: any) => [unit.id, unit]));
+    const prioritized = plan.unitPriority
+      .map(id => byId.get(id))
+      .filter(Boolean) as Array<{ id: string; cost: number; name?: string; domain?: string }>;
+
+    if (prioritized.length > 0) return prioritized;
+
+    return units
+      .filter((unit: any) => plan.fallbackDomains.includes(unit.domain))
+      .sort((a: any, b: any) => a.cost - b.cost);
+  }
+
+  private renderQuickBuildSummary(): void {
+    const summaryEl = document.getElementById('fh-quick-summary');
+    const buyDeployBtn = document.getElementById('fh-btn-buy-deploy') as HTMLButtonElement | null;
+    const tray = document.getElementById('factory-hub-tray');
+    const queue = this.productionManager.getPurchaseQueue();
+    const plan = QUICK_BUILD_PLANS[this.activeQuickPlan];
+
+    tray?.querySelectorAll<HTMLButtonElement>('.fh-plan').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.plan === this.activeQuickPlan);
+    });
+
+    if (buyDeployBtn) buyDeployBtn.disabled = queue.length === 0;
+    if (!summaryEl) return;
+
+    if (queue.length === 0) {
+      summaryEl.textContent = `${plan.label}: ${plan.summary}.`;
+      return;
+    }
+
+    const totalUnits = queue.reduce((sum, order) => sum + order.count, 0);
+    const spent = this.productionManager.getTotalPurchaseCost();
+    const left = this.productionManager.getRemainingIPCs();
+    const unitSummary = queue.map(order => {
+      const unit = this.state.unitRegistry.get(order.unitTypeId);
+      return `${order.count} ${unit?.name ?? order.unitTypeId}`;
+    }).join(', ');
+    summaryEl.textContent = `${plan.label}: spend ${spent} IPCs, add ${totalUnits} units, leave ${left}. ${unitSummary}`;
   }
 
   private updateFactoryHubBudget(): void {
@@ -103,6 +255,8 @@ export class ProductionUI {
       fillEl.style.background = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e';
     }
     if (confirmBtn) confirmBtn.disabled = spent === 0;
+    const buyDeployBtn = document.getElementById('fh-btn-buy-deploy') as HTMLButtonElement | null;
+    if (buyDeployBtn) buyDeployBtn.disabled = spent === 0;
 
     const maxCap = this.productionManager.getMaxPurchaseCapacity();
     const queued = this.productionManager.getTotalQueuedUnits();
@@ -178,6 +332,7 @@ export class ProductionUI {
         this.updateFactoryHubBudget();
         this.renderFactoryHubCatalog();
         this.renderFactoryHubOrders();
+        this.renderQuickBuildSummary();
       });
     });
 
@@ -189,6 +344,7 @@ export class ProductionUI {
         this.updateFactoryHubBudget();
         this.renderFactoryHubCatalog();
         this.renderFactoryHubOrders();
+        this.renderQuickBuildSummary();
       });
     });
 
@@ -204,6 +360,7 @@ export class ProductionUI {
         this.updateFactoryHubBudget();
         this.renderFactoryHubCatalog();
         this.renderFactoryHubOrders();
+        this.renderQuickBuildSummary();
       });
     });
   }
@@ -264,6 +421,7 @@ export class ProductionUI {
         this.updateFactoryHubBudget();
         this.renderFactoryHubCatalog();
         this.renderFactoryHubOrders();
+        this.renderQuickBuildSummary();
       });
     });
   }
@@ -305,9 +463,10 @@ export class ProductionUI {
     this.updateFactoryHubBudget();
     this.renderFactoryHubCatalog();
     this.renderFactoryHubOrders();
+    this.renderQuickBuildSummary();
   }
 
-  confirmFactoryHubOrders(): void {
+  confirmFactoryHubOrders(autoDeploy = false): void {
     const queue = this.productionManager.getPurchaseQueue();
     if (queue.length === 0) {
       this.callbacks.showToast('No units ordered', 'info');
@@ -324,7 +483,7 @@ export class ProductionUI {
         return `${o.count}× ${unit?.name ?? o.unitTypeId}`;
       }).join(', ');
 
-      this.callbacks.showToast(`Ordered: ${summary} (${totalCost} IPCs)`, 'success');
+      this.callbacks.showToast(`Ordered: ${summary} (${totalCost} IPCs). New units are ready next turn.`, 'success');
       soundManager.play('build');
 
       if (faction) {
@@ -332,6 +491,25 @@ export class ProductionUI {
           `Purchase order confirmed: ${summary}`);
         const ipcEl = document.getElementById('ipc-display');
         if (ipcEl) ipcEl.textContent = `${faction.ipcs} IPCs`;
+      }
+
+      if (autoDeploy) {
+        const deployResult = this.productionManager.autoDeployReserves();
+        if (deployResult.deployed > 0) {
+          const names = deployResult.territories
+            .map(id => this.state.territories.get(id)?.name ?? id)
+            .slice(0, 3)
+            .join(', ');
+          this.callbacks.showToast(`Ordered and deployed ${deployResult.deployed} units${names ? ` to ${names}` : ''}. New units are ready next turn.`, 'success');
+          this.renderer.render();
+          this.callbacks.updateSelectionInfo();
+          if (faction) {
+            battleLog.logBuild(this.state.turnNumber, faction.name, faction.color,
+              `Auto-deployed ${deployResult.deployed} new units`);
+          }
+        } else {
+          this.callbacks.showToast(`Ordered: ${summary}. No valid auto-deploy slots available; deploy from reserves later.`, 'info');
+        }
       }
 
       document.getElementById('factory-hub-tray')?.classList.add('hidden');

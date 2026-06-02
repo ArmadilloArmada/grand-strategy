@@ -178,6 +178,7 @@
         <div class="rba-group rba-left">
           <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️<span class="btn-label"> Undo</span></button>
           <button id="btn-redo" disabled title="Redo" aria-label="Redo">↪️<span class="btn-label"> Redo</span></button>
+          <button id="btn-simple-advanced" class="simple-advanced-toggle" title="Show advanced tools" aria-label="Show advanced tools">Advanced</button>
           <div class="btn-separator"></div>
           <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
           <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
@@ -275,28 +276,55 @@
           <div class="main-menu-logo-area">
             <span class="main-menu-emblem">🌍</span>
             <h1 id="main-menu-title" class="main-menu-title">GRAND<br>STRATEGY</h1>
-            <p class="main-menu-tagline">A turn-based game of global conquest</p>
+            <p class="main-menu-tagline">Fast war-room strategy with guided turns and deep optional command</p>
           </div>
-          <p class="main-menu-version" id="main-menu-version">v0.1.0 · Press H for help</p>
+            <p class="main-menu-version" id="main-menu-version">War Room Edition · Press H for help</p>
         </div>
 
         <!-- ── Navigation Panel ── -->
         <nav class="main-menu-nav">
+          <div class="main-menu-tabs" role="tablist" aria-label="Main menu sections">
+            <button id="menu-tab-new" class="main-menu-tab active" data-menu-tab="new" role="tab" aria-selected="true" aria-controls="menu-panel-new">New Game</button>
+            <button id="menu-tab-resume" class="main-menu-tab" data-menu-tab="resume" role="tab" aria-selected="false" aria-controls="menu-panel-resume">Resume</button>
+          </div>
 
           <!-- Quick Start (primary) -->
+          <div id="menu-panel-new" class="main-menu-panel active" data-menu-panel="new" role="tabpanel" aria-labelledby="menu-tab-new">
+          <div class="main-menu-section-label">Start Fresh</div>
           <div class="main-menu-group">
-            <button id="btn-quick-classic" class="menu-btn menu-btn-featured">
+            <button id="btn-quick-simple" class="menu-btn menu-btn-featured">
+              <span class="menu-btn-icon">⚡</span>
+              <div>
+                <div class="menu-btn-label">Simple Campaign</div>
+                <div class="menu-btn-sub">Guided turns · Recommended first move</div>
+              </div>
+            </button>
+            <button id="btn-quick-classic" class="menu-btn">
               <span class="menu-btn-icon">🎲</span>
               <div>
                 <div class="menu-btn-label">Classic Mode</div>
                 <div class="menu-btn-sub">6 phases · Full strategy experience</div>
               </div>
             </button>
-            <button id="btn-quick-simple" class="menu-btn">
-              <span class="menu-btn-icon">⚡</span>
+            <button class="menu-btn scenario-btn" data-scenario="hold-capital">
+              <span class="menu-btn-icon">🛡️</span>
               <div>
-                <div class="menu-btn-label">Quick Mode</div>
-                <div class="menu-btn-sub">4 phases · Beginner friendly</div>
+                <div class="menu-btn-label">Hold the Capital</div>
+                <div class="menu-btn-sub">Defensive guided start</div>
+              </div>
+            </button>
+            <button class="menu-btn scenario-btn" data-scenario="factory-rush">
+              <span class="menu-btn-icon">🏭</span>
+              <div>
+                <div class="menu-btn-label">Factory Rush</div>
+                <div class="menu-btn-sub">Economy and build focus</div>
+              </div>
+            </button>
+            <button class="menu-btn scenario-btn" data-scenario="first-war">
+              <span class="menu-btn-icon">⚔️</span>
+              <div>
+                <div class="menu-btn-label">First War</div>
+                <div class="menu-btn-sub">Fast attack tutorial</div>
               </div>
             </button>
           </div>
@@ -313,14 +341,30 @@
               <span class="menu-btn-icon">🎮</span>
               <div class="menu-btn-label">Custom Game Setup</div>
             </button>
+          </div>
+          </div>
+
+          <div id="menu-panel-resume" class="main-menu-panel" data-menu-panel="resume" role="tabpanel" aria-labelledby="menu-tab-resume">
+          <div class="main-menu-section-label">Continue</div>
+          <div class="main-menu-group">
             <button id="btn-continue-game" class="menu-btn">
               <span class="menu-btn-icon">▶</span>
-              <div class="menu-btn-label">Continue Last Game</div>
+              <div>
+                <div class="menu-btn-label">Resume Autosave</div>
+                <div class="menu-btn-sub">Loads the latest automatic save</div>
+              </div>
             </button>
             <button id="btn-load-game" class="menu-btn">
               <span class="menu-btn-icon">📂</span>
-              <div class="menu-btn-label">Load Saved Game</div>
+              <div>
+                <div class="menu-btn-label">Load Saved Game</div>
+                <div class="menu-btn-sub">Pick a manual save slot</div>
+              </div>
             </button>
+          </div>
+          <div class="main-menu-note">
+            New Game starts a fresh session. Your autosave remains here until another autosave replaces it.
+          </div>
           </div>
 
           <div class="menu-rule"></div>
@@ -444,6 +488,27 @@
           <p style="font-size: 0.8rem; color: #666; margin-top: 0.35rem;">
             Hold Ctrl/Cmd to pick which factions appear as opponents. The count above caps how many become active.
           </p>
+          <div class="setting-row">
+            <label for="setup-ai-difficulty">AI Difficulty</label>
+            <select id="setup-ai-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="setup-ai-personality">AI Doctrine</label>
+            <select id="setup-ai-personality">
+              <option value="default" selected>Balanced Mix</option>
+              <option value="aggressive">Aggressive</option>
+              <option value="defensive">Defensive</option>
+              <option value="economic">Economic</option>
+              <option value="naval">Naval</option>
+              <option value="blitz">Blitz</option>
+              <option value="adaptive">Adaptive</option>
+              <option value="unpredictable">Unpredictable</option>
+            </select>
+          </div>
         </div>
         
         <div class="settings-section">
@@ -505,6 +570,10 @@
           <div class="setting-row">
             <label for="auto-save">Auto-Save Each Turn</label>
             <input type="checkbox" id="auto-save" checked>
+          </div>
+          <div class="setting-row">
+            <label for="simple-mode">Simple Mode</label>
+            <input type="checkbox" id="simple-mode" checked title="Simplify HUD, build, and combat defaults">
           </div>
         </div>
         
@@ -1021,7 +1090,8 @@
             <div id="preview-risk-summary" class="preview-risk-summary even"></div>
           </div>
           <div style="text-align:center;">
-            <button id="btn-confirm-attack" class="primary">⚔️ Attack!</button>
+            <button id="btn-confirm-attack" class="primary">Auto Battle</button>
+            <button id="btn-play-tactical" style="background:linear-gradient(135deg,#2563eb,#14b8a6);color:#fff;">Play Tactical</button>
             <button id="btn-cancel-attack">Cancel</button>
           </div>
         </div>
@@ -1217,6 +1287,16 @@
           </div>
           <button id="fh-btn-optimize" class="fh-optimize-btn" title="Auto-fill with balanced unit mix">⚙ Optimize</button>
           <button id="fh-btn-close" class="fh-close-btn" title="Cancel and close">✕</button>
+        </div>
+
+        <div class="fh-quick-build" aria-label="Quick build plans">
+          <button class="fh-plan active" data-plan="balanced" title="Balanced force mix">Balanced</button>
+          <button class="fh-plan" data-plan="defend" title="Cheap defenders and support">Defend</button>
+          <button class="fh-plan" data-plan="attack" title="Mobile attacking units">Attack</button>
+          <button class="fh-plan" data-plan="naval" title="Ships and transports">Naval</button>
+          <button class="fh-plan" data-plan="air" title="Fighters and bombers">Air</button>
+          <button id="fh-btn-buy-deploy" class="fh-buy-deploy" disabled title="Confirm orders and auto-deploy reserves">Buy & Auto-Deploy</button>
+          <div id="fh-quick-summary" class="fh-quick-summary">Choose a plan to fill orders automatically.</div>
         </div>
 
         <!-- Horizontal scrollable unit card strip -->

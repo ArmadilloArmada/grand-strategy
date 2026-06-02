@@ -10,6 +10,7 @@ import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
 import { generateBattleNarrative } from '../engine/BattleNarrator';
 import { settings } from './Settings';
+import { TacticalBattleUI } from './TacticalBattleUI';
 
 export interface CombatCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
@@ -40,6 +41,7 @@ export class CombatUI {
   private pendingCombats: string[] = [];
   private pendingAttackFrom: string | null = null;
   private pendingAttackTarget: string | null = null;
+  private tacticalBattleUI = new TacticalBattleUI();
 
   constructor(
     private state: GameState,
@@ -363,15 +365,25 @@ export class CombatUI {
       for (const cu of combat.defenders) {
         if (cu.casualties > 0) defenderLosses[cu.unitType.id] = (defenderLosses[cu.unitType.id] ?? 0) + cu.casualties;
       }
+      const attackerLossText = this.formatLosses(attackerLosses);
+      const defenderLossText = this.formatLosses(defenderLosses);
+      const targetName = targetTerritory?.name ?? combat.territoryId;
+      const recap = combat.winner === 'attacker'
+        ? `Captured ${targetName}. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+        : combat.winner === 'defender'
+        ? `${targetName} held. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+        : `${targetName} emptied. Both sides destroyed.`;
 
       if (combat.winner === 'attacker') {
-        this.callbacks.showToast(`Victory! Captured ${targetTerritory?.name}!`, 'success');
+        this.callbacks.showToast(recap, 'success');
         soundManager.play('capture');
       } else if (combat.winner === 'defender') {
-        this.callbacks.showToast(`Attack failed. ${targetTerritory?.name} holds!`, 'info');
+        this.callbacks.showToast(recap, 'info');
       } else {
-        this.callbacks.showToast('Both sides destroyed!', 'info');
+        this.callbacks.showToast(recap, 'info');
       }
+      const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      battleLog.logCombat(this.state.turnNumber, attackerFaction?.name ?? 'Attacker', attackerFaction?.color ?? '#94a3b8', recap);
 
       // Battle narrative
       if (settings.getSetting('battleNarratives')) {
@@ -409,6 +421,16 @@ export class CombatUI {
     this.callbacks.renderMinimap();
     this.callbacks.updateFactionPanel();
     this.startNextCombat();
+  }
+
+  private formatLosses(losses: Record<string, number>): string {
+    const parts = Object.entries(losses)
+      .filter(([, count]) => count > 0)
+      .map(([unitTypeId, count]) => {
+        const unit = this.state.unitRegistry.get(unitTypeId);
+        return `${count} ${unit?.name ?? unitTypeId}`;
+      });
+    return parts.length > 0 ? parts.join(', ') : 'nothing';
   }
 
   closeCombatModal(): void {
@@ -623,6 +645,9 @@ export class CombatUI {
     const fromTerritory = this.state.territories.get(fromId);
     const toTerritory = this.state.territories.get(toId);
     if (!fromTerritory || !toTerritory) return;
+    const thisRef = this;
+    const sourceTerritory = fromTerritory;
+    const targetTerritory = toTerritory;
 
     // Open combined modal in preview phase
     const modal = document.getElementById('combat-modal');
@@ -683,13 +708,19 @@ export class CombatUI {
         btn.addEventListener('click', () => {
           const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
           if (input) input.value = String(Math.max(0, Number(input.value) - 1));
+          updatePreviewFromInputs();
         });
       });
       attackerUnitsEl.querySelectorAll<HTMLButtonElement>('.stepper-inc').forEach(btn => {
         btn.addEventListener('click', () => {
           const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
           if (input) input.value = String(Math.min(Number(btn.dataset.max ?? 99), Number(input.value) + 1));
+          updatePreviewFromInputs();
         });
+      });
+      attackerUnitsEl.querySelectorAll<HTMLInputElement>('.unit-count-input').forEach(input => {
+        input.addEventListener('input', updatePreviewFromInputs);
+        input.addEventListener('change', updatePreviewFromInputs);
       });
     }
 
@@ -750,6 +781,7 @@ export class CombatUI {
       consequenceEl.id = 'preview-consequence-summary';
       summaryEl?.after(consequenceEl);
     }
+    const consequenceSummaryEl = consequenceEl;
     consequenceEl.className = `preview-consequence-summary ${previewStats.riskClass}`;
     consequenceEl.innerHTML = this.buildBattleConsequenceSummary(fromId, toId, previewStats);
 
@@ -759,10 +791,69 @@ export class CombatUI {
       factorsEl.id = 'preview-swing-factors';
       consequenceEl.after(factorsEl);
     }
+    const swingFactorsEl = factorsEl;
     factorsEl.className = 'preview-swing-factors';
     factorsEl.innerHTML = previewStats.swingFactors.length > 0
       ? previewStats.swingFactors.map(factor => `<span>${factor}</span>`).join('')
       : '<span>No special modifiers spotted.</span>';
+
+    function updatePreviewFromInputs(): void {
+      if (!attackerUnitsEl) return;
+      const selectedAttackers: { unitTypeId: string; count: number }[] = [];
+      let recalculatedAttackPower = 0;
+      let selectedArtillery = 0;
+      let selectedInfantry = 0;
+
+      for (const pu of sourceTerritory.units) {
+        const unitType = (thisRef.state.unitRegistry.get(pu.unitTypeId));
+        if (!unitType || unitType.attack <= 0) continue;
+        const readyCount = sourceTerritory.getAvailableUnitCount(pu.unitTypeId);
+        const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
+        const count = input
+          ? Math.max(0, Math.min(readyCount, Math.floor(Number(input.value) || 0)))
+          : readyCount;
+        if (input && Number(input.value) !== count) input.value = String(count);
+        if (count <= 0) continue;
+        selectedAttackers.push({ unitTypeId: pu.unitTypeId, count });
+        recalculatedAttackPower += count * unitType.attack;
+        if (pu.unitTypeId === 'artillery') selectedArtillery += count;
+        if (pu.unitTypeId === 'infantry') selectedInfantry += count;
+      }
+
+      recalculatedAttackPower += Math.min(selectedArtillery, selectedInfantry);
+      const nextStats = thisRef.calculateBattlePreviewStats(
+        selectedAttackers,
+        targetTerritory.units,
+        recalculatedAttackPower,
+        defensePower,
+        effectiveDefense,
+      );
+      if (attackPowerEl) {
+        attackPowerEl.innerHTML = `Attack Power: ${nextStats.attackPower}<br><small>Expected hits: ${nextStats.expectedAttackerHits.toFixed(1)}</small>`;
+      }
+      if (defensePowerEl) {
+        const bonusText = nextStats.effectiveDefense > nextStats.defensePower
+          ? ` <small>(effective ${nextStats.effectiveDefense})</small>` : '';
+        defensePowerEl.innerHTML = `Defense Power: ${nextStats.defensePower}${bonusText}<br><small>Expected hits: ${nextStats.expectedDefenderHits.toFixed(1)}</small>`;
+      }
+      if (oddsEl) {
+        oddsEl.textContent = `~${Math.round(nextStats.odds * 100)}%`;
+        oddsEl.className = nextStats.riskClass;
+      }
+      if (summaryEl) {
+        summaryEl.className = `preview-risk-summary ${nextStats.riskClass}`;
+        summaryEl.innerHTML = `
+          <strong>${nextStats.riskLabel}</strong>
+          <span>${nextStats.riskDetail}</span>
+          <small>${nextStats.commitmentAdvice}</small>
+        `;
+      }
+      consequenceSummaryEl.className = `preview-consequence-summary ${nextStats.riskClass}`;
+      consequenceSummaryEl.innerHTML = thisRef.buildBattleConsequenceSummary(fromId, toId, nextStats);
+      swingFactorsEl.innerHTML = nextStats.swingFactors.length > 0
+        ? nextStats.swingFactors.map(factor => `<span>${factor}</span>`).join('')
+        : '<span>No special modifiers spotted.</span>';
+    }
   }
 
   private buildBattleConsequenceSummary(fromId: string, toId: string, stats: BattlePreviewStats): string {
@@ -897,7 +988,7 @@ export class CombatUI {
     return 0.10;
   }
 
-  confirmAttackFromPreview(): void {
+  confirmAttackFromPreview(autoResolve = false, tactical = false): void {
     if (!this.pendingAttackFrom || !this.pendingAttackTarget) return;
 
     const fromTerritory = this.state.territories.get(this.pendingAttackFrom);
@@ -969,12 +1060,43 @@ export class CombatUI {
     }
 
     combat.sourceTerritory = fromTerritory.id;
+    if (tactical) {
+      this.activeCombat = combat;
+      this.closeBattlePreview();
+      const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      battleLog.logCombat(this.state.turnNumber, attackerFaction?.name ?? faction.name, attackerFaction?.color ?? faction.color, `Tactical battle at ${toTerritory.name}`);
+      this.tacticalBattleUI.show(
+        combat,
+        toTerritory.name,
+        completedCombat => {
+          this.activeCombat = completedCombat;
+          this.finishCurrentCombat();
+        },
+        () => {
+          this.activeCombat = combat;
+          this.onAutoResolve();
+          this.onCloseCombat();
+        },
+      );
+      return;
+    }
+
     this.showCombatModal(combat);
     soundManager.play('combat_start');
     battleLog.logCombat(this.state.turnNumber, faction.name, faction.color, `Attacking ${toTerritory.name}`);
 
+    if (autoResolve) {
+      this.onAutoResolve();
+      this.onCloseCombat();
+      return;
+    }
+
     this.renderer.render();
     this.callbacks.updateSelectionInfo();
+  }
+
+  confirmTacticalAttackFromPreview(): void {
+    this.confirmAttackFromPreview(false, true);
   }
 
   closeBattlePreview(): void {

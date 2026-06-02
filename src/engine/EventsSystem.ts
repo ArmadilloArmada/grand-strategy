@@ -165,6 +165,49 @@ export const STRATEGIC_EVENTS: GameEvent[] = [
     cooldownTurns: 4,
     conditions: [{ type: 'at_war' }],
   },
+  {
+    id: 'frontline_crisis',
+    name: 'Frontline Crisis',
+    description: 'A contested border has become unstable. Reinforce the line or exploit the chaos quickly.',
+    type: 'choice',
+    icon: '⚠',
+    effects: [],
+    choices: [
+      {
+        id: 'rush_reserves',
+        text: 'Rush reserves to the line (+2 Infantry, -6 IPCs)',
+        cost: 6,
+        effects: [{ type: 'unit_spawn', unitType: 'infantry', value: 2, target: 'frontline' }],
+      },
+      {
+        id: 'authorize_offensive',
+        text: 'Authorize an offensive (+1 attack this turn)',
+        effects: [{ type: 'attack_bonus', value: 1, target: 'all', duration: 1 }],
+      },
+      {
+        id: 'hold_position',
+        text: 'Hold position (+1 defense for 2 turns)',
+        effects: [{ type: 'defense_bonus', value: 1, target: 'frontline', duration: 2 }],
+      },
+    ],
+    weight: 9,
+    cooldownTurns: 6,
+    conditions: [{ type: 'at_war' }, { type: 'territory_count', value: 2, comparison: 'gte' }],
+  },
+  {
+    id: 'war_room_breakthrough',
+    name: 'War Room Breakthrough',
+    description: 'Staff officers identify a weak point in the enemy line.',
+    type: 'positive',
+    icon: '★',
+    effects: [
+      { type: 'intel_reveal' },
+      { type: 'movement_bonus', value: 1, duration: 1 },
+    ],
+    weight: 7,
+    cooldownTurns: 7,
+    conditions: [{ type: 'at_war' }],
+  },
   
   // Political Events
   {

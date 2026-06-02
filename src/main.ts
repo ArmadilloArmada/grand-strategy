@@ -31,6 +31,8 @@ import { getAITaunt } from './engine/AITaunts';
 import { factionAbilityManager } from './engine/FactionAbilities';
 import { DebugPanel } from './ui/DebugPanel';
 import { ReplayUI } from './ui/ReplayUI';
+import { battleLog } from './ui/BattleLog';
+import { visualEffects } from './ui/VisualEffects';
 import { cloudSaveManager } from './engine/CloudSaveManager';
 import { WeatherSystem } from './engine/WeatherSystem';
 import { FortificationSystem } from './engine/FortificationSystem';
@@ -196,7 +198,7 @@ class Game {
 
     // Stamp the build version into the main-menu version label
     const versionEl = document.getElementById('main-menu-version');
-    if (versionEl) versionEl.textContent = `v${__APP_VERSION__} · Press H for help`;
+    if (versionEl) versionEl.textContent = `War Room Edition v${__APP_VERSION__} - Autosaves each phase`;
 
     // Setup UI event listeners
     this.setupMenuListeners();
@@ -313,6 +315,11 @@ class Game {
         fromId: d.from,
         toId: d.to,
       });
+      const destination = this.state.territories.get(d.to);
+      if (destination) {
+        const screen = this.renderer.worldToScreen(destination.center[0], destination.center[1]);
+        visualEffects.floatText(screen.x, screen.y - 12, `+${d.count} moved`, faction?.color ?? '#fbbf24', 16);
+      }
     });
     this.state.on('tech_researched', (e: any) => {
       const d = e.data as { factionId: string; techId: string };
@@ -390,9 +397,100 @@ class Game {
       turnLimit: 50,
       fogOfWar: true,
       autoSave: true,
+      simpleMode: turnStyle === 'quick',
     };
 
     this.startNewGame();
+  }
+
+  private startScenario(scenario: string): void {
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mode: 'vs-ai',
+      humanFactions: ['atlantic_alliance'],
+      turnStyle: 'quick',
+      victoryType: scenario === 'factory-rush' ? 'economic' : 'capitals',
+      economicTarget: scenario === 'factory-rush' ? 180 : this.hud.gameConfig.economicTarget,
+      capitalsToWin: scenario === 'first-war' ? 2 : 3,
+      turnLimit: scenario === 'hold-capital' ? 12 : 20,
+      fogOfWar: true,
+      autoSave: true,
+      simpleMode: true,
+      aiDifficulty: scenario === 'first-war' ? 'medium' : 'easy',
+      aiPersonality: scenario === 'hold-capital' ? 'defensive' : scenario === 'factory-rush' ? 'economic' : 'aggressive',
+    };
+    this.startNewGame();
+    this.showScenarioBriefing(scenario);
+    const labels: Record<string, string> = {
+      'hold-capital': 'Hold the Capital: survive and reinforce Washington D.C.',
+      'factory-rush': 'Factory Rush: build your economy and outproduce the AI.',
+      'first-war': 'First War: follow the co-pilot into an early attack.',
+    };
+    this.hud.showToast(labels[scenario] ?? 'Scenario started', 'success');
+  }
+
+  private showScenarioBriefing(scenario: string): void {
+    document.getElementById('scenario-briefing-overlay')?.remove();
+
+    const briefings: Record<string, { title: string; subtitle: string; goals: string[]; doctrine: string }> = {
+      'hold-capital': {
+        title: 'Hold the Capital',
+        subtitle: 'Protect Washington D.C. long enough to turn the front line.',
+        goals: ['Build defenders first.', 'Use the Threats overlay to spot danger.', 'End the phase when the co-pilot has no urgent warning.'],
+        doctrine: 'Defensive AI: reinforces strongholds and punishes exposed capitals.',
+      },
+      'factory-rush': {
+        title: 'Factory Rush',
+        subtitle: 'Win by turning production into unstoppable pressure.',
+        goals: ['Use Buy & Auto-Deploy in factory territories.', 'Protect production hubs.', 'Bank income when the front is stable.'],
+        doctrine: 'Economic AI: expands factories and tries to outproduce you.',
+      },
+      'first-war': {
+        title: 'First War',
+        subtitle: 'Learn the clean loop: build, move, fight, review.',
+        goals: ['Follow Do This Next.', 'Attack only when the preview looks favorable.', 'Watch moved units become ready next turn.'],
+        doctrine: 'Aggressive AI: looks for early attacks and weak borders.',
+      },
+    };
+
+    const briefing = briefings[scenario] ?? {
+      title: 'Scenario',
+      subtitle: 'A guided operation is ready.',
+      goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End phases when your plan is complete.'],
+      doctrine: `AI doctrine: ${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
+    };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'scenario-briefing-overlay';
+    overlay.className = 'scenario-briefing-overlay';
+    overlay.innerHTML = `
+      <div class="scenario-briefing-card">
+        <div class="scenario-briefing-kicker">Operation Briefing</div>
+        <h2>${briefing.title}</h2>
+        <p class="scenario-briefing-subtitle">${briefing.subtitle}</p>
+        <div class="scenario-briefing-goals">
+          ${briefing.goals.map((goal, index) => `
+            <div class="scenario-briefing-goal">
+              <span>${index + 1}</span>
+              <strong>${goal}</strong>
+            </div>
+          `).join('')}
+        </div>
+        <div class="scenario-briefing-doctrine">${briefing.doctrine}</div>
+        <div class="scenario-briefing-actions">
+          <button class="primary" id="btn-start-command">Start Command</button>
+          <button id="btn-briefing-copilot">Show Co-Pilot</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById('btn-start-command')?.addEventListener('click', close);
+    document.getElementById('btn-briefing-copilot')?.addEventListener('click', () => {
+      close();
+      document.querySelector<HTMLElement>('.strategic-advisor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   }
 
   /**
@@ -441,8 +539,8 @@ class Game {
     }
 
     // Apply current difficulty and personality
-    this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
-    this.aiController.setPersonality(settings.getSetting('aiPersonality') ?? 'default');
+    this.aiController.setDifficulty(this.hud.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty'));
+    this.aiController.setPersonality(this.hud.gameConfig.aiPersonality ?? settings.getSetting('aiPersonality') ?? 'default');
 
     // Set turn style from config
     this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
@@ -617,6 +715,7 @@ class Game {
     steamManager.clearRichPresence();
     const modal = document.getElementById('main-menu-modal');
     if (modal) modal.classList.remove('hidden');
+    this.setMainMenuTab('new');
 
     // Hide HUD elements that have no meaning without an active game
     document.getElementById('turn-info')?.classList.add('hidden');
@@ -627,7 +726,9 @@ class Game {
     // Update continue button state
     const continueBtn = document.getElementById('btn-continue-game') as HTMLButtonElement;
     if (continueBtn) {
-      continueBtn.disabled = !this.saveManager.hasAutoSave();
+      const hasAutoSave = this.saveManager.hasAutoSave();
+      continueBtn.disabled = !hasAutoSave;
+      continueBtn.title = hasAutoSave ? 'Loads the latest autosave from the Resume tab.' : 'No autosave found yet.';
     }
   }
 
@@ -648,6 +749,18 @@ class Game {
     requestAnimationFrame(() => dragManager.setup());
   }
 
+  private setMainMenuTab(tabName: 'new' | 'resume'): void {
+    document.querySelectorAll<HTMLElement>('[data-menu-tab]').forEach(tab => {
+      const isActive = tab.dataset.menuTab === tabName;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+    });
+
+    document.querySelectorAll<HTMLElement>('[data-menu-panel]').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.menuPanel === tabName);
+    });
+  }
+
   /**
    * Show save confirmation modal when leaving a game
    */
@@ -663,7 +776,7 @@ class Game {
       <div class="modal-content" style="text-align: center; max-width: 400px;">
         <h2>💾 Save Current Game?</h2>
         <p style="margin: 1rem 0; color: #aaa;">
-          You have a game in progress. Would you like to save before starting a new game?
+          You have a game in progress. Starting fresh will not load your autosave; it stays available from the Resume tab until another autosave replaces it.
         </p>
         <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
           <button id="btn-save-and-continue" class="primary" style="padding: 0.8rem;">
@@ -1305,6 +1418,13 @@ class Game {
       }
     };
 
+    document.querySelectorAll<HTMLElement>('[data-menu-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.menuTab === 'resume' ? 'resume' : 'new';
+        this.setMainMenuTab(target);
+      });
+    });
+
     // Theme toggle button in HUD
     document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
       const current = settings.getSetting('theme') ?? 'dark';
@@ -1321,6 +1441,13 @@ class Game {
     // Quick Start - Simple Mode
     document.getElementById('btn-quick-simple')?.addEventListener('click', () => {
       runMenuAction(() => this.confirmLeaveGame(() => this.quickStart('quick')));
+    });
+
+    document.querySelectorAll<HTMLElement>('.scenario-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const scenario = button.dataset.scenario ?? 'first-war';
+        runMenuAction(() => this.confirmLeaveGame(() => this.startScenario(scenario)));
+      });
     });
 
     // Custom Game Setup
@@ -1796,15 +1923,23 @@ class Game {
     }
     
     // Show AI indicator
-    this.hud.showToast(`${faction.name} is playing...`, 'info');
+    this.hud.showToast(`${faction.name} is playing (${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
     
     // Wait so player can see
     await new Promise(resolve => setTimeout(resolve, settings.getAIDelay()));
     
+    const aiBefore = this.captureAISummary(faction.id);
+
     // Execute AI's full turn (all phases)
     await this.aiController.executeTurn();
     this.renderer.render();
     this.hud.renderMinimap();
+    const aiSummary = this.describeAITurn(faction.id, aiBefore);
+    if (aiSummary) {
+      battleLog.addAI(this.state.turnNumber, faction.name, faction.color, aiSummary, 'Turn recap');
+      this.hud.showToast(`${faction.name}: ${aiSummary}`, 'info');
+      this.focusMostRelevantAITerritory(faction.id);
+    }
     
     // Spectator mode - pause to let player review AI moves
     if (turnStyle === 'spectator') {
@@ -1813,6 +1948,56 @@ class Game {
     
     // Small delay before next faction
     await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  private captureAISummary(factionId: string): { territories: number; units: number; ipcs: number; capitals: number } {
+    const faction = this.state.factionRegistry.get(factionId);
+    const territories = Array.from(this.state.territories.values()).filter(t => t.owner === factionId);
+    return {
+      territories: territories.length,
+      units: territories.reduce((sum, territory) => sum + territory.getTotalUnitCount(), 0),
+      ipcs: faction?.ipcs ?? 0,
+      capitals: territories.filter(t => t.isCapital).length,
+    };
+  }
+
+  private focusMostRelevantAITerritory(factionId: string): void {
+    const candidate = Array.from(this.state.territories.values())
+      .filter(t => t.owner === factionId)
+      .sort((a, b) => {
+        const aScore = (a.isCapital ? 10 : 0) + (a.hasFactory ? 8 : 0) + a.production + a.getTotalUnitCount();
+        const bScore = (b.isCapital ? 10 : 0) + (b.hasFactory ? 8 : 0) + b.production + b.getTotalUnitCount();
+        return bScore - aScore;
+      })[0];
+    if (!candidate) return;
+    this.renderer.centerOnTerritory(candidate.id);
+    this.renderer.setAIPulseTerritory(candidate.id);
+  }
+
+  private describeAITurn(factionId: string, before: { territories: number; units: number; ipcs: number; capitals: number }): string {
+    const after = this.captureAISummary(factionId);
+    const territoryDelta = after.territories - before.territories;
+    const unitDelta = after.units - before.units;
+    const ipcDelta = after.ipcs - before.ipcs;
+    const parts: string[] = [];
+    if (territoryDelta > 0) parts.push(`captured ${territoryDelta} territor${territoryDelta === 1 ? 'y' : 'ies'}`);
+    if (territoryDelta < 0) parts.push(`lost ${Math.abs(territoryDelta)} territor${territoryDelta === -1 ? 'y' : 'ies'}`);
+    if (unitDelta > 0) parts.push(`added ${unitDelta} units`);
+    if (unitDelta < 0) parts.push(`lost ${Math.abs(unitDelta)} units`);
+    if (ipcDelta > 0) parts.push(`banked +${ipcDelta} IPC`);
+    if (ipcDelta < 0) parts.push(`spent ${Math.abs(ipcDelta)} IPC`);
+    if (after.capitals > before.capitals) parts.unshift('captured a capital');
+    return parts.length > 0 ? parts.slice(0, 3).join(', ') : 'held position and reorganized';
+  }
+
+  private describeAIDoctrine(personality?: string): string {
+    switch (personality) {
+      case 'aggressive': return 'aggressive';
+      case 'defensive': return 'defensive';
+      case 'economic': return 'economic';
+      case 'balanced': return 'balanced';
+      default: return 'standard';
+    }
   }
 
   /**
@@ -1945,6 +2130,9 @@ class Game {
   private flashSaveIndicator(): void {
     const el = document.getElementById('save-indicator');
     if (!el) return;
+    const savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    el.textContent = `Saved ${savedAt}`;
+    el.setAttribute('title', `Last saved at ${savedAt}`);
     el.classList.remove('hidden', 'visible');
     void el.offsetWidth; // reflow to restart transition
     el.classList.add('visible');
