@@ -115,8 +115,9 @@ export class PhaseGuidance {
         const preferredText = preferred
           ? ` Best first: ${preferred.territory.name} (${preferred.type}, ${preferred.cost} IPCs).`
           : '';
+        const navalText = this.getNavalMobilizeHint(faction?.id);
         return {
-          text: `Click highlighted territories to mobilize forces (${canMobilize} available, ${faction?.ipcs || 0} IPCs).${preferredText}`,
+          text: `Click highlighted territories to mobilize forces (${canMobilize} available, ${faction?.ipcs || 0} IPCs).${preferredText}${navalText}`,
           className,
           tipId: 'mobilize',
           tipMessage: 'Click highlighted territories to spawn defenders. Factories and capitals usually give the strongest value.',
@@ -201,9 +202,44 @@ export class PhaseGuidance {
       };
     }
 
+    const navalMove = this.getNavalMovementHint(faction?.id);
     return {
-      text: 'Select one of your territories with ready units, then click a highlighted neighbor to move or attack.',
+      text: `Select one of your territories with ready units, then click a highlighted neighbor to move or attack.${navalMove}`,
       className,
     };
+  }
+
+  private mapHasSignificantSea(): boolean {
+    let sea = 0;
+    let land = 0;
+    for (const t of this.state.territories.values()) {
+      if (t.isSea()) sea++;
+      else land++;
+    }
+    return sea > 0 && sea / (sea + land) >= 0.12;
+  }
+
+  private factionHasTransport(factionId: string | undefined): boolean {
+    if (!factionId) return false;
+    for (const t of this.state.territories.values()) {
+      if (t.owner !== factionId) continue;
+      for (const pu of t.units) {
+        if (pu.unitTypeId === 'transport' && pu.count > 0) return true;
+      }
+    }
+    return false;
+  }
+
+  private getNavalMobilizeHint(factionId: string | undefined): string {
+    if (!this.mapHasSignificantSea() || this.factionHasTransport(factionId)) return '';
+    const coastal = this.mobilizationSystem.getMobilizationOptions()
+      .find(o => o.canMobilize && o.type === 'coastal');
+    if (!coastal) return '';
+    return ` Island maps: mobilize a transport at ${coastal.territory.name} (${coastal.cost} IPC) to cross water.`;
+  }
+
+  private getNavalMovementHint(factionId: string | undefined): string {
+    if (!this.mapHasSignificantSea() || !this.factionHasTransport(factionId)) return '';
+    return ' Use transports from coastal ports to reach islands.';
   }
 }

@@ -128,6 +128,48 @@ function main() {
     nt.adjacentTo = adj;
   }
 
+  const byId = new Map(newTerritories.map(t => [t.id, t]));
+  const oldById = new Map(oldTerritories.map(t => [t.id, t]));
+  const link = (aId, bId) => {
+    const a = byId.get(aId);
+    const b = byId.get(bId);
+    if (!a || !b) return;
+    if (!a.adjacentTo.includes(bId)) {
+      a.adjacentTo.push(bId);
+      a.adjacentTo.sort();
+    }
+    if (!b.adjacentTo.includes(aId)) {
+      b.adjacentTo.push(aId);
+      b.adjacentTo.sort();
+    }
+  };
+  for (const nt of newTerritories) {
+    if (nt.type !== 'coastal') continue;
+    const hasSea = nt.adjacentTo.some(aid => byId.get(aid)?.type === 'sea');
+    if (hasSea) continue;
+    const parentId = nt.id.includes('__') ? nt.id.split('__')[0] : null;
+    if (!parentId) continue;
+    const parent = oldById.get(parentId);
+    if (!parent) continue;
+    for (const adjId of parent.adjacentTo) {
+      const adjOld = oldById.get(adjId);
+      if (!adjOld || adjOld.type !== 'sea') continue;
+      let bestSea = null;
+      let bestD = Infinity;
+      for (const seaSub of newTerritories) {
+        if (!seaSub.id.startsWith(`${adjId}__`)) continue;
+        const dx = seaSub.center[0] - nt.center[0];
+        const dy = seaSub.center[1] - nt.center[1];
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          bestSea = seaSub.id;
+        }
+      }
+      if (bestSea) link(nt.id, bestSea);
+    }
+  }
+
   const capitals = { washington: null, moscow: null, tokyo: null, india: null };
   for (const nt of newTerritories) {
     if (nt.isCapital && capitals.hasOwnProperty(nt.id.split('__')[0])) {

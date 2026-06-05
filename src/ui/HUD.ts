@@ -530,6 +530,10 @@ export class HUD {
       this.syncSetupHelpers();
     });
 
+    document.getElementById('btn-apply-recommended-setup')?.addEventListener('click', () => {
+      this.applyRecommendedSetup();
+    });
+
     const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
     if (factionSelect) {
       const updateFactionCard = () => {
@@ -3797,6 +3801,49 @@ export class HUD {
     if (modal) modal.classList.remove('hidden');
   }
 
+  /** One-click defaults for a balanced first game (world map, guided quick play). */
+  applyRecommendedSetup(): void {
+    const setSelect = (id: string, value: string) => {
+      const el = document.getElementById(id) as HTMLSelectElement | null;
+      if (el) el.value = value;
+    };
+    const setCheck = (id: string, checked: boolean) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el) el.checked = checked;
+    };
+
+    setSelect('map-select', 'grid');
+    setSelect('unit-era', 'wwii');
+    setSelect('game-mode', 'vs-ai');
+    setSelect('player-faction', 'atlantic_alliance');
+    setSelect('turn-style', 'quick');
+    setSelect('victory-type', 'capitals');
+    setSelect('setup-ai-difficulty', 'medium');
+    setSelect('setup-ai-personality', 'default');
+    setSelect('ai-opponent-count', 'all');
+    setSelect('turn-limit', '50');
+    setCheck('preset-hold10', false);
+    setCheck('fog-of-war', true);
+    setCheck('auto-save', true);
+    setCheck('simple-mode', true);
+
+    const era = (document.getElementById('unit-era') as HTMLSelectElement)?.value as UnitEra;
+    const descEl = document.getElementById('unit-era-description');
+    if (descEl && UNIT_ERA_INFO[era]) descEl.textContent = UNIT_ERA_INFO[era].description;
+
+    const style = (document.getElementById('turn-style') as HTMLSelectElement)?.value as TurnStyle;
+    const turnDesc = document.getElementById('turn-style-description');
+    if (turnDesc && TURN_STYLE_INFO[style]) turnDesc.textContent = TURN_STYLE_INFO[style].description;
+
+    document.getElementById('victory-capitals-row')?.classList.remove('hidden');
+    document.getElementById('victory-domination-row')?.classList.add('hidden');
+    document.getElementById('victory-economic-row')?.classList.add('hidden');
+
+    this.refreshSetupFactionOptions();
+    this.syncSetupHelpers();
+    this.showToast('Recommended setup applied', 'success');
+  }
+
   /**
    * Hide new game modal
    */
@@ -4881,6 +4928,9 @@ export class HUD {
   }
 
   private getMobilizationAdvice(): string {
+    const navalHint = this.getNavalMobilizationAdvice();
+    if (navalHint) return navalHint;
+
     const options = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize);
     const best = options.sort((a, b) => {
       const aValue = (a.territory.isCapital ? 8 : 0) + (a.territory.hasFactory ? 6 : 0) + a.units.reduce((s, u) => s + u.count, 0);
@@ -4889,6 +4939,27 @@ export class HUD {
     })[0];
     if (!best) return 'No affordable mobilization is available. Preserve IPCs or advance the phase.';
     return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
+  }
+
+  private getNavalMobilizationAdvice(): string | null {
+    const mapId = this.gameConfig.mapId ?? 'grid';
+    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island')) return null;
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return null;
+
+    let hasTransport = false;
+    for (const t of this.state.territories.values()) {
+      if (t.owner !== faction.id) continue;
+      for (const pu of t.units) {
+        if (pu.unitTypeId === 'transport' && pu.count > 0) hasTransport = true;
+      }
+    }
+    if (hasTransport) return null;
+
+    const coastal = this.mobilizationSystem.getMobilizationOptions()
+      .find(o => o.canMobilize && o.type === 'coastal');
+    if (!coastal) return null;
+    return `Build a transport at ${coastal.territory.name} (${coastal.cost} IPC) — you need lift to reach enemy islands.`;
   }
 
   private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {

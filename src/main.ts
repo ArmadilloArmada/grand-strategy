@@ -4,6 +4,7 @@
  */
 
 import { GameState } from './engine/GameState';
+import { mergePersistedGameConfig } from './engine/GameConfig';
 import { TurnManager } from './engine/TurnManager';
 import { AIController } from './engine/AIController';
 import { MapRenderer } from './renderer/MapRenderer';
@@ -176,6 +177,7 @@ class Game {
     // Initialize renderer and HUD
     this.renderer = new MapRenderer(this.state, 'game-canvas');
     this.hud = new HUD(this.state, this.turnManager, this.renderer);
+    this.saveManager.setGameConfigProvider(() => this.hud.gameConfig);
     this.hud.setAISpeedCallback((multiplier) => this.aiController.setSpeed(multiplier));
     // DebugPanel is dev-only; never let it block the main menu from wiring up.
     try {
@@ -670,6 +672,7 @@ class Game {
     }
 
     if (this.saveManager.loadAutoSave()) {
+      this.applyLoadedMatchSettings();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
@@ -696,8 +699,18 @@ class Game {
     }
   }
 
+  private applyLoadedMatchSettings(): void {
+    const saved = this.saveManager.consumeLastLoadedConfig();
+    if (!saved) return;
+    this.hud.gameConfig = mergePersistedGameConfig(this.hud.gameConfig, saved);
+    this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
+    this.aiController.setDifficulty(this.hud.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty'));
+    this.aiController.setPersonality(this.hud.gameConfig.aiPersonality ?? settings.getSetting('aiPersonality') ?? 'default');
+  }
+
   private quickLoadWithFeedback(): void {
     if (this.saveManager.quickLoad()) {
+      this.applyLoadedMatchSettings();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
@@ -1248,6 +1261,7 @@ class Game {
         e.stopPropagation();
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
         if (this.saveManager.loadFromSlot(slotId)) {
+          this.applyLoadedMatchSettings();
           this.hud.updateTurnInfo();
           this.isGameStarted = true;
           this.hideSaveLoadModal();

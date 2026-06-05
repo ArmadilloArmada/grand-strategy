@@ -91,6 +91,11 @@ export class MapRenderer {
   };
   private perfEnabled: boolean = false;
 
+  /** Skip expensive terrain/wave effects on very large maps (e.g. fine grid). */
+  private isLargeMap(): boolean {
+    return this.state.territories.size >= 400;
+  }
+
   // Military map / wargame color palette
   private readonly COLORS = {
     parchment: '#cfc090',
@@ -426,10 +431,11 @@ export class MapRenderer {
    * Draw sea zones
    */
   private drawSeaZones(): void {
+    const simplified = this.isLargeMap();
     for (const territory of this.state.territories.values()) {
       if (!territory.isSea()) continue;
       this.drawTerritory(territory, true);
-      this.drawSeaWaves(territory.polygon);
+      if (!simplified) this.drawSeaWaves(territory.polygon);
     }
   }
 
@@ -515,7 +521,7 @@ export class MapRenderer {
     this.ctx.globalAlpha = 1;
 
     // Terrain texture overlay — clipped to polygon, drawn before capture animation
-    if (!isSea) {
+    if (!isSea && !this.isLargeMap()) {
       this.drawTerrainTexture(polygon, territory.terrain ?? 'plains');
     }
 
@@ -558,7 +564,7 @@ export class MapRenderer {
     }
 
     // Inner vignette: radial gradient darkens territory edges for genuine depth
-    {
+    if (!this.isLargeMap()) {
       let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
       for (const [px, py] of polygon) {
         if (px < bMinX) bMinX = px; if (py < bMinY) bMinY = py;
@@ -663,6 +669,7 @@ export class MapRenderer {
    * can never bleed into a neighbouring tile.
    */
   private drawUnitTokens(): void {
+    const simplified = this.isLargeMap();
     for (const territory of this.state.territories.values()) {
       const unitCount = territory.getTotalUnitCount();
       if (unitCount === 0) continue;
@@ -673,6 +680,25 @@ export class MapRenderer {
       if (!isVisible) continue;
 
       const [cx, cy] = territory.center;
+      if (simplified) {
+        const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+        const color = faction?.color ?? '#666666';
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        this.ctx.fillStyle = color;
+        this.ctx.fill();
+        this.ctx.strokeStyle = this.COLORS.borderDark;
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
+        if (unitCount > 1) {
+          this.ctx.fillStyle = '#fff';
+          this.ctx.font = 'bold 8px monospace';
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText(String(unitCount), cx, cy);
+        }
+        continue;
+      }
       const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
       const factionColor = faction?.color ?? '#666666';
 

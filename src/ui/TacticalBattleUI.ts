@@ -50,17 +50,19 @@ export class TacticalBattleUI {
   private hoveredTile: { x: number; y: number } | null = null;
   private readonly onModalKeyDown = (event: KeyboardEvent): void => {
     if (!document.getElementById('tactical-battle-modal')) return;
-    if (event.key !== 'Tab') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
     if (event.key === 'Enter') {
+      event.preventDefault();
       const continueButton = document.getElementById('btn-tactical-continue') as HTMLButtonElement | null;
       if (continueButton) {
         continueButton.click();
         return;
       }
       if (this.state?.phase === 'player') this.endTurn();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.autoBattleInstead();
     }
   };
 

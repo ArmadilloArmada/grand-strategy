@@ -123,6 +123,67 @@ export interface GameConfig {
   territoriesCaptured: Map<string, number>;
 }
 
+/** Serializable subset of GameConfig stored in save slots (no Map fields). */
+export type PersistedGameConfig = Pick<GameConfig,
+  | 'mapId'
+  | 'unitEra'
+  | 'mode'
+  | 'humanFactions'
+  | 'aiOpponents'
+  | 'aiOpponentCount'
+  | 'aiDifficulty'
+  | 'aiPersonality'
+  | 'activeFactionIds'
+  | 'turnStyle'
+  | 'victoryType'
+  | 'capitalsToWin'
+  | 'territoriesPercent'
+  | 'economicTarget'
+  | 'turnLimit'
+  | 'fogOfWar'
+  | 'autoSave'
+  | 'simpleMode'
+  | 'phaseTimerSeconds'
+>;
+
+export function serializeGameConfig(config: GameConfig): PersistedGameConfig {
+  return {
+    mapId: config.mapId,
+    unitEra: config.unitEra,
+    mode: config.mode,
+    humanFactions: [...config.humanFactions],
+    aiOpponents: config.aiOpponents ? [...config.aiOpponents] : undefined,
+    aiOpponentCount: config.aiOpponentCount,
+    aiDifficulty: config.aiDifficulty,
+    aiPersonality: config.aiPersonality,
+    activeFactionIds: config.activeFactionIds ? [...config.activeFactionIds] : undefined,
+    turnStyle: config.turnStyle,
+    victoryType: config.victoryType,
+    capitalsToWin: config.capitalsToWin,
+    territoriesPercent: config.territoriesPercent,
+    economicTarget: config.economicTarget,
+    turnLimit: config.turnLimit,
+    fogOfWar: config.fogOfWar,
+    autoSave: config.autoSave,
+    simpleMode: config.simpleMode,
+    phaseTimerSeconds: config.phaseTimerSeconds,
+  };
+}
+
+export function mergePersistedGameConfig(base: GameConfig, saved: PersistedGameConfig): GameConfig {
+  return {
+    ...base,
+    ...saved,
+    humanFactions: [...saved.humanFactions],
+    aiOpponents: saved.aiOpponents ? [...saved.aiOpponents] : base.aiOpponents,
+    activeFactionIds: saved.activeFactionIds ? [...saved.activeFactionIds] : base.activeFactionIds,
+    totalIPCsEarned: base.totalIPCsEarned,
+    battlesWon: base.battlesWon,
+    territoriesCaptured: base.territoriesCaptured,
+    startTime: base.startTime,
+  };
+}
+
 export const defaultConfig: GameConfig = {
   mapId: 'grid',
   unitEra: 'wwii',

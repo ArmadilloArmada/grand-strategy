@@ -91,4 +91,37 @@ describe('PhaseGuidance', () => {
     expect(tip?.tipId).toBe('combat');
     expect(document.getElementById('context-helper-text')?.textContent).toContain('1 battle to resolve');
   });
+
+  it('suggests coastal transport mobilization on sea-heavy maps without lift', () => {
+    const { state, guidance } = makeGuidance();
+    document.body.innerHTML = `
+      <div id="context-helper" class="context-helper">
+        <span id="context-helper-text"></span>
+      </div>
+    `;
+    for (let i = 0; i < 8; i++) {
+      state.territories.set(`sea_${i}`, makeTerritory(`sea_${i}`, null, { type: 'sea', name: `Sea ${i}` }));
+    }
+    state.territories.set('port', makeTerritory('port', 'atlantic_alliance', {
+      type: 'coastal',
+      name: 'Port',
+      production: 2,
+      adjacentTo: ['sea_0'],
+    }));
+    state.factionRegistry.get('atlantic_alliance')!.ipcs = 20;
+
+    const tip = guidance.updateContextHelper({
+      phase: 'purchase',
+      faction: state.factionRegistry.get('atlantic_alliance'),
+      territory: undefined,
+      isHumanTurn: true,
+      isBuildPhase: true,
+      isMovementPhase: false,
+      isCombatPhase: false,
+      isEndPhase: false,
+    });
+
+    expect(tip?.tipId).toBe('mobilize');
+    expect(document.getElementById('context-helper-text')?.textContent).toMatch(/transport/i);
+  });
 });

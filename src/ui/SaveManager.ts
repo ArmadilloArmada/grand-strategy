@@ -3,6 +3,8 @@
  */
 
 import { GameState, GameStateSnapshot } from '../engine/GameState';
+import type { GameConfig, PersistedGameConfig } from '../engine/GameConfig';
+import { serializeGameConfig } from '../engine/GameConfig';
 
 export interface SaveSlot {
   id: number;
@@ -19,6 +21,7 @@ export interface SaveData {
   name: string;
   timestamp: number;
   snapshot: GameStateSnapshot;
+  gameConfig?: PersistedGameConfig;
 }
 
 const SAVE_VERSION = '1.0.0';
@@ -26,9 +29,21 @@ const MAX_SLOTS = 5;
 
 export class SaveManager {
   private state: GameState;
+  private getGameConfig: (() => GameConfig) | null = null;
+  private lastLoadedConfig: PersistedGameConfig | null = null;
 
   constructor(state: GameState) {
     this.state = state;
+  }
+
+  setGameConfigProvider(provider: () => GameConfig): void {
+    this.getGameConfig = provider;
+  }
+
+  consumeLastLoadedConfig(): PersistedGameConfig | null {
+    const cfg = this.lastLoadedConfig;
+    this.lastLoadedConfig = null;
+    return cfg;
   }
 
   /**
@@ -93,6 +108,7 @@ export class SaveManager {
         name: name?.trim() || existing?.name || `Save ${slotId}`,
         timestamp: Date.now(),
         snapshot,
+        gameConfig: this.getGameConfig ? serializeGameConfig(this.getGameConfig()) : undefined,
       };
 
       const key = `grand-strategy-save-${slotId}`;
@@ -150,7 +166,8 @@ export class SaveManager {
       }
 
       this.state.restoreFromSnapshot(saveData.snapshot);
-      
+      this.lastLoadedConfig = saveData.gameConfig ?? null;
+
       return true;
     } catch (e) {
       console.error('Failed to load:', e);
@@ -200,6 +217,7 @@ export class SaveManager {
         name: 'Auto Save',
         timestamp: Date.now(),
         snapshot,
+        gameConfig: this.getGameConfig ? serializeGameConfig(this.getGameConfig()) : undefined,
       };
 
       localStorage.setItem('grand-strategy-autosave', JSON.stringify(saveData));
@@ -221,6 +239,7 @@ export class SaveManager {
       const saveData = this.parseSaveData(data);
       if (!saveData) return false;
       this.state.restoreFromSnapshot(saveData.snapshot);
+      this.lastLoadedConfig = saveData.gameConfig ?? null;
       return true;
     } catch (e) {
       console.error('Failed to load auto save:', e);
@@ -330,6 +349,7 @@ export class SaveManager {
         name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : 'Imported Save',
         timestamp: typeof parsed.timestamp === 'number' ? parsed.timestamp : Date.now(),
         snapshot: parsed.snapshot,
+        gameConfig: parsed.gameConfig,
       };
     } catch {
       return null;
