@@ -298,6 +298,12 @@ class Game {
           ter?.isCapital ?? false,
           ter?.hasFactory ?? false,
         );
+        if ((combat as { resolvedTactically?: boolean }).resolvedTactically) {
+          this.state.systems.moraleSystem?.recordTacticalVictory?.(
+            combat.attackingFactionId,
+            (combat as { tacticalCleanWin?: boolean }).tacticalCleanWin ?? false,
+          );
+        }
       }
     });
     this.state.on('units_produced', (e: any) => {
@@ -389,20 +395,53 @@ class Game {
    * Quick start a new game with preset settings
    */
   quickStart(turnStyle: 'classic' | 'quick'): void {
-    // Set up default config
+    const isQuick = turnStyle === 'quick';
     this.hud.gameConfig = {
       ...this.hud.gameConfig,
       mode: 'vs-ai',
       humanFactions: ['atlantic_alliance'],
       turnStyle: turnStyle,
       victoryType: 'capitals',
-      turnLimit: 50,
+      capitalsToWin: isQuick ? 2 : 3,
+      turnLimit: isQuick ? 25 : 50,
       fogOfWar: true,
       autoSave: true,
-      simpleMode: turnStyle === 'quick',
+      simpleMode: isQuick,
+      guidedOnboarding: isQuick,
+      aiDifficulty: isQuick ? 'easy' : 'medium',
+      aiPersonality: 'default',
     };
 
     this.startNewGame();
+    if (isQuick) {
+      this.showSimpleCampaignBriefing();
+    }
+  }
+
+  private showSimpleCampaignBriefing(): void {
+    document.getElementById('scenario-briefing-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'scenario-briefing-overlay';
+    overlay.className = 'scenario-briefing-overlay';
+    overlay.innerHTML = `
+      <div class="scenario-briefing-card">
+        <div class="scenario-briefing-kicker">Simple Campaign</div>
+        <h2>Your First Command</h2>
+        <p class="scenario-briefing-subtitle">Three phases per turn — Build, Move, End. The Co-Pilot will guide each step.</p>
+        <div class="scenario-briefing-goals">
+          <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
+          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack.</strong></div>
+          <div class="scenario-briefing-goal"><span>3</span><strong>Capture 2 enemy capitals before turn 25 to win.</strong></div>
+        </div>
+        <div class="scenario-briefing-doctrine">Easy AI · Favorable economy · Co-Pilot coaching enabled</div>
+        <div class="scenario-briefing-actions">
+          <button class="primary" id="btn-start-command">Begin Turn 1</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('btn-start-command')?.addEventListener('click', () => overlay.remove());
   }
 
   private startScenario(scenario: string): void {
@@ -418,6 +457,7 @@ class Game {
       fogOfWar: true,
       autoSave: true,
       simpleMode: true,
+      guidedOnboarding: true,
       aiDifficulty: scenario === 'first-war' ? 'medium' : 'easy',
       aiPersonality: scenario === 'hold-capital' ? 'defensive' : scenario === 'factory-rush' ? 'economic' : 'aggressive',
     };
@@ -625,6 +665,7 @@ class Game {
     (window as any).__gameState = this.state;
 
     this.isGameStarted = true;
+    soundManager.playMusic('gameplay');
 
     // Clean up any previous per-game listeners before adding new ones
     for (const unsub of this.unsubCampaignListeners) unsub();
@@ -643,6 +684,9 @@ class Game {
               ?.reduce((sum: number, d: { casualties: number }) => sum + (d.casualties ?? 0), 0) ?? 0;
             if (defenderLosses > 0) campaignManager.trackUnitsDestroyed(defenderLosses);
             if (combat.captured) campaignManager.trackCapture(combat.territoryId);
+            if ((combat as { resolvedTactically?: boolean }).resolvedTactically && combat.winner === 'attacker') {
+              campaignManager.trackTacticalVictory(1);
+            }
           }
         }),
         this.state.on('territory_mobilized', (e) => {
@@ -1344,6 +1388,7 @@ class Game {
     (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked = s.midGameObjectives ?? true;
     (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked = s.aiTaunts ?? true;
     (document.getElementById('setting-battle-animations') as HTMLInputElement).checked = s.battleAnimations ?? true;
+    (document.getElementById('setting-tactical-battles') as HTMLInputElement).checked = s.tacticalBattles ?? true;
     (document.getElementById('setting-commander-progression') as HTMLInputElement).checked = s.commanderProgression ?? true;
     (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
     (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
@@ -1393,6 +1438,7 @@ class Game {
       midGameObjectives: (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked,
       aiTaunts: (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked,
       battleAnimations: (document.getElementById('setting-battle-animations') as HTMLInputElement).checked,
+      tacticalBattles: (document.getElementById('setting-tactical-battles') as HTMLInputElement).checked,
       commanderProgression: (document.getElementById('setting-commander-progression') as HTMLInputElement).checked,
       dynamicWeather: (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked,
       fortifications: (document.getElementById('setting-fortifications') as HTMLInputElement).checked,
@@ -1714,6 +1760,10 @@ class Game {
       this.saveSettings();
     });
 
+    document.getElementById('btn-close-settings')?.addEventListener('click', () => {
+      this.hideSettings();
+    });
+
     document.getElementById('btn-reset-settings')?.addEventListener('click', () => {
       this.showConfirm('Reset Settings?', 'All settings will return to their defaults.', () => {
         settings.reset();
@@ -1767,14 +1817,26 @@ class Game {
         return;
       }
 
-      // Escape - clear selection, or close modal, or open/close menu
+      // Escape - close open modal, or clear selection / toggle menu
       if (e.key === 'Escape') {
+        const mainMenu = document.getElementById('main-menu-modal');
+        const gameMenu = document.getElementById('game-menu-modal');
+        const anyModal = document.querySelector<HTMLElement>('.modal:not(.hidden)');
+        if (anyModal && anyModal !== mainMenu && anyModal !== gameMenu) {
+          const closeBtn = anyModal.querySelector<HTMLElement>(
+            '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+          );
+          if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+            closeBtn.click();
+          } else {
+            anyModal.classList.add('hidden');
+          }
+          e.preventDefault();
+          return;
+        }
+
         if (this.isGameStarted) {
-          const gameMenu = document.getElementById('game-menu-modal');
-          const anyModal = document.querySelector('.modal:not(.hidden)');
-          if (anyModal && anyModal !== gameMenu) {
-            (anyModal as HTMLElement).classList.add('hidden');
-          } else if (this.state.selectedTerritoryId) {
+          if (this.state.selectedTerritoryId) {
             this.state.selectTerritory(null);
             this.renderer.render();
             this.hud.updateSelectionInfo();

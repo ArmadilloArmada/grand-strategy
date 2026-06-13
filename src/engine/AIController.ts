@@ -8,6 +8,13 @@ import { TurnManager } from "./TurnManager";
 import { MovementValidator } from "./MovementValidator";
 import { MobilizationOption, MobilizationSystem } from "./MobilizationSystem";
 import { CombatResolver } from "./CombatResolver";
+import { settings } from '../ui/Settings';
+import {
+  applyTacticalVictoryBonuses,
+  buildTacticalOutcomeMeta,
+  shouldAIUseTacticalAssault,
+} from './TacticalBattleEngine';
+import { statisticsManager } from './StatisticsManager';
 import { Territory } from "../data/Territory";
 import { Faction } from "../data/Faction";
 import {
@@ -119,7 +126,10 @@ export class AIController {
   /**
    * Set AI difficulty — scales personality risk/aggression
    */
+  private difficultyLevel: 'easy' | 'medium' | 'hard' = 'medium';
+
   setDifficulty(level: "easy" | "medium" | "hard"): void {
+    this.difficultyLevel = level;
     const scale = level === "easy" ? 0.55 : level === "hard" ? 1.15 : 1.0;
     const clamp = (v: number) => Math.min(1, Math.max(0, v * scale));
     this.personality.aggression = clamp(this.personality.aggression);
@@ -870,8 +880,14 @@ export class AIController {
         ? 0.85
         : this.riskTolerance * (0.5 + this.aggressiveness * 0.3);
     }
+    if (this.difficultyLevel === 'easy') {
+      behaviorMinSuccess = Math.min(0.95, behaviorMinSuccess + 0.12);
+    } else if (this.difficultyLevel === 'hard') {
+      behaviorMinSuccess = Math.max(0.08, behaviorMinSuccess - 0.08);
+    }
 
-    const minValue = 18 * (1 - this.expansionFocus * 0.4);
+    let minValue = 18 * (1 - this.expansionFocus * 0.4);
+    if (this.difficultyLevel === 'easy') minValue *= 1.25;
     const opportunisticSuccess = Math.max(behaviorMinSuccess + 0.15, 0.55 - this.aggressiveness * 0.1);
     const debugPlans: AIDebugPlan[] = [];
     const recordPlan = (plan: AttackPlan, status: "chosen" | "rejected", reason: string): void => {
@@ -1305,6 +1321,34 @@ export class AIController {
         continue;
       }
 
+      let usedTacticalAssault = false;
+      if (settings.getSetting('tacticalBattles')) {
+        const attackPower = attackingUnits.reduce((sum, u) => {
+          const type = this.state.unitRegistry.get(u.unitTypeId);
+          return sum + u.count * (type?.attack ?? 0);
+        }, 0);
+        const defensePower = territory.units.reduce((sum, u) => {
+          const type = this.state.unitRegistry.get(u.unitTypeId);
+          return sum + u.count * (type?.defense ?? 0);
+        }, 0);
+        if (shouldAIUseTacticalAssault(territory, attackPower, defensePower, this.personality.aggression)) {
+          combat.flankingBonus = (combat.flankingBonus ?? 0) + 1;
+          combat.resolvedTactically = true;
+          usedTacticalAssault = true;
+          const attacker = this.state.factionRegistry.get(this.state.currentFactionId);
+          this.state.emit('ai_thinking', {
+            message: `${attacker?.name ?? 'Enemy'} launches a tactical assault on ${territory.name}`,
+            action: 'tactical_assault',
+            territoryId,
+          });
+          this.state.emit('tactical_assault_start', {
+            factionId: this.state.currentFactionId,
+            territoryId,
+            territoryName: territory.name,
+          });
+        }
+      }
+
       // Retreat threshold: turtle bails sooner, aggressive AI pushes harder
       const retreatThreshold = this.hasBehavior('ignore_losses') ? 0
         : this.personality.id === 'turtle' ? 0.6
@@ -1324,6 +1368,13 @@ export class AIController {
             if (retreatTo) { this.combatResolver.processRetreat(combat, retreatTo); break; }
           }
         }
+      }
+
+      if (usedTacticalAssault && combat.winner === 'attacker') {
+        const meta = buildTacticalOutcomeMeta(combat, true);
+        combat.tacticalCleanWin = meta.cleanWin;
+        applyTacticalVictoryBonuses(combat, meta);
+        statisticsManager.trackTacticalBattle(combat.attackingFactionId, true);
       }
 
       this.combatResolver.finalizeCombat(combat);

@@ -70,3 +70,39 @@ describe('CombatUI preview stats', () => {
     expect(stats.swingFactors).toContain('Defense bonus +2');
   });
 });
+
+describe('CombatUI tactical recommendations', () => {
+  it('recommends tactical mode for contested capital assaults', () => {
+    const ui = makeCombatUI();
+    const stats = ui.calculateBattlePreviewStats(
+      [{ unitTypeId: 'infantry', count: 2 }],
+      [{ unitTypeId: 'infantry', count: 2 }],
+      2,
+      4,
+      6,
+    );
+
+    expect(ui.isTacticalRecommended(stats, { isCapital: true })).toBe(true);
+  });
+
+  it('recommends tactical mode for even-odds fights', () => {
+    const ui = makeCombatUI();
+    const stats = ui.calculateBattlePreviewStats(
+      [{ unitTypeId: 'infantry', count: 2 }],
+      [{ unitTypeId: 'infantry', count: 2 }],
+      2,
+      2,
+      2,
+    );
+
+    expect(stats.odds).toBe(0.5);
+    expect(ui.isTacticalRecommended(stats, {})).toBe(true);
+  });
+
+  it('skips tactical recommendation for unopposed captures', () => {
+    const ui = makeCombatUI();
+    const stats = ui.calculateBattlePreviewStats([], [], 0, 0, 0);
+
+    expect(ui.isTacticalRecommended(stats, { hasFactory: true })).toBe(false);
+  });
+});

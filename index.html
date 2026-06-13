@@ -307,21 +307,21 @@
               </div>
             </button>
             <button class="menu-btn scenario-btn" data-scenario="hold-capital">
-              <span class="menu-btn-icon">🛡️</span>
+              <span class="scenario-marker defense">HC</span>
               <div>
                 <div class="menu-btn-label">Hold the Capital</div>
                 <div class="menu-btn-sub">Defensive guided start</div>
               </div>
             </button>
             <button class="menu-btn scenario-btn" data-scenario="factory-rush">
-              <span class="menu-btn-icon">🏭</span>
+              <span class="scenario-marker economy">FR</span>
               <div>
                 <div class="menu-btn-label">Factory Rush</div>
                 <div class="menu-btn-sub">Economy and build focus</div>
               </div>
             </button>
             <button class="menu-btn scenario-btn" data-scenario="first-war">
-              <span class="menu-btn-icon">⚔️</span>
+              <span class="scenario-marker attack">FW</span>
               <div>
                 <div class="menu-btn-label">First War</div>
                 <div class="menu-btn-sub">Fast attack tutorial</div>
@@ -371,14 +371,14 @@
 
           <!-- Utility Footer -->
           <div class="main-menu-footer">
-            <button id="btn-achievements" class="menu-btn-icon-only" title="Achievements">🏆</button>
-            <button id="btn-replays"      class="menu-btn-icon-only" title="Watch Replays">📽️</button>
-            <button id="btn-tutorial"     class="menu-btn-icon-only" title="Tutorial">📚</button>
-            <button id="btn-open-settings" class="menu-btn-icon-only" title="Settings">⚙️</button>
+            <button id="btn-achievements" class="menu-btn-icon-only" title="Achievements">🏆<span class="sr-only">Achievements</span></button>
+            <button id="btn-replays"      class="menu-btn-icon-only" title="Watch Replays">📽️<span class="sr-only">Watch Replays</span></button>
+            <button id="btn-tutorial"     class="menu-btn-icon-only" title="Tutorial">📚<span class="sr-only">Tutorial</span></button>
+            <button id="btn-open-settings" class="menu-btn-icon-only" title="Settings">⚙️<span class="sr-only">Settings</span></button>
             <a href="/map-editor.html" target="_blank" style="display:contents;">
-              <button class="menu-btn-icon-only" title="Map Editor">🗺️</button>
+              <button class="menu-btn-icon-only" title="Map Editor">🗺️<span class="sr-only">Map Editor</span></button>
             </a>
-            <button id="btn-credits" class="menu-btn-icon-only" title="Credits">📜</button>
+            <button id="btn-credits" class="menu-btn-icon-only" title="Credits">📜<span class="sr-only">Credits</span></button>
           </div>
 
         </nav>
@@ -431,7 +431,7 @@
               <option value="modern">🛰️ Modern (2020)</option>
             </select>
           </div>
-          <p id="unit-era-description" style="font-size: 0.8rem; color: #666; margin-top: 0.5rem; font-style: italic;">
+          <p id="unit-era-description" class="modal-hint">
             Classic combined arms. Balanced mobility.
           </p>
         </div>
@@ -471,7 +471,7 @@
                 <option value="southern_federation">🟠 Southern Federation</option>
               </select>
             </div>
-            <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+            <p class="modal-hint">
               Hold Ctrl/Cmd to select multiple factions
             </p>
           </div>
@@ -490,7 +490,7 @@
             <label for="ai-opponents">Opponent Factions</label>
             <select id="ai-opponents" multiple size="4" style="width: 100%;"></select>
           </div>
-          <p style="font-size: 0.8rem; color: #666; margin-top: 0.35rem;">
+          <p class="modal-hint tight">
             Hold Ctrl/Cmd to pick which factions appear as opponents. The count above caps how many become active.
           </p>
           <div class="setting-row">
@@ -790,6 +790,11 @@
           </div>
 
           <div class="setting-row">
+            <label title="Optional mini-map battles before dice combat — move units and fire on a tactical grid">Tactical Battles</label>
+            <input type="checkbox" id="setting-tactical-battles" checked>
+          </div>
+
+          <div class="setting-row">
             <label title="Commanders gain XP from battles, level up (1–5), and unlock combat traits">Commander Progression</label>
             <input type="checkbox" id="setting-commander-progression" checked>
           </div>
@@ -805,8 +810,9 @@
           </div>
         </div>
 
-        <div style="text-align: center; margin-top: 1.5rem;">
+        <div class="settings-actions">
           <button id="btn-save-settings" class="primary">Save Settings</button>
+          <button id="btn-close-settings">Close</button>
           <button id="btn-reset-settings">Reset to Default</button>
         </div>
       </div>
@@ -904,12 +910,37 @@
             Tank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— Atk <strong>3</strong>, Def <strong>2</strong>, Cost <strong>8</strong> IPC &nbsp;<em>(can blitz empty territories)</em><br>
             Fighter &nbsp;&nbsp;— Atk <strong>3</strong>, Def <strong>4</strong>, Cost <strong>14</strong> IPC<br>
             Bomber &nbsp;&nbsp;&nbsp;— Atk <strong>4</strong>, Def <strong>1</strong>, Cost <strong>16</strong> IPC<br><br>
-            Rolling a <strong>1</strong> when Atk/Def ≥ 3 = <span style="color:#f59e0b;font-weight:bold">CRITICAL HIT</span> (counts as 2 hits!)
+            Rolling a <strong>1</strong> when Atk/Def ≥ 3 = <span style="color:#f59e0b;font-weight:bold">CRITICAL HIT</span> (counts as 2 hits!)<br><br>
+            Before dice resolve, you can choose <strong>Play Tactical</strong> in the battle preview
+            for a grid-based mini-battle instead of auto-resolve.
           </div>
         </div>
 
-        <!-- Step 7: Naval -->
+        <!-- Step 7: Tactical Battle -->
         <div class="tutorial-step" data-step="6">
+          <div class="tutorial-image">🎯</div>
+          <div class="tutorial-text">
+            <strong>Tactical Battle (Optional)</strong><br><br>
+            When you attack, the battle preview offers <strong>Play Tactical</strong> — a turn-based
+            skirmish on a small grid before the strategic result is applied.<br><br>
+            <strong>Goal</strong> — Wipe out all defenders <em>or</em> hold the central <strong>Town (T)</strong>
+            tile for two end turns (100% objective bar).<br><br>
+            <strong>Each turn</strong> — Every stack may <strong>move once</strong> and <strong>fire once</strong>.
+            Gold tiles = valid moves. Red tiles = enemies in range.<br><br>
+            <strong>Map key</strong> — <strong>F</strong> Field &nbsp;|&nbsp; <strong>D</strong> Road &nbsp;|&nbsp;
+            <strong>W</strong> Woods (+cover) &nbsp;|&nbsp; <strong>G</strong> Ridge (blocks line of sight) &nbsp;|&nbsp;
+            <strong>T</strong> Town<br><br>
+            <strong>Roles</strong> — Armor gets +1 damage after moving (charge). Artillery must
+            <em>deploy before firing</em> (no shot after moving). Ranged units need clear line of sight.<br>
+            Two adjacent attackers flanking a defender deal +1 damage.<br><br>
+            <strong>Controls</strong> — Click units &amp; tiles · <strong>Space</strong> fire ·
+            <strong>Tab</strong> cycle stacks · <strong>1</strong>–<strong>9</strong> select ·
+            <strong>U</strong> undo move · <strong>E</strong> end turn · <strong>Esc</strong> auto-battle instead
+          </div>
+        </div>
+
+        <!-- Step 8: Naval -->
+        <div class="tutorial-step" data-step="7">
           <div class="tutorial-image">⚓</div>
           <div class="tutorial-text">
             <strong>Naval Warfare</strong><br><br>
@@ -925,8 +956,8 @@
           </div>
         </div>
 
-        <!-- Step 8: Economy -->
-        <div class="tutorial-step" data-step="7">
+        <!-- Step 9: Economy -->
+        <div class="tutorial-step" data-step="8">
           <div class="tutorial-image">🏭</div>
           <div class="tutorial-text">
             <strong>Economy &amp; Production</strong><br><br>
@@ -941,8 +972,8 @@
           </div>
         </div>
 
-        <!-- Step 9: Diplomacy & Events -->
-        <div class="tutorial-step" data-step="8">
+        <!-- Step 10: Diplomacy & Events -->
+        <div class="tutorial-step" data-step="9">
           <div class="tutorial-image">🤝</div>
           <div class="tutorial-text">
             <strong>Diplomacy &amp; World Events</strong><br><br>
@@ -958,8 +989,8 @@
           </div>
         </div>
 
-        <!-- Step 10: Espionage & Intelligence -->
-        <div class="tutorial-step" data-step="9">
+        <!-- Step 11: Espionage & Intelligence -->
+        <div class="tutorial-step" data-step="10">
           <div class="tutorial-image">🕵️</div>
           <div class="tutorial-text">
             <strong>Espionage &amp; Covert Operations</strong><br><br>
@@ -977,8 +1008,8 @@
           </div>
         </div>
 
-        <!-- Step 11: Research & Nuclear -->
-        <div class="tutorial-step" data-step="10">
+        <!-- Step 12: Research & Nuclear -->
+        <div class="tutorial-step" data-step="11">
           <div class="tutorial-image">☢️</div>
           <div class="tutorial-text">
             <strong>Technology &amp; Nuclear Weapons</strong><br><br>
@@ -997,21 +1028,39 @@
           </div>
         </div>
 
-        <!-- Step 12: Tips -->
-        <div class="tutorial-step" data-step="11">
+        <!-- Step 13: Tactical Battles -->
+        <div class="tutorial-step" data-step="12">
+          <div class="tutorial-image">🎯</div>
+          <div class="tutorial-text">
+            <strong>Tactical Battles</strong><br><br>
+            Before dice combat, you can open a <strong>tactical grid</strong> from the battle preview.
+            Move your stacks, use cover, and fire on the mini-map for finer control.<br><br>
+            <strong>When to use it:</strong> contested assaults, capitals, and factories — the preview will highlight
+            <em>Play Tactical</em> when it matters.<br><br>
+            <strong>Rewards:</strong> clean tactical wins save casualties and boost morale on the strategic map.<br><br>
+            Press <strong>T</strong> in the preview, or click <strong>Play Tactical</strong>.
+            Press <strong>Esc</strong> inside the grid to fall back to auto-battle.
+          </div>
+        </div>
+
+        <!-- Step 14: Tips -->
+        <div class="tutorial-step" data-step="13">
           <div class="tutorial-image">⌨️</div>
           <div class="tutorial-text">
             <strong>Keyboard Shortcuts &amp; Tips</strong><br><br>
-            <strong>Enter / Space</strong> — End current phase<br>
+            <strong>Enter / Space</strong> — End current phase (strategic map)<br>
             <strong>Escape</strong> — Clear selection / open menu<br>
             <strong>Tab / Shift+Tab</strong> — Cycle through your territories<br>
             <strong>H</strong> — Open this help &nbsp;|&nbsp; <strong>F</strong> — Fit map to screen<br>
             <strong>C</strong> — Centre on capital &nbsp;|&nbsp; <strong>B</strong> — Build menu<br>
             <strong>A</strong> — Attack selected territory (combat phase)<br>
             <strong>Ctrl+S</strong> — Quick save &nbsp;|&nbsp; <strong>Ctrl+L</strong> — Quick load<br><br>
+            <strong>Tactical battle</strong> (when the grid is open):<br>
+            <strong>Space</strong> fire · <strong>E</strong> end turn · <strong>U</strong> undo move ·
+            <strong>1</strong>–<strong>9</strong> pick stack · <strong>Esc</strong> switch to auto-battle<br><br>
             <strong>Tips:</strong> Always buy infantry first — cheapest per IPC.
             Secure a factory early. Use naval transports to open second fronts.
-            Watch for diplomacy proposals from the AI!
+            Try tactical battles on key assaults for finer control. Watch for diplomacy proposals from the AI!
           </div>
         </div>
 
@@ -1030,12 +1079,14 @@
             <div class="tutorial-dot"></div>
             <div class="tutorial-dot"></div>
             <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
+            <div class="tutorial-dot"></div>
           </div>
           <button id="btn-tutorial-next" class="primary">Next →</button>
         </div>
 
         <div style="text-align: center; margin-top: 1rem;">
-          <button id="btn-skip-tutorial" style="background: transparent; border: none; color: #666; text-decoration: underline; cursor: pointer;">
+          <button id="btn-skip-tutorial" class="btn-link-muted">
             Skip Tutorial
           </button>
         </div>
@@ -1071,32 +1122,38 @@
 
     <!-- Combined Combat Modal: preview phase → battle phase in one window -->
     <div id="combat-modal" class="modal hidden">
-      <div class="modal-content" style="max-width:520px;">
+      <div class="modal-content combat-modal-content">
         <h2 id="combat-modal-title">⚔️ Battle</h2>
 
         <!-- PHASE: Preview — unit comparison + odds before committing -->
-        <div id="combat-phase-preview">
-          <div id="preview-territory" style="text-align:center; font-family:'Cinzel',serif; margin-bottom:1rem;"></div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
-            <div id="preview-attackers" style="background:rgba(37,99,235,0.1); padding:1rem; border-radius:8px;">
-              <h3 style="color:#2563eb; margin-bottom:0.5rem;">🗡️ Your Forces</h3>
-              <div id="preview-attacker-units"></div>
-              <div id="preview-attacker-power" style="margin-top:0.5rem; font-weight:bold;"></div>
+        <div id="combat-phase-preview" class="combat-preview-layout">
+          <div id="preview-territory" class="combat-preview-subtitle"></div>
+          <div class="combat-preview-forces">
+            <div id="preview-attackers" class="combat-preview-column attackers">
+              <h3>🗡️ Your Forces</h3>
+              <div id="preview-attacker-units" class="combat-preview-units"></div>
+              <div id="preview-attacker-power" class="combat-preview-power"></div>
             </div>
-            <div id="preview-defenders" style="background:rgba(220,38,38,0.1); padding:1rem; border-radius:8px;">
-              <h3 style="color:#dc2626; margin-bottom:0.5rem;">🛡️ Defenders</h3>
-              <div id="preview-defender-units"></div>
-              <div id="preview-defender-power" style="margin-top:0.5rem; font-weight:bold;"></div>
+            <div id="preview-defenders" class="combat-preview-column defenders">
+              <h3>🛡️ Defenders</h3>
+              <div id="preview-defender-units" class="combat-preview-units"></div>
+              <div id="preview-defender-power" class="combat-preview-power"></div>
             </div>
           </div>
-          <div id="preview-odds" style="text-align:center; padding:1rem; background:rgba(0,0,0,0.1); border-radius:8px; margin-bottom:1rem;">
-            <div style="font-size:1.5rem; font-weight:bold;" id="odds-display">~50%</div>
-            <div style="font-size:0.9rem; color:#666;">Estimated Victory Chance</div>
-            <div id="preview-risk-summary" class="preview-risk-summary even"></div>
+          <div id="preview-odds" class="preview-odds-panel combat-preview-odds">
+            <div class="preview-odds-top">
+              <div id="odds-display" class="preview-odds-pct">~50%</div>
+              <div class="preview-odds-meta">
+                <div class="preview-odds-caption">Estimated Victory Chance</div>
+                <div id="preview-risk-summary" class="preview-risk-summary even compact"></div>
+              </div>
+            </div>
+            <div id="preview-consequence-summary" class="preview-consequence-summary compact"></div>
+            <div id="preview-swing-factors" class="preview-swing-factors compact"></div>
           </div>
-          <div style="text-align:center;">
+          <div class="combat-preview-actions">
             <button id="btn-confirm-attack" class="primary">Auto Battle</button>
-            <button id="btn-play-tactical" style="background:linear-gradient(135deg,#2563eb,#14b8a6);color:#fff;">Play Tactical</button>
+            <button id="btn-play-tactical" class="btn-play-tactical">Play Tactical</button>
             <button id="btn-cancel-attack">Cancel</button>
           </div>
         </div>
@@ -1124,7 +1181,7 @@
           <div id="combat-log"></div>
           <div style="text-align:center; display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
             <button id="btn-roll-combat" class="primary">🎲 Roll Dice</button>
-            <button id="btn-auto-resolve" style="background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;">⚡ Auto-Resolve</button>
+            <button id="btn-auto-resolve" class="btn-auto-resolve">⚡ Auto-Resolve</button>
             <button id="btn-retreat" disabled>🏃 Retreat</button>
             <button id="btn-close-combat" disabled>✓ Continue</button>
           </div>

@@ -14,6 +14,9 @@ export class MinimapController {
   private ctx: CanvasRenderingContext2D | null = null;
   private threatMode: boolean = false;
   private getActiveCombat: () => CombatState | null;
+  private lastRenderAt = 0;
+  private renderQueued = false;
+  private forceRender = false;
 
   constructor(
     private state: GameState,
@@ -78,8 +81,29 @@ export class MinimapController {
     this.render();
   }
 
+  markDirty(): void {
+    this.forceRender = true;
+    this.render();
+  }
+
   render(): void {
     if (!this.ctx || !this.canvas) return;
+
+    const now = performance.now();
+    const isLarge = this.state.territories.size >= 400;
+    const minInterval = isLarge ? 220 : 80;
+    if (!this.forceRender && now - this.lastRenderAt < minInterval) {
+      if (!this.renderQueued) {
+        this.renderQueued = true;
+        requestAnimationFrame(() => {
+          this.renderQueued = false;
+          this.render();
+        });
+      }
+      return;
+    }
+    this.forceRender = false;
+    this.lastRenderAt = now;
 
     const ctx = this.ctx;
     const w = this.canvas.width;

@@ -74,7 +74,7 @@ export class MobilizationSystem {
     // Determine territory type and what it produces
     if (territory.hasFactory && !territory.isFactoryDisabled(this.state.turnNumber)) {
       type = 'factory';
-      cost = 12;
+      cost = 11;
       units = [
         { unitTypeId: 'tank', count: 1 },
         { unitTypeId: 'artillery', count: 1 },
@@ -82,7 +82,7 @@ export class MobilizationSystem {
       ];
     } else if (territory.isCapital) {
       type = 'capital';
-      cost = 10;
+      cost = 9;
       units = [
         { unitTypeId: 'infantry', count: 3 },
         { unitTypeId: 'tank', count: 1 },
@@ -90,7 +90,7 @@ export class MobilizationSystem {
       ];
     } else if (territory.type === 'coastal') {
       type = 'coastal';
-      cost = 10;
+      cost = 9;
       // Check if adjacent to sea - if so, can produce naval
       const hasSeaAccess = territory.adjacentTo.some(adjId => {
         const adj = this.state.territories.get(adjId);
@@ -110,7 +110,7 @@ export class MobilizationSystem {
       }
     } else {
       type = 'land';
-      cost = 5;
+      cost = 4;
       units = [
         { unitTypeId: 'infantry', count: 2 }
       ];

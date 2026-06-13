@@ -56,6 +56,9 @@ export interface CombatState {
   winner: "attacker" | "defender" | "draw" | null;
   /** +1 attack bonus when attackers converge from multiple territories */
   flankingBonus?: number;
+  /** Resolved via tactical mini-battle (player grid or AI assault doctrine) */
+  resolvedTactically?: boolean;
+  tacticalCleanWin?: boolean;
 }
 
 export interface BombardmentResult {

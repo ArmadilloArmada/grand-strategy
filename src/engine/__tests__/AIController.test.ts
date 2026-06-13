@@ -394,6 +394,6 @@ describe('AIController mobilization planning', () => {
 
     expect(mobilizationSystem.wasMobilized('threatened_front')).toBe(true);
     expect(mobilizationSystem.wasMobilized('safe_factory')).toBe(false);
-    expect(axis.ipcs).toBe(7);
+    expect(axis.ipcs).toBe(8);
   });
 });

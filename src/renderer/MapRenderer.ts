@@ -308,10 +308,10 @@ export class MapRenderer {
   private drawFrame(): void {
     if (this.state.territories.size === 0) return;
 
-    // Rebuild static layer when dirty or when camera moved since last build
-    const cameraChanged = this.scale !== this.staticLastScale
-      || this.offsetX !== this.staticLastOffsetX
+    const scaleChanged = this.scale !== this.staticLastScale;
+    const panChanged = this.offsetX !== this.staticLastOffsetX
       || this.offsetY !== this.staticLastOffsetY;
+    const cameraChanged = scaleChanged || panChanged;
     if (this.staticDirty || cameraChanged) {
       this.rebuildStaticLayer();
     }
@@ -1238,11 +1238,40 @@ export class MapRenderer {
    * Draw per-interaction and per-animation overlays on top of the static layer.
    * Called every frame during the animation loop — must be cheap.
    */
+  /** Territories that need per-frame overlay work (avoids O(n) scan on mega maps). */
+  private getOverlayTerritoryIds(): Set<string> | null {
+    if (!this.isLargeMap()) return null;
+
+    const ids = new Set<string>();
+    if (this.state.selectedTerritoryId) ids.add(this.state.selectedTerritoryId);
+    if (this.hoveredTerritoryId) ids.add(this.hoveredTerritoryId);
+    for (const id of this.validMoveTargets) ids.add(id);
+    for (const id of this.attackTargets) ids.add(id);
+    for (const id of this.mobilizableTargets) ids.add(id);
+    for (const id of this.mobilizedTargets) ids.add(id);
+    for (const id of this.captureAnimations.keys()) ids.add(id);
+    for (const id of this.aiPulseTerritories.keys()) ids.add(id);
+
+    if (this.options.highlightValidMoves && this.validMoveTargets.size > 0) {
+      for (const id of this.validMoveTargets) {
+        this.state.territories.get(id)?.adjacentTo.forEach(adj => ids.add(adj));
+      }
+      if (this.state.selectedTerritoryId) {
+        this.state.territories.get(this.state.selectedTerritoryId)?.adjacentTo.forEach(adj => ids.add(adj));
+      }
+    }
+    return ids;
+  }
+
   private drawDynamicTerritoryOverlays(): void {
     const selectedId = this.state.selectedTerritoryId;
     const currentFaction = this.state.getCurrentFaction();
+    const overlayIds = this.getOverlayTerritoryIds();
+    const territories = overlayIds
+      ? [...overlayIds].map(id => this.state.territories.get(id)).filter((t): t is Territory => !!t)
+      : [...this.state.territories.values()];
 
-    for (const territory of this.state.territories.values()) {
+    for (const territory of territories) {
       const polygon = territory.polygon;
       if (polygon.length < 3) continue;
       const isSea = territory.isSea();

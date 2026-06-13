@@ -114,6 +114,8 @@ export interface GameConfig {
   fogOfWar: boolean;
   autoSave: boolean;
   simpleMode: boolean;
+  /** Streamlined first-game coaching (Simple Campaign quick start). */
+  guidedOnboarding?: boolean;
   phaseTimerSeconds: number; // 0 = disabled; max seconds per phase (human only)
   
   // Tracking

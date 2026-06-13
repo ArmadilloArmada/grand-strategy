@@ -298,7 +298,7 @@ export class HUD {
     document.body.appendChild(popup);
     
     // Play sound
-    soundManager.play('victory');
+    soundManager.play('achievement');
     
     // Visual celebration
     visualEffects.confetti(window.innerWidth / 2, window.innerHeight * 0.3, 40);
@@ -587,11 +587,21 @@ export class HUD {
       // Skip modals that are non-dismissable (e.g. combat modal while active)
       const isCombat = modal.id === 'combat-modal';
 
+      const dismissModal = (): void => {
+        const closeBtn = modal.querySelector<HTMLElement>(
+          '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+        );
+        if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+          closeBtn.click();
+          return;
+        }
+        modal.classList.add('hidden');
+      };
+
       // Backdrop click: clicking the overlay (not the content) closes the modal
       modal.addEventListener('click', (e) => {
         if (e.target !== modal) return;
-        const closeBtn = modal.querySelector<HTMLElement>('[id^="btn-close"]');
-        closeBtn?.click();
+        dismissModal();
       });
 
       // Inject a sticky × close button only when the existing close button is a
@@ -605,8 +615,9 @@ export class HUD {
           xBtn.className = 'modal-x-close';
           xBtn.textContent = '×';
           xBtn.setAttribute('aria-label', 'Close');
-          xBtn.addEventListener('click', () => {
-            existingClose?.click();
+          xBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismissModal();
           });
           content.insertBefore(xBtn, content.firstChild);
         }
@@ -875,9 +886,17 @@ export class HUD {
     if (modalOpen) {
       // Escape closes the frontmost modal
       if (key === 'Escape') {
-        const openModal = document.querySelector('.modal:not(.hidden)');
-        const closeBtn = openModal?.querySelector<HTMLElement>('[id^="btn-close"]');
-        closeBtn?.click();
+        const openModal = document.querySelector<HTMLElement>('.modal:not(.hidden)');
+        if (openModal && openModal.id !== 'main-menu-modal') {
+          const closeBtn = openModal.querySelector<HTMLElement>(
+            '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+          );
+          if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+            closeBtn.click();
+          } else {
+            openModal.classList.add('hidden');
+          }
+        }
       }
       return;
     }
@@ -931,7 +950,9 @@ export class HUD {
         return;
       }
       
-      const owner = territory.owner ? this.state.factionRegistry.get(territory.owner)?.name : 'Neutral';
+      const owner = territory.owner
+        ? (this.state.factionRegistry.get(territory.owner)?.name ?? territory.owner)
+        : 'Neutral';
       const unitCount = territory.getTotalUnitCount();
       const badges: string[] = [];
       if (territory.isCapital) badges.push('⭐ Capital');
@@ -1008,18 +1029,18 @@ export class HUD {
       if (adjacentEnemies > 0) strategicTags.push(`${adjacentEnemies} enemy border${adjacentEnemies === 1 ? '' : 's'}`);
       if (adjacentFriendlies > 1) strategicTags.push(`${adjacentFriendlies} friendly links`);
       const strategicLine = strategicTags.length
-        ? `<div style="margin-top:0.35rem;font-size:0.78rem;color:#bfdbfe;">${strategicTags.map(tag => this.escapeHtml(tag)).join(' · ')}</div>`
+        ? `<div class="territory-tooltip-tags">${strategicTags.map(tag => this.escapeHtml(tag)).join(' · ')}</div>`
         : '';
 
       const unitBreakdown = showUnits
         ? (territory.units.length > 0
-            ? territory.units.map(u => {
+            ? `<div class="territory-unit-list">${territory.units.map(u => {
                 const icon = UNIT_ICONS[u.unitTypeId] || '⬜';
                 const name = this.state.unitRegistry.get(u.unitTypeId)?.name ?? u.unitTypeId;
-                return `<span style="white-space:nowrap">${icon} ${u.count}× ${name}</span>`;
-              }).join('&nbsp;&nbsp;')
-            : 'None')
-        : '<span style="color:#888">🌫️ Hidden by fog of war</span>';
+                return `<span class="territory-unit-chip">${icon} ${u.count}× ${this.escapeHtml(name)}</span>`;
+              }).join('')}</div>`
+            : '<span class="territory-tooltip-muted">None</span>')
+        : '<span class="territory-tooltip-muted">🌫️ Hidden by fog of war</span>';
 
       const tooltipCommander = showUnits
         ? territory.units.find((u: any) => u.commander)?.commander
@@ -1030,7 +1051,7 @@ export class HUD {
 
       const ownerHistory = this.state.ownershipHistory.get(territory.id) ?? [];
       const historyLine = ownerHistory.length > 0
-        ? `<div style="margin-top:0.35rem;font-size:0.75rem;color:#9ca3af;">
+        ? `<div class="territory-tooltip-history">
             📜 Previously: ${[...ownerHistory].reverse().slice(0, 3).map(h => {
               const f = this.state.factionRegistry.get(h.factionId);
               return `<span style="color:${f?.color ?? '#aaa'}">${f?.name ?? h.factionId}</span> (T${h.turnNumber})`;
@@ -1039,11 +1060,12 @@ export class HUD {
         : '';
 
       content.innerHTML = `
-        <strong>${territory.name}</strong><br>
-        Owner: ${owner}<br>
-        IPC value: ${territory.production}<br>
-        Units (${showUnits ? unitCount : '?'}): ${unitBreakdown}
-        ${badges.length ? '<br>' + badges.join(' • ') : ''}
+        <div class="territory-tooltip-title">${this.escapeHtml(territory.name)}</div>
+        <div class="territory-tooltip-row"><span>Owner</span><strong>${this.escapeHtml(owner)}</strong></div>
+        <div class="territory-tooltip-row"><span>IPC value</span><strong>${territory.production}</strong></div>
+        <div class="territory-tooltip-units-label">Units (${showUnits ? unitCount : '?'})</div>
+        ${unitBreakdown}
+        ${badges.length ? `<div class="territory-tooltip-badges">${badges.join(' · ')}</div>` : ''}
         ${commanderLine}
         ${strategicLine}
         ${historyLine}
@@ -1085,6 +1107,34 @@ export class HUD {
       }
       if (data.territoryId) {
         this.renderer.setAIPulseTerritory(data.territoryId);
+      }
+    });
+    this.state.on('tactical_assault_start', (e) => {
+      const data = e.data as { territoryId?: string; territoryName?: string };
+      soundManager.play('tactical_start');
+      soundManager.playMusic('tactical_combat');
+      if (data.territoryId) {
+        this.renderer.setAIPulseTerritory(data.territoryId);
+        const territory = this.state.territories.get(data.territoryId);
+        if (territory) {
+          const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+          visualEffects.shake(0.25);
+          visualEffects.muzzleFlash(screen.x, screen.y);
+        }
+      }
+    });
+    this.state.on('combat_start', (e) => {
+      const combat = (e.data as { combat?: { territoryId: string; attackingFactionId: string; defendingFactionId: string } })?.combat;
+      if (!combat) return;
+      const humanIds = new Set(this.state.factionRegistry.getAll().filter(f => f.controlledBy === 'human').map(f => f.id));
+      if (!humanIds.has(combat.attackingFactionId) && !humanIds.has(combat.defendingFactionId)) return;
+      soundManager.play('combat_start');
+      soundManager.playMusic('combat');
+      const territory = this.state.territories.get(combat.territoryId);
+      if (territory) {
+        const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+        visualEffects.shake(0.35);
+        visualEffects.muzzleFlash(screen.x, screen.y);
       }
     });
     this.state.on('combat_end', (e) => this.onCombatEnd(e));
@@ -1190,6 +1240,13 @@ export class HUD {
 
     const combat = data.combat;
     if (!combat) return;
+
+    if (data.retreated) {
+      soundManager.play('retreat');
+      soundManager.playMusic('gameplay');
+    } else {
+      soundManager.playMusic('gameplay');
+    }
 
     const territory = this.state.territories.get(combat.territoryId);
     const faction = this.state.getCurrentFaction();
@@ -1421,10 +1478,17 @@ export class HUD {
       const size = result.attackerCriticals > 0 ? 28 : 20;
       const label = result.attackerCriticals > 0 ? `💥 -${result.attackerHits}` : `-${result.attackerHits}`;
       visualEffects.floatText(screen.x + jitter(), screen.y - 20 + jitter(), label, color, size);
+      soundManager.play(result.attackerCriticals > 0 ? 'explosion' : 'hit');
+      visualEffects.muzzleFlash(screen.x - 12, screen.y - 8, color);
+      if (result.attackerCriticals > 0) visualEffects.shake(0.5);
+    } else {
+      soundManager.play('miss');
     }
     if (result.defenderHits > 0) {
       const color = this.state.factionRegistry.get(combat.defendingFactionId)?.color ?? '#4488ff';
       visualEffects.floatText(screen.x + jitter(), screen.y + 20 + jitter(), `-${result.defenderHits}`, color, 20);
+      soundManager.play('hit');
+      visualEffects.muzzleFlash(screen.x + 12, screen.y + 8, color);
     }
   }
 
@@ -1680,10 +1744,14 @@ export class HUD {
     // Check if phase should be auto-skipped (nothing to do)
     if (faction?.controlledBy === 'human') {
       this.checkAutoSkipPhase(phase, faction);
-      // One-time hint about the Enter shortcut to end phases
-      this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
-      const firstTurnTip = this.phaseGuidance.getFirstTurnTip(this.state.turnNumber, phase);
-      if (firstTurnTip) this.showFirstTimeTip(firstTurnTip.tipId, firstTurnTip.message);
+      const guided = this.gameConfig.guidedOnboarding && this.state.turnNumber === 1;
+      if (!guided) {
+        this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
+      }
+      if (!this.gameConfig.guidedOnboarding || this.state.turnNumber > 1) {
+        const firstTurnTip = this.phaseGuidance.getFirstTurnTip(this.state.turnNumber, phase);
+        if (firstTurnTip) this.showFirstTimeTip(firstTurnTip.tipId, firstTurnTip.message);
+      }
     }
   }
   
@@ -1753,7 +1821,11 @@ export class HUD {
     // Start the animation loop so the selection glow animates
     this.renderer.startContinuousRender();
 
-    if (!territoryId) return;
+    if (!territoryId) {
+      this.updateValidMoves();
+      this.updateStrategicAdvisor();
+      return;
+    }
 
     const phase = this.state.currentPhase;
     const faction = this.state.getCurrentFaction();
@@ -2260,8 +2332,7 @@ export class HUD {
 
         this.stopTurnTimer();
 
-        // First-time tips
-        if (this.state.turnNumber === 1) {
+        if (this.state.turnNumber === 1 && !this.gameConfig.guidedOnboarding) {
           this.showFirstTimeTip('turn_start', 'Click territories to select them, then use the action bar at the bottom');
           this.showFirstWarRoom(faction.id);
         }
@@ -2743,6 +2814,10 @@ export class HUD {
       if (detailsEl) {
         detailsEl.innerHTML = this.buildFactionSummaryHtml();
       }
+      this.renderer.clearValidMoveTargets();
+      this.validMoves = [];
+      this.selectedUnitType = null;
+      this.updateMapReadabilityLegend();
       this.updateActionButtons();
       return;
     }
@@ -3563,13 +3638,10 @@ export class HUD {
       const isNext = idx === (currentIdx + 1) % factions.length;
       const statusClass = isCurrent ? 'current' : (isNext ? 'next' : '');
       const displayName = isCurrent ? faction.name : faction.name.split(' ')[0];
-      const dotStyle = isCurrent
-        ? `background:${faction.color};box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;`
-        : `background:${faction.color};`;
 
       html += `
         <div class="turn-order-item ${statusClass}" title="${faction.name}">
-          <div class="turn-order-dot" style="${dotStyle}"></div>
+          <div class="faction-emblem turn-order-emblem" data-faction="${faction.id}" style="--faction-color:${faction.color};${isCurrent ? `box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;` : ''}"></div>
           <span>${displayName}</span>
         </div>
       `;
@@ -3610,7 +3682,7 @@ export class HUD {
 
       html += `
         <div class="faction-row ${isCurrent ? 'current' : ''} ${isDefeated ? 'defeated' : ''}">
-          <div class="faction-color" style="background: ${color};"></div>
+          <div class="faction-emblem faction-panel-emblem" data-faction="${faction.id}" style="--faction-color:${color};"></div>
           <div class="faction-info">
             <div class="faction-name">${faction.name}</div>
             <div class="faction-bars">

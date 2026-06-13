@@ -39,6 +39,7 @@ export interface SystemRegistry {
     getIncomeModifier?(factionId: string): number;
     recordCasualties?(factionId: string, count: number): void;
     recordVictory?(factionId: string, isCapital?: boolean, hasFactory?: boolean): void;
+    recordTacticalVictory?(factionId: string, cleanWin?: boolean): void;
   };
   espionageSystem?: {
     tick?(): void;
@@ -122,7 +123,8 @@ export type GameEventType =
   | 'espionage_result'
   | 'objective_reward'
   | 'tension_level_change'
-  | 'fortification_built';
+  | 'fortification_built'
+  | 'tactical_assault_start';
 
 export interface GameEvent {
   type: GameEventType;
