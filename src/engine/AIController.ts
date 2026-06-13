@@ -229,6 +229,14 @@ export class AIController {
     const faction = this.state.getCurrentFaction();
     if (!faction || faction.controlledBy !== "ai") return;
 
+    if (this.turnManager.getTurnStyle() === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      await this.executeSingleMove();
+      await this.delay(400);
+      this.turnManager.passMoveForMoveTurn();
+      this.emitPerf('aiTurnMs', performance.now() - perfStart, { factionId: faction.id, mode: 'single_move' });
+      return;
+    }
+
     if (this.hasBehavior('random_focus')) this.applyRandomFocusModifiers();
     if (this.hasBehavior('historical_priorities') || this.hasBehavior('faction_specific')) {
       this.applyHistoricalPriorities(faction.id);
@@ -254,8 +262,34 @@ export class AIController {
       if (this.state.getCurrentFaction()?.id !== faction.id) break;
       this.turnManager.advancePhase();
       await this.delay(400);
+      if (this.turnManager.getTurnStyle() === 'move_for_move') break;
     }
     this.emitPerf('aiTurnMs', performance.now() - perfStart, { factionId: faction.id });
+  }
+
+  /**
+   * Move-for-move: commit and resolve a single move or attack, then pass the turn.
+   */
+  async executeSingleMove(): Promise<void> {
+    const faction = this.state.getCurrentFaction();
+    if (!faction || faction.controlledBy !== 'ai') return;
+
+    this.mobilizationSystem.resetForNewTurn();
+    const workerPromise = this.runWorkerEvaluation(faction.id);
+    const evaluations = this.evaluateAllTerritories();
+    await workerPromise;
+
+    const pendingBefore = this.state.pendingMoves.length;
+    this.handleCombatMovePhase(evaluations, { maxMoves: 1 });
+
+    if (this.state.pendingMoves.length > pendingBefore) {
+      await this.handleCombatPhase();
+      return;
+    }
+
+    if (this.handleSingleNonCombatMove(evaluations)) return;
+
+    this.state.emit('ai_thinking', { message: 'No moves available — passing', action: 'pass' });
   }
 
   /** Clean up Worker when no longer needed */
@@ -805,7 +839,12 @@ export class AIController {
   /**
    * Combat movement — personality-aware attack planning via calculateAttackPriority
    */
-  private handleCombatMovePhase(evaluations: Map<string, TerritoryEvaluation>): void {
+  private handleCombatMovePhase(
+    evaluations: Map<string, TerritoryEvaluation>,
+    options?: { maxMoves?: number },
+  ): void {
+    const maxMoves = options?.maxMoves ?? Number.POSITIVE_INFINITY;
+    let movesCommitted = 0;
     const faction = this.state.getCurrentFaction();
     if (!faction) return;
 
@@ -919,6 +958,7 @@ export class AIController {
     };
 
     for (const plan of plans) {
+      if (movesCommitted >= maxMoves) break;
       const minSuccess = behaviorMinSuccess;
       if (plan.expectedSuccess < minSuccess) {
         recordPlan(plan, "rejected", `success ${Math.round(plan.expectedSuccess * 100)}% below minimum ${Math.round(minSuccess * 100)}%`);
@@ -947,6 +987,7 @@ export class AIController {
       let totalCommitted = 0;
 
       for (const att of plan.attackers) {
+        if (movesCommitted >= maxMoves) break;
         const available = this.movementValidator.getAvailableUnits(att.fromId, att.unitTypeId);
         const toMove = Math.min(att.count, available);
         if (toMove > 0) {
@@ -959,6 +1000,7 @@ export class AIController {
           });
           usedUnits.add(`${att.fromId}-${att.unitTypeId}`);
           totalCommitted += toMove;
+          movesCommitted++;
         }
       }
 
@@ -970,6 +1012,7 @@ export class AIController {
           territory: target.name,
           territoryId: target.id,
         });
+        if (movesCommitted >= maxMoves) break;
       } else {
         recordPlan(plan, "rejected", "no available units remained");
       }
@@ -983,6 +1026,71 @@ export class AIController {
       plans: debugPlans,
       chosenCount: debugPlans.filter(plan => plan.status === "chosen").length,
     } satisfies AIDebugSnapshot);
+  }
+
+  private handleSingleNonCombatMove(evaluations: Map<string, TerritoryEvaluation>): boolean {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return false;
+
+    const ourTerritories = Array.from(evaluations.values())
+      .filter(e => e.territory.owner === faction.id)
+      .sort((a, b) => b.threatLevel - a.threatLevel);
+
+    const keepHome = this.hasBehavior('maximum_defense') ? 6
+      : this.hasBehavior('fortify_borders') ? 4
+      : this.personality.defense > 0.7 ? 3 : 2;
+
+    const excess: { territoryId: string; unitTypeId: string; count: number }[] = [];
+    for (const eval_ of ourTerritories) {
+      if (eval_.defenseStrength > eval_.threatLevel * 2 && eval_.threatLevel < 20) {
+        for (const pu of eval_.territory.units) {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          if (!ut || ut.domain !== "land") continue;
+          const extra = Math.max(0, pu.count - keepHome);
+          if (extra > 0) excess.push({ territoryId: eval_.territory.id, unitTypeId: pu.unitTypeId, count: extra });
+        }
+      }
+    }
+
+    const threatThreshold = this.hasBehavior('maximum_defense') ? 1
+      : this.hasBehavior('analyze_threats') ? 3
+      : this.hasBehavior('fortify_borders') ? 5
+      : this.personality.defense > 0.7 ? 5 : 10;
+
+    for (const threatened of ourTerritories) {
+      if (threatened.threatLevel < threatThreshold) continue;
+      if (threatened.defenseStrength > threatened.threatLevel * 1.5) continue;
+
+      for (const ex of excess) {
+        if (ex.count <= 0) continue;
+        const validMoves = this.movementValidator.getValidMoves(ex.unitTypeId, ex.territoryId, false);
+        const moveToward = validMoves.find(m =>
+          m.territoryId === threatened.territory.id ||
+          threatened.territory.adjacentTo.includes(m.territoryId)
+        );
+        if (moveToward) {
+          const available = this.movementValidator.getAvailableUnits(ex.territoryId, ex.unitTypeId);
+          const toMove = Math.min(ex.count, available);
+          if (toMove > 0) {
+            this.movementValidator.executeMove({
+              unitTypeId: ex.unitTypeId,
+              count: toMove,
+              fromTerritoryId: ex.territoryId,
+              toTerritoryId: moveToward.territoryId,
+              path: moveToward.path,
+            });
+            this.state.emit("ai_thinking", {
+              message: `Reinforcing ${this.state.territories.get(moveToward.territoryId)?.name ?? moveToward.territoryId}`,
+              action: 'move',
+              territoryId: moveToward.territoryId,
+            });
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   private generateAttackPlans(

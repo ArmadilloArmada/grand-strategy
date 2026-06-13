@@ -14,7 +14,8 @@ export type TurnStyle =
   | 'spectator'    // Pause between each AI turn
   | 'action'       // Pause after every move/attack
   | 'civilization' // Each unit moves OR attacks once per turn
-  | 'chess';       // One action per turn, alternating
+  | 'chess'        // One action per turn, alternating
+  | 'move_for_move'; // All factions build, then alternate one move at a time
 
 export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: string; icon: string }> = {
   quick: {
@@ -46,6 +47,11 @@ export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: str
     name: 'Chess',
     description: 'One action per turn, then opponent goes. Pure tactics!',
     icon: '♟️'
+  },
+  move_for_move: {
+    name: 'Move for Move',
+    description: 'Your build phase, then everyone alternates one move at a time, then collect income.',
+    icon: '↔️'
   }
 };
 

@@ -65,6 +65,7 @@ import {
 } from './hud/ActionButtonState';
 import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
 import { isAttackMovePhase, isMovementPhase } from './hud/PhaseHelpers';
+import { MoveForMoveHUD, buildMoveForMoveView } from './hud/MoveForMoveHUD';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -86,6 +87,8 @@ export class HUD {
   private phaseGuidance!: PhaseGuidance;
   private turnRecapPanel!: TurnRecapPanel;
   private abilityPanel!: AbilityPanel;
+  private moveForMoveHUD = new MoveForMoveHUD();
+  private moveForMovePassBound = false;
 
   // Current UI state
   private selectedUnitType: string | null = null;
@@ -165,6 +168,7 @@ export class HUD {
     private renderer: MapRenderer
   ) {
     this.movementValidator = new MovementValidator(state);
+    this.turnManager.setMovementValidator(this.movementValidator);
     this.productionManager = new ProductionManager(state);
     state.systems.reserveSystem = this.productionManager.getReserveSystem();
     this.mobilizationSystem = new MobilizationSystem(state);
@@ -180,6 +184,7 @@ export class HUD {
       updateFactionPanel: () => this.updateFactionPanel(),
       updateSelectionInfo: () => this.updateSelectionInfo(),
       updateActionButtons: () => this.updateActionButtons(),
+      afterUnitAction: () => this.handleMoveForMovePass(),
     };
     this.combatUI = new CombatUI(state, renderer, this.combatResolver, combatCallbacks);
 
@@ -307,6 +312,37 @@ export class HUD {
     setTimeout(() => popup.remove(), 4000);
   }
 
+  private ensureMoveForMovePassListener(): void {
+    if (this.moveForMovePassBound) return;
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('#btn-mfm-pass')) {
+        this.onMoveForMovePassClick();
+      }
+    });
+    this.moveForMovePassBound = true;
+  }
+
+  private onMoveForMovePassClick(): void {
+    if (this.gameConfig.turnStyle !== 'move_for_move') return;
+    if (!this.turnManager.isMoveForMoveSegmentActive()) return;
+    const faction = this.state.getCurrentFaction();
+    if (faction?.controlledBy !== 'human') return;
+
+    this.showToast('Passing move to the next player…', 'info');
+    this.handleMoveForMovePass();
+  }
+
+  private syncMoveForMoveChrome(): void {
+    const isMfm = this.gameConfig.turnStyle === 'move_for_move';
+    this.moveForMoveHUD.setEnabled(isMfm);
+    if (!isMfm) return;
+
+    this.moveForMoveHUD.mount();
+    const view = buildMoveForMoveView(this.state, this.turnManager);
+    this.moveForMoveHUD.render(view);
+  }
+
   /**
    * Setup DOM event listeners
    */
@@ -328,6 +364,7 @@ export class HUD {
     document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
     document.getElementById('btn-end-phase')?.addEventListener('click', () => this.onEndPhaseClick());
+    this.ensureMoveForMovePassListener();
 
     // Help button
     document.getElementById('help-button')?.addEventListener('click', () => this.showTutorial());
@@ -1395,6 +1432,22 @@ export class HUD {
         setTimeout(() => this.showToast(`💬 ${taunt}`, 'info'), 1200);
       }
     }
+
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      setTimeout(() => this.handleMoveForMovePass(), 400);
+    }
+  }
+
+  /** Pass the turn to the next faction after a single move in move-for-move mode. */
+  private handleMoveForMovePass(): void {
+    if (this.gameConfig.turnStyle !== 'move_for_move') return;
+    if (!this.turnManager.isMoveForMoveSegmentActive()) return;
+    this.turnManager.passMoveForMoveTurn();
+    this.updateTurnInfo();
+    this.updatePhaseInfo();
+    this.updateActionButtons();
+    this.renderer.render();
+    this.renderMinimap();
   }
 
   /**
@@ -2037,6 +2090,9 @@ export class HUD {
       const movedDomain = this.state.unitRegistry.get(unitsToMove[0]?.unitTypeId)?.domain ?? 'land';
       soundManager.play(movedDomain === 'sea' ? 'naval_horn' : movedDomain === 'air' ? 'aircraft' : 'move');
     }
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      this.showToast('Move complete — next player\'s turn', 'info');
+    }
     const recap = this.ensureTurnRecap(faction.id);
     recap.unitsMoved += totalMoved;
     battleLog.logMove(this.state.turnNumber, faction.name, faction.color, `${totalMoved} units moved to ${toTerritory.name}; ready next turn.`);
@@ -2057,6 +2113,10 @@ export class HUD {
     this.updateActionButtons();
     this.updateUndoButton();
     this.updateStrategicAdvisor();
+
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      this.handleMoveForMovePass();
+    }
   }
 
   /**
@@ -2520,17 +2580,20 @@ export class HUD {
    */
   updatePhaseInfo(): void {
     this.syncSimpleModeChrome();
+    this.syncMoveForMoveChrome();
     const phaseEl = document.getElementById('current-phase');
     const phase = this.state.currentPhase;
     
-    if (phaseEl) {
+    if (phaseEl && this.gameConfig.turnStyle !== 'move_for_move') {
       phaseEl.textContent = this.gameConfig.simpleMode
         ? this.getSimplePhaseLabel(phase)
         : this.turnManager.getPhaseDisplayName();
     }
 
     // Update phase progress indicator
-    this.updatePhaseProgress(phase);
+    if (this.gameConfig.turnStyle !== 'move_for_move') {
+      this.updatePhaseProgress(phase);
+    }
     
     this.updateActionButtons();
     this.renderer.clearValidMoveTargets();
@@ -3256,16 +3319,25 @@ export class HUD {
 
     // End Phase button — show next phase name and keyboard hint
     if (endBtn) {
+      const mfmView = this.gameConfig.turnStyle === 'move_for_move'
+        ? buildMoveForMoveView(this.state, this.turnManager)
+        : null;
       const endState = getEndPhaseButtonState({
         isEndPhase,
-        nextLabel: this.getNextPhaseLabel(phaseStr),
+        nextLabel: mfmView?.endButtonLabel ?? this.getNextPhaseLabel(phaseStr),
         isHumanTurn,
         noPendingMoves: this.state.pendingMoves.length === 0,
         noActiveCombat: !this.combatUI.getActiveCombat(),
         noSelection: !this.state.selectedTerritoryId,
       });
-      endBtn.innerHTML = endState.labelHtml;
+      endBtn.innerHTML = mfmView
+        ? `${isEndPhase ? '✓' : '➡️'} ${mfmView.endButtonLabel} <kbd class="kbd-hint">↵</kbd>`
+        : endState.labelHtml;
       endBtn.classList.toggle('btn-end-phase-pulse', endState.shouldPulse);
+    }
+
+    if (this.gameConfig.turnStyle === 'move_for_move') {
+      this.syncMoveForMoveChrome();
     }
 
     // Shortcut badge on Build button
@@ -3296,6 +3368,7 @@ export class HUD {
   private getNextPhaseLabel(currentPhase: string): string {
     const sequences: Record<string, string[]> = {
       quick: ['build', 'move', 'attack', 'end'],
+      move_for_move: ['build', 'move', 'end'],
       classic: ['purchase', 'combat_move', 'combat', 'noncombat_move', 'production', 'collect_income'],
       simple: ['move', 'attack', 'build', 'collect_income'],
       civilization: ['orders', 'resolve'],
@@ -3458,7 +3531,7 @@ export class HUD {
 
     if (attackTargets.length === 1) {
       this.combatUI.showBattlePreview(fromId, attackTargets[0].territoryId);
-      if (this.gameConfig.simpleMode) {
+      if (this.gameConfig.simpleMode && this.gameConfig.turnStyle !== 'move_for_move') {
         this.combatUI.confirmAttackFromPreview(true);
       }
     } else {
@@ -3507,8 +3580,8 @@ export class HUD {
   private onEndPhaseClick(): void {
     const phase = this.state.currentPhase as string;
 
-    // Execute pending moves at end of movement phases
-    if (phase === 'noncombat_move' || phase === 'move') {
+    // Execute pending moves at end of movement phases (classic queue — not move-for-move)
+    if ((phase === 'noncombat_move' || phase === 'move') && this.gameConfig.turnStyle !== 'move_for_move') {
       this.movementValidator.executeAllPendingMoves();
     }
 

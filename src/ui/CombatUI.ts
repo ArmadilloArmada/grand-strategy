@@ -23,6 +23,7 @@ export interface CombatCallbacks {
   updateFactionPanel(): void;
   updateSelectionInfo(): void;
   updateActionButtons(): void;
+  afterUnitAction?: () => void;
 }
 
 export interface BattlePreviewStats {
@@ -1168,12 +1169,14 @@ export class CombatUI {
       toTerritory.units = [];
       for (const au of attackingUnits) {
         toTerritory.addUnits(au.unitTypeId, au.count);
+        toTerritory.markUnitsActed(au.unitTypeId, au.count);
       }
       this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
       soundManager.play('capture');
       battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
       this.renderer.render();
       this.callbacks.renderMinimap();
+      this.callbacks.afterUnitAction?.();
       return;
     }
 

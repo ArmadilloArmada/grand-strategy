@@ -43,6 +43,10 @@ export function getPhasesForStyle(style: TurnStyle): string[] {
       // Chess-style: one action then opponent goes
       return ["action"];
 
+    case "move_for_move":
+      // Shared build → alternating moves → shared income
+      return ["build", "move", "end"];
+
     default:
       return [
         "purchase",
@@ -113,6 +117,11 @@ export function isMoveOrAttackOnly(style: TurnStyle): boolean {
   return style === "civilization";
 }
 
+/** Alternating single-move segment during the shared move phase */
+export function isMoveForMoveStyle(style: TurnStyle): boolean {
+  return style === "move_for_move";
+}
+
 /**
  * Get phase tips for players
  */
@@ -145,6 +154,17 @@ export function getPhaseTip(phase: string, style: TurnStyle): string {
 
   if (style === "chess") {
     return "Make ONE action: move a unit OR attack with a unit";
+  }
+
+  if (style === "move_for_move") {
+    switch (phase) {
+      case "build":
+        return "Mobilize at your territories — click Done Building when finished";
+      case "move":
+        return "Move one stack or attack, then the next player goes";
+      case "end":
+        return "Collect income and end your turn";
+    }
   }
 
   // Classic tips

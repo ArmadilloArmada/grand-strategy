@@ -9,7 +9,9 @@ import { TurnStyle } from "./GameConfig";
 import {
   getPhasesForStyle,
   getPhaseDisplayName as getStylePhaseDisplayName,
+  isMoveForMoveStyle,
 } from "./TurnStyleManager";
+import { MovementValidator } from "./MovementValidator";
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -28,10 +30,28 @@ export class TurnManager {
   public actionsThisTurn: number = 0;
   public maxActionsPerTurn: number = 1;
 
+  // For move-for-move: shared alternating move segment
+  public moveForMoveSegmentActive: boolean = false;
+  /** Faction whose build phase opened the current alternating move segment */
+  public moveForMoveTurnOwnerId: string | null = null;
+  private movementValidator: MovementValidator | null = null;
+
   // Callback for when we need to wait
   public onWaitForContinue: (() => void) | null = null;
 
   constructor(private state: GameState) {}
+
+  setMovementValidator(validator: MovementValidator): void {
+    this.movementValidator = validator;
+  }
+
+  isMoveForMoveSegmentActive(): boolean {
+    return this.moveStyleUsesAlternatingMoves() && this.moveForMoveSegmentActive;
+  }
+
+  private moveStyleUsesAlternatingMoves(): boolean {
+    return isMoveForMoveStyle(this.turnStyle);
+  }
 
   setTurnStyle(style: TurnStyle): void {
     this.turnStyle = style;
@@ -71,6 +91,19 @@ export class TurnManager {
       phase: currentPhase,
       factionId: this.state.currentFactionId,
     });
+
+    if (this.moveStyleUsesAlternatingMoves()) {
+      const phase = currentPhase as string;
+      if (phase === "build") {
+        this.moveForMoveTurnOwnerId = this.state.currentFactionId;
+        this.startMoveForMoveSegment();
+        return;
+      }
+      if (phase === "move") {
+        this.endMoveForMoveSegment();
+        return;
+      }
+    }
 
     const nextPhase = this.customPhases
       ? this.getNextPhaseForStyle(currentPhase)
@@ -367,6 +400,109 @@ export class TurnManager {
       this.waitingForContinue = true;
       this.onWaitForContinue?.();
     }
+  }
+
+  /**
+   * After a single move/attack in move-for-move mode, pass to the next faction with moves.
+   */
+  passMoveForMoveTurn(): void {
+    if (!this.isMoveForMoveSegmentActive() || (this.state.currentPhase as string) !== "move") return;
+
+    const nextFactionId = this.findNextMovableFaction(this.state.currentFactionId);
+    if (nextFactionId) {
+      this.switchToFaction(nextFactionId);
+    } else {
+      this.endMoveForMoveSegment();
+    }
+  }
+
+  private endMoveForMoveSegment(): void {
+    this.moveForMoveSegmentActive = false;
+
+    const ownerId = this.moveForMoveTurnOwnerId ?? this.state.currentFactionId;
+    this.moveForMoveTurnOwnerId = null;
+
+    this.state.currentPhase = "end" as GamePhase;
+    this.state.pendingMoves = [];
+    this.state.selectedTerritoryId = null;
+    this.state.selectedUnits.clear();
+    this.switchToFaction(ownerId, false);
+    this.onPhaseStart("end");
+    this.state.emit("turn_start", {
+      turnNumber: this.state.turnNumber,
+      factionId: ownerId,
+    });
+  }
+
+  private startMoveForMoveSegment(): void {
+    this.moveForMoveSegmentActive = true;
+    this.state.currentPhase = "move" as GamePhase;
+
+    const factions = this.state.factionRegistry.getActive();
+    for (const faction of factions) {
+      for (const territory of this.state.getTerritoriesOwnedBy(faction.id)) {
+        territory.resetActedUnits();
+      }
+    }
+
+    this.state.pendingMoves = [];
+    this.state.purchaseOrders = [];
+    this.state.selectedTerritoryId = null;
+    this.state.selectedUnits.clear();
+
+    this.onPhaseStart("move");
+
+    const firstMovable = this.findNextMovableFaction(null);
+    if (firstMovable) {
+      this.switchToFaction(firstMovable);
+    } else {
+      this.endMoveForMoveSegment();
+    }
+  }
+
+  private switchToFaction(factionId: string, emitTurnStart = true): void {
+    if (this.state.currentFactionId === factionId && emitTurnStart) return;
+
+    this.state.pendingMoves = [];
+    this.state.selectedTerritoryId = null;
+    this.state.selectedUnits.clear();
+    this.state.currentFactionId = factionId;
+
+    if (emitTurnStart) {
+      this.state.emit("turn_start", {
+        turnNumber: this.state.turnNumber,
+        factionId: factionId,
+      });
+    }
+  }
+
+  private findNextMovableFaction(afterFactionId: string | null): string | null {
+    const factions = this.state.factionRegistry.getActive();
+    if (factions.length === 0) return null;
+
+    const startIndex = afterFactionId
+      ? (factions.findIndex(f => f.id === afterFactionId) + 1) % factions.length
+      : 0;
+
+    for (let i = 0; i < factions.length; i++) {
+      const faction = factions[(startIndex + i) % factions.length];
+      if (this.factionHasMovableUnits(faction.id)) return faction.id;
+    }
+    return null;
+  }
+
+  private factionHasMovableUnits(factionId: string): boolean {
+    if (this.movementValidator) {
+      return this.movementValidator.factionHasMovableUnits(factionId);
+    }
+
+    for (const territory of this.state.territories.values()) {
+      if (territory.owner !== factionId) continue;
+      for (const pu of territory.units) {
+        if (territory.getAvailableUnitCount(pu.unitTypeId) > 0) return true;
+      }
+    }
+    return false;
   }
 
   continue(): void {

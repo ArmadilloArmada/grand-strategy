@@ -9,6 +9,7 @@ import {
   shouldPauseAfterAction,
   isOneActionPerTurn,
   isMoveOrAttackOnly,
+  isMoveForMoveStyle,
   getPhaseTip,
 } from '../TurnStyleManager';
 
@@ -34,6 +35,11 @@ describe('getPhasesForStyle', () => {
   it('chess returns single "action" phase', () => {
     const phases = getPhasesForStyle('chess');
     expect(phases).toEqual(['action']);
+  });
+
+  it('move_for_move returns build/move/end like quick', () => {
+    const phases = getPhasesForStyle('move_for_move');
+    expect(phases).toEqual(['build', 'move', 'end']);
   });
 
   it('spectator uses classic phases', () => {
@@ -128,6 +134,13 @@ describe('isMoveOrAttackOnly', () => {
     for (const style of ['classic', 'quick', 'chess', 'spectator', 'action'] as const) {
       expect(isMoveOrAttackOnly(style)).toBe(false);
     }
+  });
+});
+
+describe('isMoveForMoveStyle', () => {
+  it('returns true only for move_for_move', () => {
+    expect(isMoveForMoveStyle('move_for_move')).toBe(true);
+    expect(isMoveForMoveStyle('quick')).toBe(false);
   });
 });
 

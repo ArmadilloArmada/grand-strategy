@@ -422,6 +422,23 @@ export class MovementValidator {
   }
 
   /**
+   * Whether a faction still has units that can move or attack this turn.
+   */
+  factionHasMovableUnits(factionId: string): boolean {
+    for (const territory of this.state.territories.values()) {
+      if (territory.owner !== factionId) continue;
+      for (const pu of territory.units) {
+        if (territory.getAvailableUnitCount(pu.unitTypeId) <= 0) continue;
+        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+        if (!unitType) continue;
+        const moves = this.getValidMoves(pu.unitTypeId, territory.id, true);
+        if (moves.length > 0) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Get available units (not already committed to moves and haven't acted this turn)
    */
   getAvailableUnits(territoryId: string, unitTypeId: string): number {
