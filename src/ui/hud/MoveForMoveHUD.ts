@@ -1,23 +1,20 @@
 /**
  * Dedicated HUD chrome for Move-for-Move turn style.
- * Replaces the generic 6-step phase rail with Build → Alternating Moves → Collect.
+ * No build/move/collect phases — build is on-demand, End Turn collects income.
  */
 
 import { GameState } from '../../engine/GameState';
 import { TurnManager } from '../../engine/TurnManager';
-import { isBuildPhase, isMovementPhase } from './PhaseHelpers';
-
-export type MoveForMoveMacroPhase = 'build' | 'move' | 'end';
 
 export interface MoveForMoveHUDView {
-  macroPhase: MoveForMoveMacroPhase;
   turnOwnerName: string;
   turnOwnerColor: string;
   activeFactionName: string;
   activeFactionColor: string;
   isHumanActive: boolean;
-  isSegmentActive: boolean;
+  isTurnOwner: boolean;
   canPass: boolean;
+  canEndTurn: boolean;
   endButtonLabel: string;
   contextLine: string;
   detailLine: string;
@@ -27,59 +24,48 @@ export function buildMoveForMoveView(
   state: GameState,
   turnManager: TurnManager,
 ): MoveForMoveHUDView {
-  const phase = state.currentPhase as string;
   const faction = state.getCurrentFaction();
   const ownerId = turnManager.moveForMoveTurnOwnerId;
   const owner = ownerId ? state.factionRegistry.get(ownerId) : faction;
-  const segmentActive = turnManager.isMoveForMoveSegmentActive();
-
-  let macroPhase: MoveForMoveMacroPhase = 'build';
-  if (isBuildPhase(phase)) macroPhase = 'build';
-  else if (isMovementPhase(phase) && segmentActive) macroPhase = 'move';
-  else macroPhase = 'end';
-
   const isHumanActive = faction?.controlledBy === 'human';
-  const canPass = macroPhase === 'move' && isHumanActive;
+  const isTurnOwner = Boolean(faction && ownerId && faction.id === ownerId);
+  const canPass = isHumanActive && turnManager.isMoveForMoveSegmentActive();
+  const canEndTurn = Boolean(
+    isHumanActive &&
+    ownerId &&
+    faction &&
+    faction.id === ownerId &&
+    faction.controlledBy === 'human',
+  );
 
-  let endButtonLabel = 'End Phase';
-  let contextLine = 'Select a territory to begin.';
+  let contextLine = 'Select a territory to move or attack.';
   let detailLine = '';
 
-  if (macroPhase === 'build') {
-    endButtonLabel = 'Done Building';
-    contextLine = isHumanActive
-      ? 'Mobilize units, then finish building to open the shared move round.'
-      : `${faction?.name ?? 'Opponent'} is mobilizing…`;
-    detailLine = 'You can keep buying until you click Done Building.';
-  } else if (macroPhase === 'move') {
-    endButtonLabel = owner?.controlledBy === 'human' ? 'Finish Move Round' : 'Finish Moving';
-    if (isHumanActive) {
-      contextLine = 'Your move — relocate one stack or attack, then the next player goes.';
-      detailLine = 'Green = move, red = attack. Use Pass if you want to skip this turn.';
+  if (isHumanActive) {
+    if (isTurnOwner) {
+      contextLine = 'Your turn — click 🏭 Build anytime, then move one stack at a time.';
+      detailLine = 'Each move passes to the next player. End Turn when finished.';
     } else {
-      contextLine = `${faction?.name ?? 'Opponent'} is moving…`;
-      detailLine = owner
-        ? `${owner.name}'s move round — players alternate one move at a time.`
-        : 'Players alternate one move at a time.';
+      contextLine = 'Your move — relocate one stack or attack, then the next player goes.';
+      detailLine = 'You can still open 🏭 Build before or after moving.';
     }
-  } else {
-    endButtonLabel = 'Collect & End Turn';
-    contextLine = isHumanActive
-      ? 'Collect income and review your turn.'
-      : `${faction?.name ?? 'Opponent'} is collecting income…`;
-    detailLine = 'Next up: your build phase when your turn comes around again.';
+  } else if (faction) {
+    contextLine = `${faction.name} is playing…`;
+    detailLine = owner
+      ? `${owner.name}'s turn window — players alternate one move at a time.`
+      : 'Players alternate one move at a time.';
   }
 
   return {
-    macroPhase,
     turnOwnerName: owner?.name ?? faction?.name ?? '—',
     turnOwnerColor: owner?.colorLight ?? owner?.color ?? '#94a3b8',
     activeFactionName: faction?.name ?? '—',
     activeFactionColor: faction?.colorLight ?? faction?.color ?? '#94a3b8',
     isHumanActive,
-    isSegmentActive: segmentActive,
+    isTurnOwner,
     canPass,
-    endButtonLabel,
+    canEndTurn,
+    endButtonLabel: 'End Turn',
     contextLine,
     detailLine,
   };
@@ -98,23 +84,10 @@ export class MoveForMoveHUD {
     const rail = document.createElement('div');
     rail.id = 'mfm-progress';
     rail.className = 'mfm-progress hidden';
-    rail.setAttribute('role', 'group');
-    rail.setAttribute('aria-label', 'Move for move phase');
+    rail.setAttribute('role', 'status');
+    rail.setAttribute('aria-label', 'Move for move status');
     rail.innerHTML = `
-      <div class="mfm-step" data-mfm-step="build">
-        <span class="mfm-step-icon">🏭</span>
-        <span class="mfm-step-label">Build</span>
-      </div>
-      <div class="mfm-connector"></div>
-      <div class="mfm-step" data-mfm-step="move">
-        <span class="mfm-step-icon">↔️</span>
-        <span class="mfm-step-label">Move Round</span>
-      </div>
-      <div class="mfm-connector"></div>
-      <div class="mfm-step" data-mfm-step="end">
-        <span class="mfm-step-icon">💰</span>
-        <span class="mfm-step-label">Collect</span>
-      </div>
+      <span class="mfm-mode-badge">↔️ Move for Move</span>
       <div id="mfm-status" class="mfm-status"></div>
     `;
     ribbonCenter.appendChild(rail);
@@ -149,33 +122,16 @@ export class MoveForMoveHUD {
   render(view: MoveForMoveHUDView): void {
     this.mount();
 
-    document.body.classList.toggle('mfm-move-segment', view.macroPhase === 'move' && view.isSegmentActive);
-
-    const steps = ['build', 'move', 'end'];
-    const activeIdx = steps.indexOf(view.macroPhase);
-
-    document.querySelectorAll<HTMLElement>('.mfm-step').forEach(el => {
-      const step = el.dataset.mfmStep ?? '';
-      const idx = steps.indexOf(step);
-      el.classList.remove('active', 'completed', 'active-pop');
-      if (idx < activeIdx) el.classList.add('completed');
-      else if (idx === activeIdx) el.classList.add('active', 'active-pop');
-    });
-
-    document.querySelectorAll('.mfm-connector').forEach((el, i) => {
-      el.classList.toggle('completed', i < activeIdx);
-    });
+    document.body.classList.toggle('mfm-move-segment', view.isHumanActive);
 
     const statusEl = document.getElementById('mfm-status');
     if (statusEl) {
-      if (view.macroPhase === 'move' && view.isSegmentActive) {
-        statusEl.innerHTML = view.isHumanActive
-          ? `<strong style="color:${view.activeFactionColor}">Your move</strong> · ${view.turnOwnerName}'s round`
-          : `<span style="color:${view.activeFactionColor}">${view.activeFactionName}</span> moving · ${view.turnOwnerName}'s round`;
-      } else if (view.macroPhase === 'build') {
-        statusEl.innerHTML = `<span style="color:${view.activeFactionColor}">${view.activeFactionName}</span> building`;
+      if (view.isHumanActive) {
+        statusEl.innerHTML = view.isTurnOwner
+          ? `<strong style="color:${view.activeFactionColor}">Your turn</strong> · ${view.turnOwnerName}`
+          : `<strong style="color:${view.activeFactionColor}">Your move</strong> · ${view.turnOwnerName}'s turn`;
       } else {
-        statusEl.innerHTML = `<span style="color:${view.activeFactionColor}">${view.activeFactionName}</span> collecting`;
+        statusEl.innerHTML = `<span style="color:${view.activeFactionColor}">${view.activeFactionName}</span> · ${view.turnOwnerName}'s turn window`;
       }
     }
 
@@ -192,17 +148,8 @@ export class MoveForMoveHUD {
 
     const phaseEl = document.getElementById('current-phase');
     if (phaseEl) {
-      const labels: Record<MoveForMoveMacroPhase, string> = {
-        build: '🏭 Build Phase',
-        move: '↔️ Move for Move',
-        end: '💰 Collect Income',
-      };
-      phaseEl.textContent = labels[view.macroPhase];
+      phaseEl.textContent = '↔️ Move for Move';
       phaseEl.classList.remove('hidden');
     }
-  }
-
-  getEndButtonLabel(view: MoveForMoveHUDView): string {
-    return view.endButtonLabel;
   }
 }

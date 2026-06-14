@@ -76,13 +76,22 @@ export function getBuildButtonState(args: {
   turnStyle: string;
 }): { canBuild: boolean; title: string } {
   const { buildPhase, isHumanTurn, canMobilize, turnStyle } = args;
-  const canBuild = buildPhase && isHumanTurn;
+  const freeformBuild = turnStyle === 'move_for_move' && isHumanTurn;
+  const canBuild = freeformBuild || (buildPhase && isHumanTurn);
   if (!canBuild) {
     return {
       canBuild: false,
       title: !isHumanTurn
         ? 'Wait for your turn'
+        : turnStyle === 'move_for_move'
+        ? 'Wait for your turn'
         : `Only available in ${turnStyle === 'quick' ? 'Build' : 'Purchase/Production'} phase`,
+    };
+  }
+  if (turnStyle === 'move_for_move') {
+    return {
+      canBuild: true,
+      title: 'Open the build menu anytime (B)',
     };
   }
   return {

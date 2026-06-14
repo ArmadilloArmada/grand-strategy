@@ -44,8 +44,8 @@ export function getPhasesForStyle(style: TurnStyle): string[] {
       return ["action"];
 
     case "move_for_move":
-      // Shared build → alternating moves → shared income
-      return ["build", "move", "end"];
+      // Freeform: build anytime, alternating moves, end turn to collect
+      return ["play"];
 
     default:
       return [
@@ -157,14 +157,7 @@ export function getPhaseTip(phase: string, style: TurnStyle): string {
   }
 
   if (style === "move_for_move") {
-    switch (phase) {
-      case "build":
-        return "Mobilize at your territories — click Done Building when finished";
-      case "move":
-        return "Move one stack or attack, then the next player goes";
-      case "end":
-        return "Collect income and end your turn";
-    }
+    return "Build anytime (🏭), move or attack one stack at a time, then End Turn";
   }
 
   // Classic tips

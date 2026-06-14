@@ -37,9 +37,9 @@ describe('getPhasesForStyle', () => {
     expect(phases).toEqual(['action']);
   });
 
-  it('move_for_move returns build/move/end like quick', () => {
+  it('move_for_move returns single freeform play phase', () => {
     const phases = getPhasesForStyle('move_for_move');
-    expect(phases).toEqual(['build', 'move', 'end']);
+    expect(phases).toEqual(['play']);
   });
 
   it('spectator uses classic phases', () => {

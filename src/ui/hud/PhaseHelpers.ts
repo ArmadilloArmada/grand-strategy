@@ -1,5 +1,5 @@
 export function isMovementPhase(phase: string): boolean {
-  return ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
+  return ['combat_move', 'noncombat_move', 'move', 'orders', 'action', 'play'].includes(phase);
 }
 
 export function isBuildPhase(phase: string): boolean {
@@ -11,5 +11,5 @@ export function isCombatPhase(phase: string): boolean {
 }
 
 export function isAttackMovePhase(phase: string): boolean {
-  return ['combat_move', 'move', 'orders', 'action'].includes(phase);
+  return ['combat_move', 'move', 'orders', 'action', 'play'].includes(phase);
 }

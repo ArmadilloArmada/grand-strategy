@@ -32,8 +32,10 @@ export class TurnManager {
 
   // For move-for-move: shared alternating move segment
   public moveForMoveSegmentActive: boolean = false;
-  /** Faction whose build phase opened the current alternating move segment */
+  /** Faction whose turn window opened the current alternating move segment */
   public moveForMoveTurnOwnerId: string | null = null;
+  /** AI mobilizes once per turn owner at the start of their window */
+  public moveForMoveOwnerBuildDone: boolean = false;
   private movementValidator: MovementValidator | null = null;
 
   // Callback for when we need to wait
@@ -73,6 +75,10 @@ export class TurnManager {
     this.resetActionCounters();
     this.updateSeason();
 
+    if (this.moveStyleUsesAlternatingMoves()) {
+      this.beginMoveForMoveTurn(factions[0].id);
+    }
+
     this.state.emit("turn_start", {
       turnNumber: this.state.turnNumber,
       factionId: this.state.currentFactionId,
@@ -93,16 +99,8 @@ export class TurnManager {
     });
 
     if (this.moveStyleUsesAlternatingMoves()) {
-      const phase = currentPhase as string;
-      if (phase === "build") {
-        this.moveForMoveTurnOwnerId = this.state.currentFactionId;
-        this.startMoveForMoveSegment();
-        return;
-      }
-      if (phase === "move") {
-        this.endMoveForMoveSegment();
-        return;
-      }
+      this.endMoveForMoveTurn();
+      return;
     }
 
     const nextPhase = this.customPhases
@@ -185,6 +183,10 @@ export class TurnManager {
 
     for (const territory of this.state.territories.values()) {
       if (territory.owner === nextFaction.id) territory.resetActedUnits();
+    }
+
+    if (this.moveStyleUsesAlternatingMoves()) {
+      this.beginMoveForMoveTurn(nextFaction.id);
     }
 
     this.state.emit("turn_start", {
@@ -406,40 +408,36 @@ export class TurnManager {
    * After a single move/attack in move-for-move mode, pass to the next faction with moves.
    */
   passMoveForMoveTurn(): void {
-    if (!this.isMoveForMoveSegmentActive() || (this.state.currentPhase as string) !== "move") return;
+    if (!this.isMoveForMoveSegmentActive() || (this.state.currentPhase as string) !== "play") return;
 
     const nextFactionId = this.findNextMovableFaction(this.state.currentFactionId);
     if (nextFactionId) {
       this.switchToFaction(nextFactionId);
-    } else {
-      this.endMoveForMoveSegment();
+      return;
+    }
+
+    const ownerId = this.moveForMoveTurnOwnerId ?? this.state.currentFactionId;
+    if (ownerId !== this.state.currentFactionId) {
+      this.switchToFaction(ownerId);
     }
   }
 
-  private endMoveForMoveSegment(): void {
+  /** End the active faction's turn window: collect income and advance. */
+  private endMoveForMoveTurn(): void {
     this.moveForMoveSegmentActive = false;
-
-    const ownerId = this.moveForMoveTurnOwnerId ?? this.state.currentFactionId;
     this.moveForMoveTurnOwnerId = null;
-
-    this.state.currentPhase = "end" as GamePhase;
-    this.state.pendingMoves = [];
-    this.state.selectedTerritoryId = null;
-    this.state.selectedUnits.clear();
-    this.switchToFaction(ownerId, false);
-    this.onPhaseStart("end");
-    this.state.emit("turn_start", {
-      turnNumber: this.state.turnNumber,
-      factionId: ownerId,
-    });
+    this.moveForMoveOwnerBuildDone = false;
+    this.collectIncome();
+    this.advanceFaction();
   }
 
-  private startMoveForMoveSegment(): void {
+  private beginMoveForMoveTurn(ownerId: string): void {
     this.moveForMoveSegmentActive = true;
-    this.state.currentPhase = "move" as GamePhase;
+    this.moveForMoveTurnOwnerId = ownerId;
+    this.moveForMoveOwnerBuildDone = false;
+    this.state.currentPhase = "play" as GamePhase;
 
-    const factions = this.state.factionRegistry.getActive();
-    for (const faction of factions) {
+    for (const faction of this.state.factionRegistry.getActive()) {
       for (const territory of this.state.getTerritoriesOwnedBy(faction.id)) {
         territory.resetActedUnits();
       }
@@ -449,15 +447,6 @@ export class TurnManager {
     this.state.purchaseOrders = [];
     this.state.selectedTerritoryId = null;
     this.state.selectedUnits.clear();
-
-    this.onPhaseStart("move");
-
-    const firstMovable = this.findNextMovableFaction(null);
-    if (firstMovable) {
-      this.switchToFaction(firstMovable);
-    } else {
-      this.endMoveForMoveSegment();
-    }
   }
 
   private switchToFaction(factionId: string, emitTurnStart = true): void {

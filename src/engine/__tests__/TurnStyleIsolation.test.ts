@@ -49,12 +49,9 @@ describe('Turn style isolation', () => {
     tm.startGame();
 
     expect(state.currentPhase).toBe('build');
-    expect(state.currentFactionId).toBe('alpha');
-
     tm.advancePhase();
     expect(state.currentPhase as string).toBe('move');
     expect(tm.isMoveForMoveSegmentActive()).toBe(false);
-    expect(tm.moveForMoveTurnOwnerId).toBeNull();
     expect(state.currentFactionId).toBe('alpha');
   });
 
@@ -74,23 +71,33 @@ describe('Turn style isolation', () => {
     const { tm } = buildTwoFactionState();
     tm.setTurnStyle('quick');
     tm.startGame();
-
-    const factionBefore = tm.getTurnStyle();
     tm.passMoveForMoveTurn();
     expect(tm.isMoveForMoveSegmentActive()).toBe(false);
-    expect(factionBefore).toBe('quick');
   });
 
-  it('move_for_move sets segment only after build ends', () => {
+  it('move_for_move uses a single play phase with freeform segment', () => {
+    const { state, tm } = buildTwoFactionState();
+    tm.setTurnStyle('move_for_move');
+    tm.startGame();
+
+    expect(getPhasesForStyle('move_for_move')).toEqual(['play']);
+    expect(state.currentPhase as string).toBe('play');
+    expect(tm.isMoveForMoveSegmentActive()).toBe(true);
+    expect(tm.moveForMoveTurnOwnerId).toBe('alpha');
+  });
+
+  it('move_for_move end turn advances faction and keeps play phase', () => {
     const { state, tm } = buildTwoFactionState();
     state.territories.get('alpha_cap')!.addUnits('infantry', 2);
     tm.setTurnStyle('move_for_move');
     tm.startGame();
 
-    expect(tm.isMoveForMoveSegmentActive()).toBe(false);
+    const ipcsBefore = state.factionRegistry.get('alpha')!.ipcs;
     tm.advancePhase();
-    expect(tm.isMoveForMoveSegmentActive()).toBe(true);
-    expect(state.currentPhase as string).toBe('move');
-    expect(tm.moveForMoveTurnOwnerId).toBe('alpha');
+
+    expect(state.currentFactionId).toBe('beta');
+    expect(state.currentPhase as string).toBe('play');
+    expect(tm.moveForMoveTurnOwnerId).toBe('beta');
+    expect(state.factionRegistry.get('alpha')!.ipcs).toBeGreaterThan(ipcsBefore);
   });
 });

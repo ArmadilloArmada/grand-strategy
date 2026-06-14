@@ -190,17 +190,11 @@ describe('TurnManager — turn style phases', () => {
     expect(tm.getPhases().length).toBeLessThan(classicLen);
   });
 
-  it('move_for_move enters alternating move segment after the active faction finishes build', () => {
+  it('move_for_move starts in play phase with active segment', () => {
     const { state, tm } = buildTwoFactionState();
-    state.territories.get('alpha_cap')!.addUnits('infantry', 3);
-    state.territories.get('beta_cap')!.addUnits('infantry', 3);
     tm.setTurnStyle('move_for_move');
     tm.startGame();
-    expect(state.currentPhase).toBe('build');
-    expect(state.currentFactionId).toBe('alpha');
-
-    tm.advancePhase();
-    expect(state.currentPhase).toBe('move');
+    expect(state.currentPhase as string).toBe('play');
     expect(tm.isMoveForMoveSegmentActive()).toBe(true);
     expect(tm.moveForMoveTurnOwnerId).toBe('alpha');
   });
