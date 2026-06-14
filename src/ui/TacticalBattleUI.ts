@@ -1,11 +1,15 @@
 import type { CombatState, CombatUnit } from '../engine/CombatResolver';
+import { canUnitEngageTarget, canLandUnitStrikeNaval, getLandAntiNavalAttack } from '../engine/NavalSystem';
 import { buildTacticalOutcomeMeta, type TacticalOutcomeMeta } from '../engine/TacticalBattleEngine';
+import type { UnitDomain } from '../data/Unit';
 import { soundManager } from '../audio/SoundManager';
 import { visualEffects } from './VisualEffects';
 
 type TacticalSide = 'attacker' | 'defender';
 type TacticalPhase = 'player' | 'enemy' | 'victory' | 'defeat';
 type TacticalRole = 'Infantry' | 'Armor' | 'Artillery' | 'Air' | 'Naval';
+export type TacticalBattleMode = 'land' | 'naval' | 'amphibious';
+export type TacticalTerritoryType = 'land' | 'sea' | 'coastal';
 
 export interface TacticalTerrain {
   name: string;
@@ -13,6 +17,8 @@ export interface TacticalTerrain {
   moveCost: number;
   color: string;
   note: string;
+  kind?: 'land' | 'water' | 'shore';
+  isObjective?: boolean;
 }
 
 interface TacticalUnit {
@@ -21,6 +27,8 @@ interface TacticalUnit {
   sourceIndex: number;
   name: string;
   role: TacticalRole;
+  domain: UnitDomain;
+  canBombard: boolean;
   count: number;
   x: number;
   y: number;
@@ -60,6 +68,7 @@ interface UndoMove {
 interface TacticalState {
   width: number;
   height: number;
+  mode: TacticalBattleMode;
   phase: TacticalPhase;
   turn: number;
   selectedId: string | null;
@@ -69,6 +78,7 @@ interface TacticalState {
   fx: CombatFx[];
   pulseTile: { x: number; y: number; expiresAt: number } | null;
   captureProgress: number;
+  coastalSupportHp: number;
   undoMove: UndoMove | null;
   moveAnim: MoveAnim | null;
 }
@@ -77,11 +87,11 @@ interface TacticalState {
 export function buildTacticalTerrainGrid(width: number, height: number): TacticalTerrain[][] {
   const midY = Math.floor(height / 2);
   const grid: TacticalTerrain[][] = [];
-  const field: TacticalTerrain = { name: 'Field', cover: 0, moveCost: 1, color: '#64774a', note: 'Open ground.' };
-  const road: TacticalTerrain = { name: 'Road', cover: 0, moveCost: 1, color: '#756b49', note: 'Fast advance lane.' };
-  const woods: TacticalTerrain = { name: 'Woods', cover: 1, moveCost: 2, color: '#345f42', note: 'Light cover, slower movement.' };
-  const ridge: TacticalTerrain = { name: 'Ridge', cover: 2, moveCost: 2, color: '#56616a', note: 'Strong cover.' };
-  const town: TacticalTerrain = { name: 'Town', cover: 1, moveCost: 1, color: '#6a5a48', note: 'Urban cover, good firing positions.' };
+  const field: TacticalTerrain = { name: 'Field', kind: 'land', cover: 0, moveCost: 1, color: '#64774a', note: 'Open ground.' };
+  const road: TacticalTerrain = { name: 'Road', kind: 'land', cover: 0, moveCost: 1, color: '#756b49', note: 'Fast advance lane.' };
+  const woods: TacticalTerrain = { name: 'Woods', kind: 'land', cover: 1, moveCost: 2, color: '#345f42', note: 'Light cover, slower movement.' };
+  const ridge: TacticalTerrain = { name: 'Ridge', kind: 'land', cover: 2, moveCost: 2, color: '#56616a', note: 'Strong cover.' };
+  const town: TacticalTerrain = { name: 'Town', kind: 'land', cover: 1, moveCost: 1, color: '#6a5a48', note: 'Urban cover, good firing positions.' };
 
   for (let y = 0; y < height; y++) {
     const row: TacticalTerrain[] = [];
@@ -92,7 +102,7 @@ export function buildTacticalTerrainGrid(width: number, height: number): Tactica
       const inSpawnBand = x <= 2 || x >= width - 3;
 
       if (x === centerX && y === centerY) {
-        row.push({ ...town, note: 'Objective — hold or seize this ground.' });
+        row.push({ ...town, isObjective: true, note: 'Objective — hold or seize this ground.' });
       } else if (y === midY && x > 0 && x < width - 1) {
         row.push(road);
       } else if (!inSpawnBand && (x === centerX - 1 || x === centerX + 1) && Math.abs(y - centerY) <= 1) {
@@ -110,14 +120,157 @@ export function buildTacticalTerrainGrid(width: number, height: number): Tactica
   return grid;
 }
 
+const OPEN_WATER: TacticalTerrain = {
+  name: 'Open Water',
+  kind: 'water',
+  cover: 0,
+  moveCost: 1,
+  color: '#1e5a8a',
+  note: 'Standard steaming lanes.',
+};
+const DEEP_WATER: TacticalTerrain = {
+  name: 'Deep Water',
+  kind: 'water',
+  cover: 0,
+  moveCost: 2,
+  color: '#153956',
+  note: 'Slower passage for large hulls.',
+};
+const SHORE: TacticalTerrain = {
+  name: 'Shore',
+  kind: 'shore',
+  cover: 1,
+  moveCost: 2,
+  color: '#8b7355',
+  note: 'Coastal waters — bombards can hit land here.',
+};
+const BEACH: TacticalTerrain = {
+  name: 'Beach',
+  kind: 'shore',
+  cover: 0,
+  moveCost: 1,
+  color: '#c4a574',
+  note: 'Amphibious landing zone.',
+};
+const COASTAL_FIELD: TacticalTerrain = {
+  name: 'Coast',
+  kind: 'land',
+  cover: 0,
+  moveCost: 1,
+  color: '#6b8050',
+  note: 'Coastal ground — land units only.',
+};
+
+/** Pick land vs naval vs amphibious tactical layout from the strategic battle context. */
+export function resolveTacticalBattleMode(
+  territoryType: TacticalTerritoryType,
+  combat: CombatState,
+): TacticalBattleMode {
+  const hasNaval = (units: CombatUnit[]) => units.some(u => u.unitType.domain === 'sea');
+  const allNaval = (units: CombatUnit[]) => units.length > 0 && units.every(u => u.unitType.domain === 'sea');
+
+  if (territoryType === 'sea') return 'naval';
+  if (allNaval(combat.attackers) && allNaval(combat.defenders)) return 'naval';
+  if (territoryType === 'coastal' && (hasNaval(combat.attackers) || hasNaval(combat.defenders))) {
+    return 'amphibious';
+  }
+  return 'land';
+}
+
+/** Water-first tactical grid for fleet engagements and coastal landings. */
+export function buildNavalTacticalTerrainGrid(
+  width: number,
+  height: number,
+  mode: 'naval' | 'amphibious',
+): TacticalTerrain[][] {
+  const grid: TacticalTerrain[][] = [];
+  const centerX = Math.floor(width / 2);
+  const centerY = Math.floor(height / 2);
+  const landStart = mode === 'amphibious' ? Math.ceil(width * 0.62) : width;
+  const shoreStart = mode === 'amphibious' ? Math.ceil(width * 0.48) : Math.max(0, width - 2);
+
+  for (let y = 0; y < height; y++) {
+    const row: TacticalTerrain[] = [];
+    for (let x = 0; x < width; x++) {
+      const hash = (x * 19 + y * 29 + width * 5) % 100;
+      if (x === centerX && y === centerY) {
+        row.push({
+          ...OPEN_WATER,
+          isObjective: true,
+          name: mode === 'amphibious' ? 'Sea Lane' : 'Engagement Zone',
+          note: 'Control this zone to win the engagement.',
+        });
+      } else if (mode === 'amphibious' && x >= landStart) {
+        if (x === landStart && y === centerY) {
+          row.push({
+            ...COASTAL_FIELD,
+            isObjective: true,
+            name: 'Beachhead',
+            kind: 'land',
+            note: 'Seize the beachhead or eliminate defenders.',
+          });
+        } else {
+          row.push({ ...COASTAL_FIELD });
+        }
+      } else if (mode === 'amphibious' && x >= shoreStart && x < landStart) {
+        row.push(x === shoreStart ? { ...BEACH } : { ...SHORE });
+      } else if (mode === 'naval' && x >= width - 2) {
+        row.push({ ...SHORE, note: 'Enemy coastline — bombards can strike here.' });
+      } else if (hash > 82) {
+        row.push({ ...DEEP_WATER });
+      } else {
+        row.push({ ...OPEN_WATER });
+      }
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+export function getTacticalTerrainLegend(mode: TacticalBattleMode): Array<{ code: string; name: string; note: string; color: string }> {
+  if (mode === 'naval') {
+    return [
+      { code: 'W', name: 'Open Water', note: 'Naval movement', color: OPEN_WATER.color },
+      { code: 'P', name: 'Deep Water', note: 'Slower', color: DEEP_WATER.color },
+      { code: 'S', name: 'Shore', note: 'Bombardment target', color: SHORE.color },
+      { code: 'O', name: 'Zone', note: 'Capture objective', color: '#2563eb' },
+    ];
+  }
+  if (mode === 'amphibious') {
+    return [
+      { code: 'W', name: 'Water', note: 'Ships only', color: OPEN_WATER.color },
+      { code: 'B', name: 'Beach', note: 'Landing zone', color: BEACH.color },
+      { code: 'C', name: 'Coast', note: 'Land units', color: COASTAL_FIELD.color },
+      { code: 'O', name: 'Zone', note: 'Objectives', color: '#2563eb' },
+    ];
+  }
+  return TERRAIN_LEGEND;
+}
+
+export function objectiveLabelForMode(mode: TacticalBattleMode): string {
+  switch (mode) {
+    case 'naval': return 'Engagement Zone';
+    case 'amphibious': return 'Beachhead / Sea Lane';
+    default: return 'Town';
+  }
+}
+
 /** Single-letter map codes (unique per terrain type). */
 export function terrainTileCode(name: string): string {
   switch (name) {
     case 'Field': return 'F';
     case 'Road': return 'D';
-    case 'Woods': return 'W';
+    case 'Woods': return 'L';
     case 'Ridge': return 'G';
     case 'Town': return 'T';
+    case 'Open Water': return 'W';
+    case 'Deep Water': return 'P';
+    case 'Shore': return 'S';
+    case 'Beach': return 'B';
+    case 'Coast': return 'C';
+    case 'Engagement Zone':
+    case 'Sea Lane':
+    case 'Beachhead': return 'O';
     default: return name.slice(0, 1).toUpperCase();
   }
 }
@@ -125,7 +278,7 @@ export function terrainTileCode(name: string): string {
 export const TERRAIN_LEGEND: Array<{ code: string; name: string; note: string; color: string }> = [
   { code: 'F', name: 'Field', note: 'Open ground', color: '#64774a' },
   { code: 'D', name: 'Road', note: 'Fast advance', color: '#756b49' },
-  { code: 'W', name: 'Woods', note: '+1 cover, slower', color: '#345f42' },
+  { code: 'L', name: 'Woods', note: '+1 cover, slower', color: '#345f42' },
   { code: 'G', name: 'Ridge', note: '+2 cover, blocks LOS', color: '#56616a' },
   { code: 'T', name: 'Town', note: 'Capture objective', color: '#6a5a48' },
 ];
@@ -140,6 +293,85 @@ export function computeTacticalDamage(
   const living = Math.max(1, Math.min(attacker.count, Math.ceil(attacker.hp / 3)));
   const baseDamage = Math.ceil(attacker.attack * living * 0.65);
   return Math.max(1, baseDamage - cover + flankBonus + extraDamage);
+}
+
+/** Line-of-sight for naval bombardment — water never blocks. */
+export function hasNavalBombardLineOfSight(
+  width: number,
+  height: number,
+  terrain: TacticalTerrain[][],
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): boolean {
+  const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+  if (steps <= 1) return true;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const x = Math.round(ax + (bx - ax) * t);
+    const y = Math.round(ay + (by - ay) * t);
+    if (x < 0 || y < 0 || x >= width || y >= height) continue;
+    if (x === ax && y === ay) continue;
+    if (x === bx && y === by) continue;
+    const tile = terrain[y]?.[x];
+    if (!tile) return false;
+    if (tile.kind === 'land' && tile.cover >= 2) return false;
+  }
+  return true;
+}
+
+export function isTacticalAdjacentToWater(
+  width: number,
+  height: number,
+  terrain: TacticalTerrain[][],
+  x: number,
+  y: number,
+): boolean {
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+    if (terrain[ny]?.[nx]?.kind === 'water') return true;
+  }
+  return false;
+}
+
+export function isTacticalCoastalFiringPosition(
+  width: number,
+  height: number,
+  terrain: TacticalTerrain[][],
+  x: number,
+  y: number,
+): boolean {
+  const kind = terrain[y]?.[x]?.kind ?? 'land';
+  if (kind === 'shore') return true;
+  return kind === 'land' && isTacticalAdjacentToWater(width, height, terrain, x, y);
+}
+
+/** Whether a land unit on the tactical grid can fire on a naval unit in water. */
+export function canTacticalLandAttackNaval(
+  unitType: import('../data/Unit').UnitType,
+  attacker: { x: number; y: number; range: number },
+  target: { x: number; y: number; domain: UnitDomain; hp: number },
+  terrain: TacticalTerrain[][],
+  width: number,
+  height: number,
+  hasRangedLineOfSight: (ax: number, ay: number, bx: number, by: number) => boolean,
+): boolean {
+  if (target.domain !== 'sea' || target.hp <= 0 || unitType.domain !== 'land') return false;
+  if (terrain[target.y]?.[target.x]?.kind !== 'water') return false;
+
+  const dist = Math.max(Math.abs(attacker.x - target.x), Math.abs(attacker.y - target.y));
+  const maxRange = canLandUnitStrikeNaval(unitType) ? attacker.range : 1;
+  if (dist > maxRange) return false;
+
+  if (canLandUnitStrikeNaval(unitType)) {
+    return hasRangedLineOfSight(attacker.x, attacker.y, target.x, target.y);
+  }
+
+  if (!isTacticalCoastalFiringPosition(width, height, terrain, attacker.x, attacker.y)) return false;
+  return hasNavalBombardLineOfSight(width, height, terrain, attacker.x, attacker.y, target.x, target.y);
 }
 
 /** Line-of-sight for ranged fire (woods/ridges/units block). */
@@ -235,6 +467,7 @@ export class TacticalBattleUI {
   show(
     combat: CombatState,
     territoryName: string,
+    territoryType: TacticalTerritoryType,
     finish: (combat: CombatState, meta?: TacticalOutcomeMeta) => void,
     autoBattle: () => void,
   ): void {
@@ -243,13 +476,21 @@ export class TacticalBattleUI {
     this.finishCallback = finish;
     this.autoCallback = autoBattle;
     this.territoryName = territoryName;
-    this.state = this.createState(combat, territoryName);
+    const mode = resolveTacticalBattleMode(territoryType, combat);
+    this.state = this.createState(combat, territoryName, mode);
+    const brief = mode === 'naval'
+      ? 'Fleet action on open water. Battleships and cruisers can bombard the shore (S tiles). Control the engagement zone or sink the enemy fleet.'
+      : mode === 'amphibious'
+        ? 'Amphibious assault. Ships fight on water; land units take the beach. Bombardment can soften coastal defenders before landing.'
+        : 'Move, then fire. Hold the town objective or eliminate defenders. Artillery must deploy before firing.';
+    const objectiveLabel = objectiveLabelForMode(mode);
+    const legend = getTacticalTerrainLegend(mode);
 
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const modal = document.createElement('div');
     modal.id = 'tactical-battle-modal';
-    modal.className = 'modal tactical-battle-modal';
+    modal.className = `modal tactical-battle-modal tactical-mode-${mode}`;
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'tactical-battle-title');
@@ -257,14 +498,14 @@ export class TacticalBattleUI {
       <div class="modal-content tactical-battle-content">
         <div class="tactical-header">
           <div>
-            <div class="tactical-kicker">Tactical Battle</div>
+            <div class="tactical-kicker">${mode === 'naval' ? 'Naval Tactical Battle' : mode === 'amphibious' ? 'Amphibious Tactical Battle' : 'Tactical Battle'}</div>
             <h2 id="tactical-battle-title">${this.escape(territoryName)}</h2>
-            <p class="tactical-brief">Move, then fire. Hold the town objective or eliminate defenders. Artillery must deploy before firing.</p>
+            <p class="tactical-brief">${this.escape(brief)}</p>
           </div>
           <button id="btn-tactical-close" type="button" title="Auto battle instead" aria-label="Close and auto-resolve battle">&times;</button>
         </div>
         <div id="tactical-objective-wrap" class="tactical-objective-wrap">
-          <span>Objective — Town</span>
+          <span>Objective — ${this.escape(objectiveLabel)}</span>
           <div class="tactical-objective-track"><div id="tactical-objective-fill" class="tactical-objective-fill"></div></div>
           <em id="tactical-objective-label">0% secured</em>
         </div>
@@ -273,14 +514,14 @@ export class TacticalBattleUI {
             <canvas id="tactical-battle-canvas" class="tactical-canvas" aria-label="Tactical battle map"></canvas>
             <div class="tactical-terrain-legend" aria-label="Terrain legend">
               <span class="tactical-legend-title">Map key</span>
-              ${TERRAIN_LEGEND.map(t => `
+              ${legend.map(t => `
                 <span class="tactical-legend-item" title="${this.escape(t.note)}">
                   <i style="background:${t.color}"></i>
                   <b>${t.code}</b> ${this.escape(t.name)}
                   <em>${this.escape(t.note)}</em>
                 </span>
               `).join('')}
-              <span class="tactical-legend-hint">Gold = move · Red = attack · Blue tint = range</span>
+              <span class="tactical-legend-hint">Gold = move · Red = attack · Blue tint = range${mode !== 'land' ? ' · Shore = bombard' : ''}</span>
             </div>
           </div>
           <aside class="tactical-panel">
@@ -367,12 +608,36 @@ export class TacticalBattleUI {
     this.previousFocus = null;
   }
 
-  private createState(combat: CombatState, territoryName: string): TacticalState {
+  private buildOpeningLog(mode: TacticalBattleMode, territoryName: string): string[] {
+    const lines = [
+      mode === 'naval'
+        ? `Fleet action at ${territoryName}.`
+        : mode === 'amphibious'
+          ? `Amphibious battle for ${territoryName}.`
+          : `Battle for ${territoryName}.`,
+      mode === 'land'
+        ? 'Capture the town (100%) or wipe out defenders. Ranged units need line of sight.'
+        : 'Move infantry to shore tiles (S/B) to fire on ships. Artillery and armor can engage from coastal ground.',
+    ];
+    if (mode === 'amphibious' && typeof localStorage !== 'undefined') {
+      const hintKey = 'gs-tactical-amphibious-hint';
+      if (!localStorage.getItem(hintKey)) {
+        lines.push('Tip: Select infantry, move to shore (S/B), then click enemy ships in range.');
+        localStorage.setItem(hintKey, '1');
+      }
+    }
+    return lines;
+  }
+
+  private createState(combat: CombatState, territoryName: string, mode: TacticalBattleMode): TacticalState {
     const units: TacticalUnit[] = [];
     const width = Math.max(8, Math.min(10, 8 + Math.floor(Math.max(combat.attackers.length, combat.defenders.length) / 5)));
     const height = Math.max(6, Math.min(9, Math.ceil(Math.max(combat.attackers.length, combat.defenders.length) / 2) + 2));
-    const attackerPositions = this.getDeploymentPositions('attacker', combat.attackers.length, width, height);
-    const defenderPositions = this.getDeploymentPositions('defender', combat.defenders.length, width, height);
+    const terrain = mode === 'land'
+      ? buildTacticalTerrainGrid(width, height)
+      : buildNavalTacticalTerrainGrid(width, height, mode);
+    const attackerPositions = this.getDeploymentPositions('attacker', combat.attackers, width, height, mode, terrain);
+    const defenderPositions = this.getDeploymentPositions('defender', combat.defenders, width, height, mode, terrain);
     combat.attackers.forEach((cu, index) => {
       const position = attackerPositions[index] ?? { x: 1, y: 1 };
       units.push(this.makeTacticalUnit(cu, 'attacker', index, position.x, position.y));
@@ -384,41 +649,47 @@ export class TacticalBattleUI {
     return {
       width,
       height,
+      mode,
       phase: 'player',
       turn: 1,
       selectedId: units.find(unit => unit.side === 'attacker')?.id ?? null,
       units,
-      terrain: buildTacticalTerrainGrid(width, height),
-      log: [
-        `Battle for ${territoryName}.`,
-        'Capture the town (100%) or wipe out defenders. Ranged units need line of sight.',
-      ],
+      terrain,
+      log: this.buildOpeningLog(mode, territoryName),
       fx: [],
       pulseTile: null,
       captureProgress: 0,
+      coastalSupportHp: mode === 'land' ? 0 : 30,
       undoMove: null,
       moveAnim: null,
     };
   }
 
   private makeTacticalUnit(cu: CombatUnit, side: TacticalSide, index: number, x: number, y: number): TacticalUnit {
-    const isFast = cu.unitType.id.includes('tank') || cu.unitType.id.includes('armor') || cu.unitType.domain === 'air';
+    const isFast = cu.unitType.id.includes('tank') || cu.unitType.id.includes('armor')
+      || cu.unitType.domain === 'air'
+      || (cu.unitType.domain === 'sea' && (cu.unitType.id.includes('destroy') || cu.unitType.id.includes('cruiser')));
     const isRanged = cu.unitType.id.includes('artillery') || cu.unitType.domain === 'air' || cu.unitType.domain === 'sea';
     const role = this.getRole(cu);
+    const navalRange = cu.unitType.canBombard ? 4 : cu.unitType.id.includes('sub') ? 2 : 3;
     return {
       id: `${side}-${index}-${cu.unitType.id}`,
       side,
       sourceIndex: index,
       name: cu.unitType.name,
       role,
+      domain: cu.unitType.domain,
+      canBombard: cu.unitType.canBombard,
       count: cu.count,
       x,
       y,
       hp: Math.max(2, cu.count * 3),
       maxHp: Math.max(2, cu.count * 3),
       attack: Math.max(1, side === 'attacker' ? cu.unitType.attack : cu.unitType.defense),
-      range: isRanged ? (role === 'Artillery' ? 4 : 3) : 1,
-      move: isFast ? 3 : 2,
+      range: isRanged ? (role === 'Artillery' ? 4 : cu.unitType.domain === 'sea' ? navalRange : 3) : 1,
+      move: cu.unitType.domain === 'sea'
+        ? Math.max(2, Math.min(4, cu.unitType.movement))
+        : isFast ? 3 : 2,
       moved: false,
       attacked: false,
     };
@@ -440,6 +711,11 @@ export class TacticalBattleUI {
 
     if (clickedUnit?.side === 'defender') {
       this.tryAttack(selected, clickedUnit);
+      return;
+    }
+
+    if (!clickedUnit && this.canBombardTile(selected, point.x, point.y)) {
+      this.performBombardment(selected, point.x, point.y);
       return;
     }
 
@@ -469,6 +745,8 @@ export class TacticalBattleUI {
     if (point && this.state?.phase === 'player' && selected) {
       const hoveredUnit = this.getUnitAt(point.x, point.y);
       if (hoveredUnit?.side === 'defender' && this.canAttackTarget(selected, hoveredUnit)) {
+        cursor = 'crosshair';
+      } else if (!hoveredUnit && this.canBombardTile(selected, point.x, point.y)) {
         cursor = 'crosshair';
       } else if (!selected.moved && this.canMoveTo(selected, point.x, point.y)) {
         cursor = 'pointer';
@@ -506,7 +784,13 @@ export class TacticalBattleUI {
     const selected = this.getSelected();
     if (!selected || !this.hoveredTile) return;
     const target = this.getUnitAt(this.hoveredTile.x, this.hoveredTile.y);
-    if (target) this.tryAttack(selected, target);
+    if (target) {
+      this.tryAttack(selected, target);
+      return;
+    }
+    if (this.canBombardTile(selected, this.hoveredTile.x, this.hoveredTile.y)) {
+      this.performBombardment(selected, this.hoveredTile.x, this.hoveredTile.y);
+    }
   }
 
   private tryAttack(attacker: TacticalUnit, target: TacticalUnit): void {
@@ -514,7 +798,11 @@ export class TacticalBattleUI {
       if (attacker.attacked) this.pushLog(`${attacker.name} already fired.`);
       else if (attacker.role === 'Artillery' && attacker.moved) this.pushLog('Artillery must fire from a deployed position.');
       else if (this.distance(attacker, target) > attacker.range) this.pushLog('Target out of range.');
-      else this.pushLog('No line of sight — clear woods/ridges/units.');
+      else if (attacker.domain === 'land' && target.domain === 'sea' && !this.isCoastalFiringPosition(attacker.x, attacker.y)) {
+        this.pushLog('Move to the shore (S/B) or coastal ground to fire on ships.');
+      } else if (attacker.domain === 'land' && target.domain === 'sea') {
+        this.pushLog('No line of sight to the target ship.');
+      } else this.pushLog('No line of sight — clear woods/ridges/units.');
       this.render();
       return;
     }
@@ -562,7 +850,7 @@ export class TacticalBattleUI {
     this.state.undoMove = null;
     this.tickObjectiveCapture();
     if (this.state.captureProgress >= 100) {
-      this.pushLog('Town secured — defenders routed!');
+      this.pushLog(this.state.mode === 'land' ? 'Town secured — defenders routed!' : 'Engagement zone secured — enemy fleet breaks off!');
       this.evaluate();
       return;
     }
@@ -597,6 +885,9 @@ export class TacticalBattleUI {
         const refreshed = this.pickBestTarget(enemy);
         if (refreshed && this.canAttackTarget(enemy, refreshed)) this.attack(enemy, refreshed);
       }
+    } else if (!enemy.attacked && enemy.canBombard) {
+      const shoreTile = this.findBombardTile(enemy);
+      if (shoreTile) this.performBombardment(enemy, shoreTile.x, shoreTile.y);
     }
     this.evaluate();
     if (this.state.phase === 'victory' || this.state.phase === 'defeat') return;
@@ -628,10 +919,10 @@ export class TacticalBattleUI {
     const defenderOn = this.state.units.some(u => u.side === 'defender' && u.hp > 0 && u.x === objective.x && u.y === objective.y);
     if (attackerOn && !defenderOn) {
       this.state.captureProgress = Math.min(100, this.state.captureProgress + 55);
-      this.pushLog(`Town assault ${this.state.captureProgress}% secured.`);
+      this.pushLog(`${objectiveLabelForMode(this.state.mode)} ${this.state.captureProgress}% secured.`);
     } else if (defenderOn) {
       this.state.captureProgress = Math.max(0, this.state.captureProgress - 25);
-      this.pushLog('Defenders contest the town.');
+      this.pushLog(`Defenders contest the ${objectiveLabelForMode(this.state.mode).toLowerCase()}.`);
     }
   }
 
@@ -662,6 +953,29 @@ export class TacticalBattleUI {
     this.pushLog(target.hp <= 0
       ? `${attacker.name} destroyed ${target.name}${tags ? ` (${tags})` : ''}.`
       : `${attacker.name} hit ${target.name} for ${damage}${tags ? ` (${tags})` : ''}.`);
+  }
+
+  private performBombardment(attacker: TacticalUnit, x: number, y: number): void {
+    if (!this.state || !this.canBombardTile(attacker, x, y)) return;
+    const targetUnit = this.getUnitAt(x, y);
+    if (targetUnit) {
+      this.tryAttack(attacker, targetUnit);
+      return;
+    }
+    const damage = Math.max(2, Math.ceil(attacker.attack * Math.max(1, this.getLivingCount(attacker)) * 0.45));
+    attacker.attacked = true;
+    if (this.state.coastalSupportHp > 0) {
+      this.state.coastalSupportHp = Math.max(0, this.state.coastalSupportHp - damage);
+      this.pushLog(`${attacker.name} bombards the coast (${this.state.coastalSupportHp} coastal support left).`);
+    } else {
+      this.state.captureProgress = Math.min(100, this.state.captureProgress + 20);
+      this.pushLog(`${attacker.name} shells the shore — ${this.state.captureProgress}% secured.`);
+    }
+    this.spawnDamageFx(x, y, damage, true);
+    soundManager.play('tactical_fire');
+    this.state.undoMove = null;
+    this.evaluate();
+    this.render();
   }
 
   private spawnDamageFx(x: number, y: number, damage: number, flank: boolean): void {
@@ -734,8 +1048,13 @@ export class TacticalBattleUI {
 
     ctx.clearRect(0, 0, bounds.width, bounds.height);
     const bg = ctx.createLinearGradient(0, 0, bounds.width, bounds.height);
-    bg.addColorStop(0, '#101827');
-    bg.addColorStop(1, '#151b16');
+    if (this.state.mode === 'naval' || this.state.mode === 'amphibious') {
+      bg.addColorStop(0, '#0b1f3a');
+      bg.addColorStop(1, '#071526');
+    } else {
+      bg.addColorStop(0, '#101827');
+      bg.addColorStop(1, '#151b16');
+    }
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, bounds.width, bounds.height);
 
@@ -776,13 +1095,31 @@ export class TacticalBattleUI {
           }
         }
       }
+      const selectedType = this.resolveCombatUnitType(selected);
+      if (!selected.attacked && selected.domain === 'land' && selectedType && !canLandUnitStrikeNaval(selectedType)) {
+        for (let y = 0; y < this.state.height; y++) {
+          for (let x = 0; x < this.state.width; x++) {
+            if (this.getUnitAt(x, y)) continue;
+            if (isTacticalCoastalFiringPosition(this.state.width, this.state.height, this.state.terrain, x, y)) {
+              this.fillTile(ctx, x, y, 'rgba(45, 212, 191, 0.22)');
+            }
+          }
+        }
+      }
       if (!selected.attacked) {
         this.state.units
           .filter(unit => unit.side === 'defender' && unit.hp > 0 && this.canAttackTarget(selected, unit))
           .forEach(unit => this.fillTile(ctx, unit.x, unit.y, 'rgba(220,60,60,0.34)'));
         for (let y = 0; y < this.state.height; y++) {
           for (let x = 0; x < this.state.width; x++) {
-            if (!this.getUnitAt(x, y) && this.distance(selected, { x, y }) <= selected.range) {
+            if (this.getUnitAt(x, y)) continue;
+            if (this.canBombardTile(selected, x, y)) {
+              this.fillTile(ctx, x, y, 'rgba(220,90,60,0.36)');
+            } else if (selected.domain === 'land' && this.getTerrain(x, y).kind === 'water'
+              && this.state.units.some(u => u.side === 'defender' && u.hp > 0 && u.x === x && u.y === y
+                && this.canAttackTarget(selected, u))) {
+              this.fillTile(ctx, x, y, 'rgba(251, 146, 60, 0.18)');
+            } else if (this.distance(selected, { x, y }) <= selected.range) {
               this.fillTile(ctx, x, y, 'rgba(96,165,250,0.08)');
             }
           }
@@ -863,7 +1200,11 @@ export class TacticalBattleUI {
     const label = document.getElementById('tactical-objective-label');
     const pct = this.state?.captureProgress ?? 0;
     if (fill) fill.style.width = `${pct}%`;
-    if (label) label.textContent = pct >= 100 ? 'Town secured' : `${pct}% secured`;
+    if (label) {
+      label.textContent = pct >= 100
+        ? `${objectiveLabelForMode(this.state?.mode ?? 'land')} secured`
+        : `${pct}% secured`;
+    }
   }
 
   private updateActionButtons(): void {
@@ -874,7 +1215,10 @@ export class TacticalBattleUI {
     const undoBtn = document.getElementById('btn-tactical-undo') as HTMLButtonElement | null;
     const endBtn = document.getElementById('btn-tactical-end-turn') as HTMLButtonElement | null;
     const hoveredEnemy = this.hoveredTile ? this.getUnitAt(this.hoveredTile.x, this.hoveredTile.y) : undefined;
-    const canFire = !!(selected && hoveredEnemy && this.canAttackTarget(selected, hoveredEnemy));
+    const canFire = !!(selected && (
+      (hoveredEnemy && this.canAttackTarget(selected, hoveredEnemy))
+      || (this.hoveredTile && this.canBombardTile(selected, this.hoveredTile.x, this.hoveredTile.y))
+    ));
     if (fireBtn) {
       fireBtn.disabled = !playerPhase || !canFire;
     }
@@ -916,7 +1260,8 @@ export class TacticalBattleUI {
         <div><span>Orders</span><strong>${orders}</strong></div>
         <div><span>Attackers</span><strong>${attackerTotals.alive}/${attackerTotals.total}</strong></div>
         <div><span>Defenders</span><strong>${defenderTotals.alive}/${defenderTotals.total}</strong></div>
-        <div><span>Town</span><strong>${this.state.captureProgress}%</strong></div>
+        <div><span>${this.state.mode === 'land' ? 'Town' : 'Zone'}</span><strong>${this.state.captureProgress}%</strong></div>
+        ${this.state.coastalSupportHp > 0 ? `<div><span>Coast</span><strong>${this.state.coastalSupportHp} support</strong></div>` : ''}
         <div><span>Selected</span><strong>${selected ? `${this.roleTag(selected)} ${this.escape(selected.name)} ×${this.getLivingCount(selected)}` : 'None'}</strong></div>
         ${selected ? `<div><span>Role tip</span><strong>${this.escape(this.getRoleTip(selected))}</strong></div>` : ''}
         ${selected ? `<div><span>Stack HP</span><strong>${selected.hp}/${selected.maxHp}</strong></div>` : ''}
@@ -1023,18 +1368,95 @@ export class TacticalBattleUI {
     return this.state?.units.find(unit => unit.x === x && unit.y === y && unit.hp > 0);
   }
 
+  private tileAllowsUnit(unit: TacticalUnit, x: number, y: number): boolean {
+    const kind = this.getTerrain(x, y).kind ?? 'land';
+    if (unit.domain === 'air') return true;
+    if (unit.domain === 'sea') return kind === 'water';
+    return kind === 'land' || kind === 'shore';
+  }
+
+  private isBombardableTile(x: number, y: number): boolean {
+    const kind = this.getTerrain(x, y).kind ?? 'land';
+    return kind === 'shore' || kind === 'land';
+  }
+
   private canMoveTo(unit: TacticalUnit, x: number, y: number): boolean {
     if (!this.state || unit.moved) return false;
     if (this.getUnitAt(x, y)) return false;
-    const terrainCost = unit.role === 'Air' ? 0 : Math.max(0, this.getTerrain(x, y).moveCost - 1);
+    if (!this.tileAllowsUnit(unit, x, y)) return false;
+    const terrainCost = unit.domain === 'air' ? 0 : Math.max(0, this.getTerrain(x, y).moveCost - 1);
     return this.distance(unit, { x, y }) + terrainCost <= unit.move;
+  }
+
+  private canBombardTile(attacker: TacticalUnit, x: number, y: number): boolean {
+    if (!this.state || attacker.attacked || !attacker.canBombard || attacker.domain !== 'sea') return false;
+    if (!this.isBombardableTile(x, y)) return false;
+    if (this.distance(attacker, { x, y }) > attacker.range) return false;
+    const targetUnit = this.getUnitAt(x, y);
+    if (targetUnit?.side === attacker.side) return false;
+    return hasNavalBombardLineOfSight(this.state.width, this.state.height, this.state.terrain, attacker.x, attacker.y, x, y);
+  }
+
+  private resolveCombatUnitType(unit: TacticalUnit): import('../data/Unit').UnitType | null {
+    if (!this.activeCombat) return null;
+    const pool = unit.side === 'attacker' ? this.activeCombat.attackers : this.activeCombat.defenders;
+    return pool[unit.sourceIndex]?.unitType ?? null;
+  }
+
+  private isAdjacentToWater(x: number, y: number): boolean {
+    if (!this.state) return false;
+    return isTacticalAdjacentToWater(this.state.width, this.state.height, this.state.terrain, x, y);
+  }
+
+  private isCoastalFiringPosition(x: number, y: number): boolean {
+    if (!this.state) return false;
+    return isTacticalCoastalFiringPosition(this.state.width, this.state.height, this.state.terrain, x, y);
+  }
+
+  private canLandUnitAttackNavalTactical(attacker: TacticalUnit, target: TacticalUnit): boolean {
+    const attackerType = this.resolveCombatUnitType(attacker);
+    if (!attackerType || !this.state) return false;
+    return canTacticalLandAttackNaval(
+      attackerType,
+      attacker,
+      target,
+      this.state.terrain,
+      this.state.width,
+      this.state.height,
+      (ax, ay, bx, by) => this.hasLineOfSight(ax, ay, bx, by),
+    );
   }
 
   private canAttackTarget(attacker: TacticalUnit, target: TacticalUnit): boolean {
     if (!this.state || attacker.attacked || target.hp <= 0) return false;
+    const attackerType = this.resolveCombatUnitType(attacker);
+    const targetType = this.resolveCombatUnitType(target);
+    if (attackerType && targetType) {
+      if (attackerType.domain === 'land' && targetType.domain === 'sea') {
+        if (!this.canLandUnitAttackNavalTactical(attacker, target)) return false;
+      } else if (!canUnitEngageTarget(attackerType, targetType)) {
+        return false;
+      }
+    }
     if (attacker.role === 'Artillery' && attacker.moved) return false;
     if (this.distance(attacker, target) > attacker.range) return false;
-    if (attacker.range <= 1) return true;
+    if (attacker.range <= 1) {
+      if (attacker.domain === 'land' && target.domain === 'sea') {
+        return true;
+      }
+      return this.tileAllowsUnit(attacker, target.x, target.y) || this.tileAllowsUnit(attacker, attacker.x, attacker.y);
+    }
+    if (attacker.domain === 'sea' && (target.domain === 'land' || this.isBombardableTile(target.x, target.y))) {
+      return hasNavalBombardLineOfSight(
+        this.state.width,
+        this.state.height,
+        this.state.terrain,
+        attacker.x,
+        attacker.y,
+        target.x,
+        target.y,
+      );
+    }
     return this.hasLineOfSight(attacker.x, attacker.y, target.x, target.y);
   }
 
@@ -1055,11 +1477,13 @@ export class TacticalBattleUI {
 
   private getRoleTip(unit: TacticalUnit): string {
     switch (unit.role) {
-      case 'Armor': return 'Charge: +1 dmg after moving';
+      case 'Armor': return unit.domain === 'land' && this.state?.mode !== 'land'
+        ? 'Coastal fire or charge inland after landing'
+        : 'Charge: +1 dmg after moving';
       case 'Artillery': return 'Deploy first — no fire after moving';
       case 'Air': return 'Ignores terrain movement cost';
-      case 'Infantry': return 'Steady line fighter';
-      default: return 'Combined arms support';
+      case 'Naval': return unit.canBombard ? 'Bombard shore tiles (S/C) in range' : 'Fleet combat — stay on water';
+      default: return 'Coastal fire: move to shore (S/B) to engage ships';
     }
   }
 
@@ -1083,7 +1507,19 @@ export class TacticalBattleUI {
     const cover = this.getTerrain(target.x, target.y).cover;
     const flankBonus = this.getFlankBonus(attacker, target);
     const chargeBonus = attacker.role === 'Armor' && attacker.moved && attacker.side === 'attacker' ? 1 : 0;
-    const damage = computeTacticalDamage(attacker, target, cover, flankBonus, chargeBonus);
+    const attackerType = this.resolveCombatUnitType(attacker);
+    const targetType = this.resolveCombatUnitType(target);
+    let attackPower = attacker.attack;
+    if (attackerType && targetType?.domain === 'sea' && attackerType.domain === 'land') {
+      attackPower = getLandAntiNavalAttack(attackerType, attackPower);
+    }
+    const damage = computeTacticalDamage(
+      { attack: attackPower, count: attacker.count, hp: attacker.hp },
+      target,
+      cover,
+      flankBonus,
+      chargeBonus,
+    );
     return {
       attacker,
       target,
@@ -1095,7 +1531,56 @@ export class TacticalBattleUI {
     };
   }
 
-  private getDeploymentPositions(side: TacticalSide, count: number, width: number, height: number): Array<{ x: number; y: number }> {
+  private getDeploymentPositions(
+    side: TacticalSide,
+    combatUnits: CombatUnit[],
+    width: number,
+    height: number,
+    mode: TacticalBattleMode,
+    terrain: TacticalTerrain[][],
+  ): Array<{ x: number; y: number }> {
+    if (mode === 'land') {
+      return this.getLandDeploymentPositions(side, combatUnits.length, width, height);
+    }
+
+    const slots: Array<{ x: number; y: number }> = [];
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 0; x < width; x++) {
+        const tile = terrain[y]?.[x];
+        if (!tile) continue;
+        const onAttackerFlank = side === 'attacker' ? x <= Math.floor(width * 0.35) : x >= Math.floor(width * 0.55);
+        if (!onAttackerFlank) continue;
+        if (tile.kind === 'water' || tile.kind === 'shore' || tile.kind === 'land') {
+          slots.push({ x, y });
+        }
+      }
+    }
+
+    return combatUnits.map((cu, index) => {
+      const domain = cu.unitType.domain;
+      const preferred = slots.filter(({ x, y }) => {
+        const kind = terrain[y][x].kind ?? 'land';
+        if (domain === 'sea') return kind === 'water';
+        if (domain === 'land') return kind === 'land' || kind === 'shore' || kind === 'beach';
+        return true;
+      });
+      const coastalPreferred = domain === 'land'
+        ? preferred.filter(({ x, y }) => {
+            const kind = terrain[y][x].kind ?? 'land';
+            return kind === 'shore' || kind === 'beach';
+          })
+        : [];
+      const pool = coastalPreferred.length > 0 ? coastalPreferred : preferred.length > 0 ? preferred : slots;
+      return pool[index % pool.length] ?? pool[0] ?? { x: side === 'attacker' ? 1 : width - 2, y: 1 + index };
+    });
+  }
+
+  private getLandDeploymentPositions(
+    side: TacticalSide,
+    count: number,
+    width: number,
+    height: number,
+  ): Array<{ x: number; y: number }> {
     const primaryColumns = side === 'attacker' ? [1, 2] : [width - 2, width - 3];
     const reserveColumns = side === 'attacker' ? [0, 3] : [width - 1, width - 4];
     const columns = [...primaryColumns, ...reserveColumns].filter((x, index, all) => x >= 0 && x < width && all.indexOf(x) === index);
@@ -1157,16 +1642,30 @@ export class TacticalBattleUI {
       .sort((a, b) => this.distance(unit, a) - this.distance(unit, b))[0];
   }
 
+  private findBombardTile(unit: TacticalUnit): { x: number; y: number } | null {
+    if (!this.state || !unit.canBombard) return null;
+    for (let y = 0; y < this.state.height; y++) {
+      for (let x = 0; x < this.state.width; x++) {
+        if (this.canBombardTile(unit, x, y)) return { x, y };
+      }
+    }
+    return null;
+  }
+
   private bestStepToward(unit: TacticalUnit, target: TacticalUnit): { x: number; y: number } | null {
     const candidates = [
       { x: unit.x + 1, y: unit.y },
       { x: unit.x - 1, y: unit.y },
       { x: unit.x, y: unit.y + 1 },
       { x: unit.x, y: unit.y - 1 },
-    ].filter(point => point.x >= 0 && point.y >= 0 && this.state && point.x < this.state.width && point.y < this.state.height && !this.getUnitAt(point.x, point.y));
+    ].filter(point => point.x >= 0 && point.y >= 0 && this.state && point.x < this.state.width && point.y < this.state.height
+      && !this.getUnitAt(point.x, point.y) && this.tileAllowsUnit(unit, point.x, point.y));
+    const wantsShore = unit.domain === 'land' && target.domain === 'sea';
     return candidates.sort((a, b) => {
-      const da = this.distance(a, target) + this.getTerrain(a.x, a.y).moveCost * 0.1;
-      const db = this.distance(b, target) + this.getTerrain(b.x, b.y).moveCost * 0.1;
+      const shoreA = wantsShore && this.isCoastalFiringPosition(a.x, a.y) ? -0.75 : 0;
+      const shoreB = wantsShore && this.isCoastalFiringPosition(b.x, b.y) ? -0.75 : 0;
+      const da = this.distance(a, target) + this.getTerrain(a.x, a.y).moveCost * 0.1 + shoreA;
+      const db = this.distance(b, target) + this.getTerrain(b.x, b.y).moveCost * 0.1 + shoreB;
       return da - db;
     })[0] ?? null;
   }

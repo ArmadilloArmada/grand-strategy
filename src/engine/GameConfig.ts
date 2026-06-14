@@ -50,7 +50,7 @@ export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: str
   },
   move_for_move: {
     name: 'Move for Move',
-    description: 'Your build phase, then everyone alternates one move at a time, then collect income.',
+    description: 'Build anytime with the 🏭 button. Each move passes to the next player. End Turn to collect.',
     icon: '↔️'
   }
 };
@@ -60,22 +60,22 @@ export type UnitEra = 'wwi' | 'wwii' | 'coldwar' | 'modern';
 export const UNIT_ERA_INFO: Record<UnitEra, { name: string; description: string; icon: string }> = {
   wwi: {
     name: 'World War I (1914)',
-    description: 'Slow trench warfare. Infantry dominant, early tanks.',
+    description: 'Slow trench warfare. Most units move 1 tile; cavalry and destroyers reach 2.',
     icon: '🎖️'
   },
   wwii: {
     name: 'World War II (1942)',
-    description: 'Classic combined arms. Balanced mobility.',
+    description: 'Classic combined arms. Standard mobility — land 1–2, air 3–4, naval 2.',
     icon: '⚔️'
   },
   coldwar: {
     name: 'Cold War (1970)',
-    description: 'Jet age. Faster units, stronger air power.',
+    description: 'Jet age. Armor and fleets move 3 tiles; jets reach 4–5.',
     icon: '☢️'
   },
   modern: {
     name: 'Modern (2020)',
-    description: 'High-tech warfare. Fast, powerful, expensive.',
+    description: 'High-tech warfare. Motorized land 2–3, air 5–6, naval task forces up to 4.',
     icon: '🛰️'
   }
 };

@@ -63,7 +63,7 @@ export class UnitType {
       case 'land':
         return territoryType === 'land' || territoryType === 'coastal';
       case 'sea':
-        return territoryType === 'sea' || territoryType === 'coastal';
+        return territoryType === 'sea';
       case 'air':
         return true; // Air units can go anywhere
     }

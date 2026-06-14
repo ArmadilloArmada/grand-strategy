@@ -12,6 +12,7 @@
 
 import { GameState } from './GameState';
 import { Territory } from '../data/Territory';
+import { hasSeaAccess, spawnUnitsOnTerritory } from './navalPlacement';
 
 export interface MobilizationOption {
   territory: Territory;
@@ -22,10 +23,16 @@ export interface MobilizationOption {
   reason?: string;
 }
 
+export interface SpawnedUnit {
+  unitTypeId: string;
+  count: number;
+  territoryId: string;
+}
+
 export interface MobilizationResult {
   success: boolean;
   reason?: string;
-  unitsSpawned?: { unitTypeId: string; count: number }[];
+  unitsSpawned?: SpawnedUnit[];
 }
 
 export class MobilizationSystem {
@@ -80,6 +87,9 @@ export class MobilizationSystem {
         { unitTypeId: 'artillery', count: 1 },
         { unitTypeId: 'infantry', count: 2 }
       ];
+      if (hasSeaAccess(this.state, territory)) {
+        this.appendNavalMobilizationUnits(units, territory);
+      }
     } else if (territory.isCapital) {
       type = 'capital';
       cost = 9;
@@ -88,21 +98,16 @@ export class MobilizationSystem {
         { unitTypeId: 'tank', count: 1 },
         { unitTypeId: 'fighter', count: 1 }
       ];
-    } else if (territory.type === 'coastal') {
+      if (hasSeaAccess(this.state, territory)) {
+        this.appendNavalMobilizationUnits(units, territory);
+      }
+    } else if (territory.type === 'coastal' || hasSeaAccess(this.state, territory)) {
       type = 'coastal';
       cost = 9;
-      // Check if adjacent to sea - if so, can produce naval
-      const hasSeaAccess = territory.adjacentTo.some(adjId => {
-        const adj = this.state.territories.get(adjId);
-        return adj?.type === 'sea';
-      });
-      
-      if (hasSeaAccess) {
-        units = [
-          { unitTypeId: 'infantry', count: 2 },
-          { unitTypeId: 'destroyer', count: 1 },
-          { unitTypeId: 'transport', count: 1 },
-        ];
+
+      if (hasSeaAccess(this.state, territory)) {
+        units = [{ unitTypeId: 'infantry', count: 2 }];
+        this.appendNavalMobilizationUnits(units, territory);
       } else {
         units = [
           { unitTypeId: 'infantry', count: 3 }
@@ -126,10 +131,10 @@ export class MobilizationSystem {
       cost = Math.ceil(cost * (1 + (productionMultiplier - 1) * 0.5));
     }
 
-    // Swap in faction-specific unique unit (replace one infantry per package)
-    if (faction) {
+    // Faction elite infantry (e.g. Atlantic Alliance Marines) only on cheap land mobilizations.
+    if (faction && type === 'land') {
       const uniqueUnit = this.state.unitRegistry.getAll()
-        .find(u => u.factionId === faction.id);
+        .find(u => u.factionId === faction.id && u.domain === 'land');
       if (uniqueUnit) {
         const infantry = units.find(u => u.unitTypeId === 'infantry');
         if (infantry && infantry.count > 0) {
@@ -218,32 +223,46 @@ export class MobilizationSystem {
     // Deduct IPCs
     faction.spendIPCs(option.cost);
 
-    // Spawn land units on this territory; sea-domain units go into an adjacent sea zone
-    // (MovementValidator counts lift capacity in sea tiles — coastal-only naval never enabled amphib moves.)
-    const navalSpawnSeaId =
-      option.type === 'coastal' ? this.getCoastalMobilizationSeaId(territory) : null;
-
+    const spawnedUnits: SpawnedUnit[] = [];
     for (const unit of option.units) {
-      const ut = this.state.unitRegistry.get(unit.unitTypeId);
-      const spawnId = navalSpawnSeaId && ut?.domain === 'sea' ? navalSpawnSeaId : territoryId;
-      const spawnTerritory = this.state.territories.get(spawnId);
-      if (!spawnTerritory) continue;
-      spawnTerritory.addUnits(unit.unitTypeId, unit.count);
-      spawnTerritory.markUnitsActed(unit.unitTypeId, unit.count);
+      const result = spawnUnitsOnTerritory(
+        this.state,
+        faction.id,
+        territoryId,
+        unit.unitTypeId,
+        unit.count,
+      );
+      if (!result.success || !result.territoryId) {
+        for (const placed of spawnedUnits) {
+          this.state.territories.get(placed.territoryId)?.removeUnits(placed.unitTypeId, placed.count);
+        }
+        faction.ipcs += option.cost;
+        const unitName = this.state.unitRegistry.get(unit.unitTypeId)?.name ?? unit.unitTypeId;
+        return {
+          success: false,
+          reason: result.reason ?? `Could not place ${unitName}`,
+        };
+      }
+      const spawnTerritory = this.state.territories.get(result.territoryId);
+      spawnTerritory?.markUnitsActed(unit.unitTypeId, unit.count);
+      spawnedUnits.push({
+        unitTypeId: unit.unitTypeId,
+        count: unit.count,
+        territoryId: result.territoryId,
+      });
     }
 
-    // Mark territory as mobilized this turn
     this.mobilizedThisTurn.add(territoryId);
 
     this.state.emit('territory_mobilized', {
       territoryId,
-      units: option.units,
-      cost: option.cost
+      units: spawnedUnits,
+      cost: option.cost,
     });
 
     return {
       success: true,
-      unitsSpawned: option.units
+      unitsSpawned: spawnedUnits,
     };
   }
 
@@ -284,13 +303,21 @@ export class MobilizationSystem {
     this.mobilizedThisTurn.delete(territoryId);
   }
 
-  /** Deterministic adjacent sea for spawning naval units from a coastal mobilization. */
-  private getCoastalMobilizationSeaId(territory: Territory): string | null {
-    if (territory.type !== 'coastal') return null;
-    const seas = territory.adjacentTo
-      .filter(id => this.state.territories.get(id)?.type === 'sea')
-      .sort();
-    return seas[0] ?? null;
+  /** Naval units included in coastal and sea-access capital mobilizations. */
+  private appendNavalMobilizationUnits(
+    units: { unitTypeId: string; count: number }[],
+    territory: Territory,
+  ): void {
+    units.push({ unitTypeId: 'transport', count: 1 });
+    if (territory.production >= 2) {
+      units.push({ unitTypeId: 'destroyer', count: 1 });
+    }
+    if (territory.production >= 3) {
+      units.push({ unitTypeId: 'cruiser', count: 1 });
+    }
+    if (territory.production >= 4) {
+      units.push({ unitTypeId: 'submarine', count: 1 });
+    }
   }
 
   /**

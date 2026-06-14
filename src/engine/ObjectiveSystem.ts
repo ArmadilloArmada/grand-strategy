@@ -7,7 +7,7 @@
  */
 
 import { GameState } from './GameState';
-import { resolveTerritoryForNavalUnitPlacement } from './navalPlacement';
+import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export type ObjectiveRewardType = 'ipc' | 'research' | 'units';
 
@@ -326,13 +326,13 @@ export class ObjectiveSystem {
     } else if (obj.reward.type === 'units' && obj.reward.unitTypeId) {
       const capital = this.state.territories.get(faction.capital);
       if (capital) {
-        const spawn = resolveTerritoryForNavalUnitPlacement(
+        spawnUnitsOnTerritory(
           this.state,
-          capital,
-          obj.reward.unitTypeId,
           obj.factionId,
+          capital.id,
+          obj.reward.unitTypeId,
+          obj.reward.amount,
         );
-        if (spawn) spawn.addUnits(obj.reward.unitTypeId, obj.reward.amount);
       }
     }
     // 'research' reward is informational — TechnologyManager can pick it up via event

@@ -6,7 +6,7 @@
 import { GameState } from './GameState';
 import { Territory } from '../data/Territory';
 import { Faction } from '../data/Faction';
-import { resolveTerritoryForNavalUnitPlacement } from './navalPlacement';
+import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export interface GameEvent {
   id: string;
@@ -873,13 +873,13 @@ export class EventsSystem {
       case 'unit_spawn': {
         const targetTerritory = this.getTargetTerritory(effect.target, factionId);
         if (targetTerritory && effect.unitType) {
-          const spawn = resolveTerritoryForNavalUnitPlacement(
+          spawnUnitsOnTerritory(
             this.state,
-            targetTerritory,
-            effect.unitType,
             factionId,
+            targetTerritory.id,
+            effect.unitType,
+            effect.value || 1,
           );
-          if (spawn) spawn.addUnits(effect.unitType, effect.value || 1);
         }
         break;
       }

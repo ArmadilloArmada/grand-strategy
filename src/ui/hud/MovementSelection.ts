@@ -37,18 +37,24 @@ export function resolveTerritorySelectionMove(args: {
 export function splitMoveAndAttackTargets(moves: ValidMove[]): {
   moveTargets: string[];
   attackTargets: string[];
+  coastalStrikeTargets: string[];
 } {
   const moveTargets: string[] = [];
   const attackTargets: string[] = [];
+  const coastalStrikeTargets: string[] = [];
   const seen = new Set<string>();
 
   for (const move of moves) {
     if (seen.has(move.territoryId)) continue;
     seen.add(move.territoryId);
 
-    if (move.isAttack) attackTargets.push(move.territoryId);
-    else moveTargets.push(move.territoryId);
+    if (move.isAttack) {
+      attackTargets.push(move.territoryId);
+      if (move.coastalStrike) coastalStrikeTargets.push(move.territoryId);
+    } else {
+      moveTargets.push(move.territoryId);
+    }
   }
 
-  return { moveTargets, attackTargets };
+  return { moveTargets, attackTargets, coastalStrikeTargets };
 }

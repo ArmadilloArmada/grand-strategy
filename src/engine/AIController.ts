@@ -23,6 +23,18 @@ import {
   calculateAttackPriority,
   calculateUnitPriority,
 } from "./AIPersonalities";
+import {
+  applyDifficultyToPersonality,
+  clonePersonality,
+  countFactionUnitsByDomain,
+  getIpcReserveFloor,
+  getMaxMobilizationsForTurn,
+  mobilizationNavalPenalty,
+  MOBILIZATION_LIMITS,
+  shouldSkipNavalHeavyMobilization,
+  type AIDifficultyLevel,
+} from './AIDifficulty';
+import { isNavalReachNeighbor } from './gridAdjacency';
 import type { AIWorkerState, AIWorkerResponse } from "../workers/aiWorkerTypes";
 
 interface PerfBucket {
@@ -92,6 +104,7 @@ export class AIController {
 
   // Active personality (drives all decisions)
   private personality: AIPersonality = getPersonality('balanced');
+  private personalityPresetId = 'balanced';
 
   // Derived decision weights from personality
   private get aggressiveness(): number { return this.personality.aggression; }
@@ -107,7 +120,10 @@ export class AIController {
 
   constructor(private state: GameState, private turnManager: TurnManager) {
     this.movementValidator = new MovementValidator(state);
-    this.mobilizationSystem = new MobilizationSystem(state);
+    if (!state.systems.mobilizationSystem) {
+      state.systems.mobilizationSystem = new MobilizationSystem(state);
+    }
+    this.mobilizationSystem = state.systems.mobilizationSystem;
     this.combatResolver = new CombatResolver(state);
 
     // Record grudges when territory is attacked
@@ -124,17 +140,27 @@ export class AIController {
   }
 
   /**
-   * Set AI difficulty — scales personality risk/aggression
+   * Set AI difficulty — scales combat aggression and naval/economic focus.
    */
-  private difficultyLevel: 'easy' | 'medium' | 'hard' = 'medium';
+  private difficultyLevel: AIDifficultyLevel = 'medium';
 
-  setDifficulty(level: "easy" | "medium" | "hard"): void {
+  setDifficulty(level: AIDifficultyLevel): void {
     this.difficultyLevel = level;
-    const scale = level === "easy" ? 0.55 : level === "hard" ? 1.15 : 1.0;
-    const clamp = (v: number) => Math.min(1, Math.max(0, v * scale));
-    this.personality.aggression = clamp(this.personality.aggression);
-    this.personality.riskTolerance = clamp(this.personality.riskTolerance);
-    this.personality.expansion = clamp(this.personality.expansion);
+    this.rebuildPersonality(null);
+  }
+
+  /** Rebuild personality from preset, optional faction modifiers, then difficulty. */
+  private rebuildPersonality(factionId: string | null): void {
+    this.personality = clonePersonality(getPersonality(this.personalityPresetId));
+
+    if (factionId && (this.hasBehavior('historical_priorities') || this.hasBehavior('faction_specific'))) {
+      this.applyHistoricalPriorities(factionId);
+    }
+    if (this.hasBehavior('random_focus')) {
+      this.applyRandomFocusModifiers();
+    }
+
+    applyDifficultyToPersonality(this.personality, this.difficultyLevel);
   }
 
   /** Load a named AI personality preset */
@@ -146,12 +172,15 @@ export class AIController {
       economic: 'economic',
       opportunist: 'adaptive',
     };
-    this.personality = getPersonality(mapping[preset] ?? preset);
+    this.personalityPresetId = mapping[preset] ?? preset;
+    this.rebuildPersonality(null);
   }
 
   /** Load a full AIPersonality object directly */
   setPersonalityObject(p: AIPersonality): void {
-    this.personality = p;
+    this.personality = clonePersonality(p);
+    this.personalityPresetId = p.id;
+    applyDifficultyToPersonality(this.personality, this.difficultyLevel);
   }
 
   /**
@@ -230,6 +259,14 @@ export class AIController {
     if (!faction || faction.controlledBy !== "ai") return;
 
     if (this.turnManager.getTurnStyle() === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      const ownerId = this.turnManager.moveForMoveTurnOwnerId;
+      if (faction.id === ownerId && !this.turnManager.moveForMoveOwnerBuildDone) {
+        this.rebuildPersonality(faction.id);
+        this.mobilizationSystem.resetForNewTurn();
+        const evaluations = this.evaluateAllTerritories();
+        this.handleMobilizationPhase(evaluations);
+        this.turnManager.moveForMoveOwnerBuildDone = true;
+      }
       await this.executeSingleMove();
       await this.delay(400);
       this.turnManager.passMoveForMoveTurn();
@@ -237,10 +274,7 @@ export class AIController {
       return;
     }
 
-    if (this.hasBehavior('random_focus')) this.applyRandomFocusModifiers();
-    if (this.hasBehavior('historical_priorities') || this.hasBehavior('faction_specific')) {
-      this.applyHistoricalPriorities(faction.id);
-    }
+    this.rebuildPersonality(faction.id);
 
     this.state.emit("ai_thinking", { message: "Evaluating board..." });
     this.mobilizationSystem.resetForNewTurn();
@@ -723,6 +757,7 @@ export class AIController {
         this.handleMobilizationPhase(evaluations);
         break;
       case "move":
+      case "play":
       case "orders":
       case "action":
         this.handleCombatMovePhase(evaluations);
@@ -769,16 +804,29 @@ export class AIController {
       return scoreB - scoreA;
     });
 
-    // Patient personalities mobilize fewer sites per turn to save IPCs
-    const maxMobilizations = this.personality.patience > 0.7 ? 2 : 3;
+    const limits = MOBILIZATION_LIMITS[this.difficultyLevel];
+    let navalCount = countFactionUnitsByDomain(this.state, faction.id, 'sea');
+    let landCount = countFactionUnitsByDomain(this.state, faction.id, 'land');
+    const ipcReserveFloor = getIpcReserveFloor(this.difficultyLevel, faction.ipcs);
+    const maxMobilizations = getMaxMobilizationsForTurn(this.difficultyLevel, this.personality.patience);
     let count = 0;
 
     for (const option of options) {
       if (count >= maxMobilizations) break;
       if (faction.ipcs < option.cost) continue;
+      if (faction.ipcs - option.cost < ipcReserveFloor) continue;
+      if (shouldSkipNavalHeavyMobilization(option, navalCount, landCount, limits, this.difficultyLevel)) {
+        continue;
+      }
+
       const result = this.mobilizationSystem.mobilize(option.territory.id);
       if (result.success) {
         count++;
+        for (const spawned of result.unitsSpawned ?? []) {
+          const unitType = this.state.unitRegistry.get(spawned.unitTypeId);
+          if (unitType?.domain === 'sea') navalCount += spawned.count;
+          else if (unitType?.domain === 'land') landCount += spawned.count;
+        }
         this.state.emit("ai_thinking", {
           message: `Mobilizing forces at ${option.territory.name}`,
           action: 'mobilize',
@@ -828,6 +876,14 @@ export class AIController {
     if (this.personality.economy > 0.7 && faction.ipcs < 20 && threatLevel < 5 && option.type === 'land') {
       score -= 20;
     }
+
+    score -= mobilizationNavalPenalty(
+      option,
+      countFactionUnitsByDomain(this.state, faction.id, 'sea'),
+      countFactionUnitsByDomain(this.state, faction.id, 'land'),
+      MOBILIZATION_LIMITS[this.difficultyLevel],
+      this.difficultyLevel,
+    );
 
     return score;
   }
@@ -1144,12 +1200,11 @@ export class AIController {
       const candidates: AttackCandidate[] = [];
 
       for (const t of owned) {
-        if (!t.adjacentTo.includes(targetId)) continue;
+        if (!t.adjacentTo.includes(targetId) && !this.canStrikeTarget(t, target, targetId)) continue;
         for (const pu of t.units) {
           const ut = this.state.unitRegistry.get(pu.unitTypeId);
-          if (!ut || ut.attack === 0 || !ut.canEnter(target.type)) continue;
-          // Naval AI skips inland targets for naval units
-          if (this.personality.naval > 0.8 && ut.domain === 'sea' && target.type === 'land') continue;
+          if (!ut || ut.attack === 0) continue;
+          if (!ut.canEnter(target.type) && !this.movementValidator.isCoastalStrike(t, target, ut)) continue;
           const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
           if (availableCount <= 0) continue;
           candidates.push({
@@ -1239,7 +1294,37 @@ export class AIController {
       }
     }
 
+    if (this.hasBehavior('control_seas') || this.personality.naval > 0.7) {
+      for (const t of owned) {
+        if (t.type !== 'sea') continue;
+        for (const pu of t.units) {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          if (!ut || ut.domain !== 'sea' || ut.attack === 0) continue;
+          const reachable = this.movementValidator.getValidMoves(pu.unitTypeId, t.id, true);
+          for (const vm of reachable) {
+            if (!vm.isAttack || !vm.coastalStrike) continue;
+            if (plans.some(p => p.targetId === vm.territoryId)) continue;
+            const eval_ = evaluations.get(vm.territoryId);
+            if (!eval_) continue;
+            const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
+            if (availableCount <= 0) continue;
+            plans.push({
+              targetId: vm.territoryId,
+              attackers: [{ fromId: t.id, unitTypeId: pu.unitTypeId, count: Math.min(availableCount, 3) }],
+              expectedSuccess: this.estimateSuccessRate(Math.min(availableCount, 3) * ut.attack, eval_.defenseStrength),
+              strategicValue: eval_.strategicValue + 25,
+            });
+          }
+        }
+      }
+    }
+
     return plans;
+  }
+
+  private canStrikeTarget(from: Territory, target: Territory, targetId: string): boolean {
+    if (from.adjacentTo.includes(targetId)) return true;
+    return isNavalReachNeighbor(this.state, from, target);
   }
 
   private selectAttackersForTarget(
@@ -1420,7 +1505,13 @@ export class AIController {
         continue;
       }
 
-      const combat = this.combatResolver.initiateCombat(territoryId, this.state.currentFactionId, attackingUnits);
+      const sourceTerritoryId = attackingMoves[0]?.fromTerritoryId;
+      const combat = this.combatResolver.initiateCombat(
+        territoryId,
+        this.state.currentFactionId,
+        attackingUnits,
+        sourceTerritoryId,
+      );
 
       if (!combat) {
         for (const move of attackingMoves) {
@@ -1428,6 +1519,9 @@ export class AIController {
         }
         continue;
       }
+
+      combat.sourceTerritory = sourceTerritoryId;
+      this.combatResolver.runPreCombatPhases(combat);
 
       let usedTacticalAssault = false;
       if (settings.getSetting('tacticalBattles')) {
@@ -1615,8 +1709,8 @@ export class AIController {
       this.personality.aggression = Math.max(0, this.personality.aggression - 0.05);
     }
     if ((bonuses.incomeMultiplierBonus ?? 0) > 0) {
-      // Wealthy faction — naval and economic dominance
-      this.personality.naval   = Math.min(1, this.personality.naval   + 0.15);
+      // Wealthy faction — modest naval interest (scaled by difficulty elsewhere)
+      this.personality.naval   = Math.min(1, this.personality.naval   + 0.08);
       this.personality.economy = Math.min(1, this.personality.economy + 0.1);
     }
   }

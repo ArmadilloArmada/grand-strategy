@@ -134,15 +134,59 @@ describe('ReserveSystem — queueDeployment', () => {
       type: 'coastal' as any,
       isCapital: true,
       production: 2,
-      adjacentTo: [],
+      adjacentTo: ['sea1'],
     });
+    const sea1 = makeTerritory('sea1', 'player', { type: 'sea' as const, adjacentTo: ['port'] });
     state.territories.set('port', port);
+    state.territories.set('sea1', sea1);
     state.currentFactionId = 'player';
 
     const reserves = new ReserveSystem(state);
     reserves.addToReserve('player', 'transport', 1);
     const result = reserves.queueDeployment('transport', 'port', 1);
     expect(result.success).toBe(true);
+  });
+
+  it('rejects deploying land units directly to a sea zone', () => {
+    const state = new GameState();
+    state.factionRegistry.register(makeFactionData('player', { capital: 'home', allies: [], startingIPCs: 30 }));
+    state.unitRegistry.register(makeUnitData({ id: 'infantry' }));
+    const home = makeTerritory('home', 'player', { type: 'land' as any, adjacentTo: ['sea1'] });
+    const sea1 = makeTerritory('sea1', 'player', { type: 'sea' as any, adjacentTo: ['home'] });
+    state.territories.set('home', home);
+    state.territories.set('sea1', sea1);
+    state.currentFactionId = 'player';
+
+    const reserves = new ReserveSystem(state);
+    reserves.addToReserve('player', 'infantry', 2);
+    const result = reserves.queueDeployment('infantry', 'sea1', 1);
+    expect(result.success).toBe(false);
+  });
+
+  it('auto-deploy keeps land units on land tiles', () => {
+    const state = new GameState();
+    state.factionRegistry.register(makeFactionData('player', { capital: 'home', allies: [], startingIPCs: 30 }));
+    state.unitRegistry.register(makeUnitData({ id: 'infantry' }));
+    state.unitRegistry.register(makeUnitData({ id: 'transport', domain: 'sea' as any, transportCapacity: 2, attack: 0, defense: 0 }));
+    const home = makeTerritory('home', 'player', {
+      type: 'land' as any,
+      production: 2,
+      hasFactory: true,
+      adjacentTo: ['sea1'],
+    });
+    const sea1 = makeTerritory('sea1', 'player', { type: 'sea' as any, adjacentTo: ['home'] });
+    state.territories.set('home', home);
+    state.territories.set('sea1', sea1);
+    state.currentFactionId = 'player';
+
+    const reserves = new ReserveSystem(state);
+    reserves.addToReserve('player', 'infantry', 2);
+    reserves.addToReserve('player', 'transport', 1);
+    const result = reserves.autoDeployReserves('player');
+    expect(result.deployed).toBeGreaterThan(0);
+    expect(home.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
+    expect(sea1.units.some(u => u.unitTypeId === 'infantry')).toBe(false);
+    expect(sea1.units.some(u => u.unitTypeId === 'transport')).toBe(true);
   });
 });
 

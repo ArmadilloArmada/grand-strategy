@@ -5,7 +5,7 @@
 import { GameState } from '../engine/GameState';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { ProductionManager } from '../engine/ProductionManager';
-import { MobilizationSystem, MobilizationOption } from '../engine/MobilizationSystem';
+import { MobilizationSystem, MobilizationOption, SpawnedUnit } from '../engine/MobilizationSystem';
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
@@ -62,7 +62,7 @@ export interface ProductionCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
   updateMobilizationHighlights(): void;
   updateSelectionInfo(): void;
-  onMobilized(territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]): void;
+  onMobilized(territoryId: string, cost: number, units: SpawnedUnit[]): void;
 }
 
 export class ProductionUI {
@@ -77,6 +77,24 @@ export class ProductionUI {
     private mobilizationSystem: MobilizationSystem,
     private callbacks: ProductionCallbacks
   ) {}
+
+  private formatSpawnedUnitsDesc(
+    mobilizedTerritoryId: string,
+    units: SpawnedUnit[],
+    withIcons = false,
+  ): string {
+    return units.map(u => {
+      const icon = withIcons ? (UNIT_ICONS[u.unitTypeId] || '⬜') : '';
+      const unit = this.state.unitRegistry.get(u.unitTypeId);
+      const name = unit?.name || u.unitTypeId;
+      const atSea = u.territoryId !== mobilizedTerritoryId;
+      const zoneName = atSea
+        ? this.state.territories.get(u.territoryId)?.name
+        : null;
+      const placement = zoneName ? ` → ${zoneName}` : '';
+      return `${icon}${u.count}× ${name}${placement}`;
+    }).join(', ');
+  }
 
   // ==================== FACTORY HUB ====================
 
@@ -643,10 +661,7 @@ export class ProductionUI {
       this.callbacks.onMobilized(territoryId, option.cost, result.unitsSpawned ?? []);
 
       const territory = this.state.territories.get(territoryId);
-      const unitsDesc = result.unitsSpawned?.map(u => {
-        const unit = this.state.unitRegistry.get(u.unitTypeId);
-        return `${u.count}× ${unit?.name || u.unitTypeId}`;
-      }).join(', ') || 'units';
+      const unitsDesc = this.formatSpawnedUnitsDesc(territoryId, result.unitsSpawned ?? []);
 
       this.callbacks.showToast(`Mobilized ${territory?.name}: ${unitsDesc}`, 'success');
       soundManager.play('build');
@@ -690,11 +705,7 @@ export class ProductionUI {
       this.callbacks.onMobilized(territoryId, option.cost, result.unitsSpawned ?? []);
 
       const territory = this.state.territories.get(territoryId);
-      const unitsDesc = result.unitsSpawned?.map(u => {
-        const icon = UNIT_ICONS[u.unitTypeId] || '⬜';
-        const unit = this.state.unitRegistry.get(u.unitTypeId);
-        return `${icon}${u.count}× ${unit?.name || u.unitTypeId}`;
-      }).join(', ') || 'units';
+      const unitsDesc = this.formatSpawnedUnitsDesc(territoryId, result.unitsSpawned ?? [], true);
 
       this.callbacks.showToast(`⚔️ ${territory?.name}: ${unitsDesc}`, 'success');
       soundManager.play('build');
@@ -709,6 +720,8 @@ export class ProductionUI {
       this.callbacks.updateSelectionInfo();
       this.callbacks.updateMobilizationHighlights();
       this.renderer.render();
+    } else {
+      this.callbacks.showToast(result.reason || 'Cannot mobilize', 'info');
     }
   }
 

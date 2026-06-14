@@ -4,6 +4,10 @@
 
 import { GameState, PendingMove } from './GameState';
 import { UnitType } from '../data/Unit';
+import { canIssueOrdersFromTerritory } from './territoryControl';
+import { canLandUnitStrikeNaval, canLandUnitEngageNaval } from './NavalSystem';
+import { hasSeaAccess } from './navalPlacement';
+import { getNavalReachNeighborIds, isNavalReachNeighbor } from './gridAdjacency';
 
 export interface MovementResult {
   valid: boolean;
@@ -18,6 +22,8 @@ export interface ValidMove {
   movementCost: number;
   isAttack: boolean;
   viaTransport?: string; // set when move requires a sea transport
+  /** Shore bombardment / coastal artillery — attackers stay in the source tile */
+  coastalStrike?: boolean;
 }
 
 export class MovementValidator {
@@ -50,12 +56,15 @@ export class MovementValidator {
       return { valid: false, reason: 'No current faction' };
     }
 
-    if (fromTerritory.owner !== currentFaction.id) {
+    if (!canIssueOrdersFromTerritory(fromTerritory, currentFaction.id)) {
       return { valid: false, reason: 'You do not control the source territory' };
     }
 
     if (!unitType.canEnter(toTerritory.type)) {
-      return { valid: false, reason: `${unitType.name} cannot enter ${toTerritory.type} territory` };
+      const coastalStrike = isCombatMove && this.isCoastalStrike(fromTerritory, toTerritory, unitType);
+      if (!coastalStrike) {
+        return { valid: false, reason: `${unitType.name} cannot enter ${toTerritory.type} territory` };
+      }
     }
 
     // Weather: air units grounded
@@ -66,7 +75,9 @@ export class MovementValidator {
       }
     }
 
-    const pathResult = this.findPath(fromTerritoryId, toTerritoryId, unitType);
+    const pathResult = this.isCoastalStrike(fromTerritory, toTerritory, unitType) && isCombatMove
+      ? { valid: true as const, path: [fromTerritoryId, toTerritoryId] }
+      : this.findPath(fromTerritoryId, toTerritoryId, unitType);
     if (!pathResult.valid) {
       return pathResult;
     }
@@ -120,6 +131,12 @@ export class MovementValidator {
   ): ValidMove[] {
     const unitType = this.state.unitRegistry.get(unitTypeId);
     if (!unitType) return [];
+
+    const fromTerritory = this.state.territories.get(fromTerritoryId);
+    if (!fromTerritory) return [];
+    if (unitType.domain === 'land' && fromTerritory.type === 'sea') {
+      return [];
+    }
 
     const currentFaction = this.state.getCurrentFaction();
     if (!currentFaction) return [];
@@ -253,7 +270,122 @@ export class MovementValidator {
       }
     }
 
+    // Coastal strikes: sea→shore bombardment, artillery→offshore fleet
+    for (const coastalMove of this.getCoastalStrikeMoves(fromTerritoryId, unitType, isCombatMove)) {
+      if (!validMoves.some(m => m.territoryId === coastalMove.territoryId)) {
+        validMoves.push(coastalMove);
+      }
+    }
+
     return validMoves;
+  }
+
+  /** Adjacent cross-domain attack targets where the attacker never leaves its tile. */
+  private getCoastalStrikeMoves(
+    fromTerritoryId: string,
+    unitType: UnitType,
+    isCombatMove: boolean,
+  ): ValidMove[] {
+    if (!isCombatMove || !unitType.canAttack()) return [];
+
+    const fromTerritory = this.state.territories.get(fromTerritoryId);
+    const currentFaction = this.state.getCurrentFaction();
+    if (!fromTerritory || !currentFaction) return [];
+
+    const moves: ValidMove[] = [];
+
+    if (unitType.domain === 'sea' && fromTerritory.type === 'sea') {
+      for (const adjId of getNavalReachNeighborIds(this.state, fromTerritory)) {
+        if (adjId === fromTerritoryId) continue;
+        const adj = this.state.territories.get(adjId);
+        if (!adj || !adj.isLand()) continue;
+        if (!adj.owner || !currentFaction.isEnemyOf(adj.owner)) continue;
+        const pactRel = this.state.diplomacyManager.getRelation(currentFaction.id, adj.owner);
+        if (pactRel === 'pact') continue;
+        if (moves.some(m => m.territoryId === adjId)) continue;
+        moves.push({
+          territoryId: adjId,
+          path: [fromTerritoryId, adjId],
+          movementCost: 1,
+          isAttack: true,
+          coastalStrike: true,
+        });
+      }
+    }
+
+    if (unitType.domain === 'land' && fromTerritory.isLand() && canLandUnitStrikeNaval(unitType)) {
+      for (const adjId of getNavalReachNeighborIds(this.state, fromTerritory)) {
+        const adj = this.state.territories.get(adjId);
+        if (!adj || adj.type !== 'sea') continue;
+        const hasEnemyFleet = adj.units.some(pu => {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          return ut?.domain === 'sea' && pu.count > 0;
+        });
+        const enemySeaOwner = adj.owner && currentFaction.isEnemyOf(adj.owner);
+        if (!enemySeaOwner && !hasEnemyFleet) continue;
+        if (adj.owner) {
+          const pactRel = this.state.diplomacyManager.getRelation(currentFaction.id, adj.owner);
+          if (pactRel === 'pact') continue;
+        }
+        if (moves.some(m => m.territoryId === adjId)) continue;
+        moves.push({
+          territoryId: adjId,
+          path: [fromTerritoryId, adjId],
+          movementCost: 1,
+          isAttack: true,
+          coastalStrike: true,
+        });
+      }
+    }
+
+    if (unitType.domain === 'land' && fromTerritory.isLand() && canLandUnitEngageNaval(unitType) && !canLandUnitStrikeNaval(unitType)) {
+      const onCoast = fromTerritory.type === 'coastal' || hasSeaAccess(this.state, fromTerritory);
+      if (!onCoast) return moves;
+
+      for (const adjId of fromTerritory.adjacentTo) {
+        const adj = this.state.territories.get(adjId);
+        if (!adj || adj.type !== 'sea') continue;
+        const hasEnemyFleet = adj.units.some(pu => {
+          const ut = this.state.unitRegistry.get(pu.unitTypeId);
+          return ut?.domain === 'sea' && pu.count > 0;
+        });
+        const enemySeaOwner = adj.owner && currentFaction.isEnemyOf(adj.owner);
+        if (!enemySeaOwner && !hasEnemyFleet) continue;
+        if (adj.owner) {
+          const pactRel = this.state.diplomacyManager.getRelation(currentFaction.id, adj.owner);
+          if (pactRel === 'pact') continue;
+        }
+        if (moves.some(m => m.territoryId === adjId)) continue;
+        moves.push({
+          territoryId: adjId,
+          path: [fromTerritoryId, adjId],
+          movementCost: 1,
+          isAttack: true,
+          coastalStrike: true,
+        });
+      }
+    }
+
+    return moves;
+  }
+
+  /** True when a combat move fires across a coast without entering the target tile. */
+  isCoastalStrike(
+    from: import('../data/Territory').Territory,
+    to: import('../data/Territory').Territory,
+    unitType: UnitType,
+  ): boolean {
+    if (unitType.domain === 'sea' && from.type === 'sea' && to.isLand()) {
+      return isNavalReachNeighbor(this.state, from, to);
+    }
+    if (unitType.domain === 'land' && from.isLand() && to.type === 'sea' && canLandUnitStrikeNaval(unitType)) {
+      return isNavalReachNeighbor(this.state, from, to);
+    }
+    if (unitType.domain === 'land' && from.isLand() && to.type === 'sea' && canLandUnitEngageNaval(unitType) && !canLandUnitStrikeNaval(unitType)) {
+      const onCoast = from.type === 'coastal' || hasSeaAccess(this.state, from);
+      return onCoast && from.adjacentTo.includes(to.id);
+    }
+    return false;
   }
 
   /**
@@ -426,7 +558,7 @@ export class MovementValidator {
    */
   factionHasMovableUnits(factionId: string): boolean {
     for (const territory of this.state.territories.values()) {
-      if (territory.owner !== factionId) continue;
+      if (!canIssueOrdersFromTerritory(territory, factionId)) continue;
       for (const pu of territory.units) {
         if (territory.getAvailableUnitCount(pu.unitTypeId) <= 0) continue;
         const unitType = this.state.unitRegistry.get(pu.unitTypeId);
@@ -466,6 +598,12 @@ export class MovementValidator {
     const toTerritory = this.state.territories.get(move.toTerritoryId);
 
     if (!fromTerritory || !toTerritory) return false;
+
+    const unitType = this.state.unitRegistry.get(move.unitTypeId);
+    if (!unitType || !unitType.canEnter(toTerritory.type)) return false;
+    if (unitType.domain === 'land' && fromTerritory.type === 'sea' && !move.viaTransport) {
+      return false;
+    }
 
     if (!fromTerritory.removeUnits(move.unitTypeId, move.count)) {
       return false;

@@ -7,14 +7,32 @@ import { PlacedUnit } from "../data/Territory";
 import { UnitType } from "../data/Unit";
 import { SupplySystem } from "./SupplySystem";
 import { getCommanderCombatBonuses, processBattleXP, BattleXPOutcome } from "./CommanderProgression";
+import {
+  getFleetCompositionBonus,
+  getNavalAttackCounterBonus,
+  getNavalDefenseCounterBonus,
+  collectOffshoreNavalDefenders,
+  canUnitEngageTarget,
+  getLandAntiNavalAttack,
+  getLandAntiNavalDefense,
+  getShoreBombardmentTargets,
+  collectShoreBombardmentForCombat,
+  collectCoastalArtilleryBarrage,
+  canSubmarinesSurpriseStrike,
+} from "./NavalSystem";
+import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export interface CombatUnit {
   unitType: UnitType;
   count: number;
   hits: number;
   casualties: number;
+  /** Multi-HP units (battleships, carriers) absorb one hit before sinking. */
+  damagedCount?: number;
   veteranCount?: number; // +1 attack/defense per veteran
   batteredUntilTurn?: number; // -1 attack while battered (from retreat)
+  /** Sea stacks fighting from an adjacent zone (not the battle tile). */
+  stationedTerritoryId?: string;
 }
 
 export interface CombatRoundResult {
@@ -65,6 +83,13 @@ export interface BombardmentResult {
   rolls: DiceRoll[];
   hits: number;
   casualties: CasualtySummary[];
+}
+
+export interface PreCombatPhaseResult {
+  shoreBombardment?: BombardmentResult;
+  coastalArtillery?: BombardmentResult;
+  submarineStrike?: BombardmentResult;
+  airIntercept?: { hits: number };
 }
 
 export interface StrategicBombingResult {
@@ -153,7 +178,8 @@ export class CombatResolver {
   initiateCombat(
     territoryId: string,
     attackingFactionId: string,
-    attackingUnits: PlacedUnit[]
+    attackingUnits: PlacedUnit[],
+    sourceTerritoryId?: string,
   ): CombatState | null {
     const territory = this.state.territories.get(territoryId);
     if (!territory || !territory.owner) {
@@ -164,6 +190,10 @@ export class CombatResolver {
     if (defendingFactionId === attackingFactionId) {
       return null; // Can't attack own territory
     }
+
+    const sourceTerritory = sourceTerritoryId
+      ? this.state.territories.get(sourceTerritoryId)
+      : null;
 
     // Build attacker units (with veterancy bonus and battered status)
     const attackers: CombatUnit[] = [];
@@ -177,22 +207,45 @@ export class CombatResolver {
           casualties: 0,
           veteranCount: pu.veteranCount ?? 0,
           batteredUntilTurn: pu.batteredUntilTurn ?? 0,
+          stationedTerritoryId: unitType.domain === 'sea' && sourceTerritory?.type === 'sea'
+            ? sourceTerritory.id
+            : undefined,
         });
       }
     }
 
-    // Build defender units (with veterancy bonus)
+    // Build defender units on the battle tile (land/air only — ships belong in sea zones)
     const defenders: CombatUnit[] = [];
     for (const pu of territory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (unitType && unitType.canDefend()) {
-        defenders.push({
-          unitType,
-          count: pu.count,
-          hits: 0,
-          casualties: 0,
-          veteranCount: pu.veteranCount ?? 0,
-        });
+      if (!unitType || !unitType.canDefend()) continue;
+      if (unitType.domain === 'sea' && territory.type !== 'sea') continue;
+      defenders.push({
+        unitType,
+        count: pu.count,
+        hits: 0,
+        casualties: 0,
+        veteranCount: pu.veteranCount ?? 0,
+      });
+    }
+
+    // Offshore fleet support for land/coastal battles
+    if (territory.type !== 'sea') {
+      for (const offshore of collectOffshoreNavalDefenders(this.state, territoryId, defendingFactionId)) {
+        const existing = defenders.find(
+          d => d.unitType.id === offshore.unitType.id && d.stationedTerritoryId === offshore.stationedTerritoryId,
+        );
+        if (existing) {
+          existing.count += offshore.count;
+        } else {
+          defenders.push({
+            unitType: offshore.unitType,
+            count: offshore.count,
+            hits: 0,
+            casualties: 0,
+            stationedTerritoryId: offshore.stationedTerritoryId,
+          });
+        }
       }
     }
 
@@ -210,6 +263,7 @@ export class CombatResolver {
       isComplete: false,
       winner: null,
       flankingBonus: 0,
+      sourceTerritory: sourceTerritoryId,
     };
 
     this.state.emit("combat_start", { combat });
@@ -218,24 +272,24 @@ export class CombatResolver {
 
   /**
    * Bonus attack when an attacker type hard-counters the defenders present.
-   * Creates rock-paper-scissors feel without adding new unit types.
    */
   private getCounterBonus(attackerTypeId: string, defenders: CombatUnit[]): number {
-    const defIds = new Set(defenders.map(cu => cu.unitType.id));
-    const hasAir = defenders.some(cu => cu.unitType.domain === 'air');
+    const defIds = new Set(defenders.filter(cu => cu.count > cu.casualties).map(cu => cu.unitType.id));
+    const hasAir = defenders.some(cu => cu.unitType.domain === 'air' && cu.count > cu.casualties);
     if (attackerTypeId === 'fighter' && defIds.has('bomber')) return 2;
-    if (attackerTypeId === 'destroyer' && defIds.has('submarine')) return 2;
-    if (attackerTypeId === 'submarine' && (defIds.has('battleship') || defIds.has('carrier'))) return 1;
     if (attackerTypeId === 'tank' && defIds.has('artillery') && !hasAir) return 1;
+    const navalBonus = getNavalAttackCounterBonus(attackerTypeId, defenders);
+    if (navalBonus > 0) return navalBonus;
     return 0;
   }
 
   private getDefenderCounterBonus(defenderTypeId: string, attackers: CombatUnit[]): number {
-    const hasAir = attackers.some(cu => cu.unitType.domain === 'air');
-    const atkIds = new Set(attackers.map(cu => cu.unitType.id));
+    const hasAir = attackers.some(cu => cu.unitType.domain === 'air' && cu.count > cu.casualties);
+    const atkIds = new Set(attackers.filter(cu => cu.count > cu.casualties).map(cu => cu.unitType.id));
     if (defenderTypeId === 'anti_air' && hasAir) return 2;
-    if (defenderTypeId === 'destroyer' && atkIds.has('submarine')) return 2;
     if (defenderTypeId === 'fighter' && atkIds.has('bomber')) return 1;
+    const navalBonus = getNavalDefenseCounterBonus(defenderTypeId, attackers);
+    if (navalBonus > 0) return navalBonus;
     return 0;
   }
 
@@ -308,6 +362,12 @@ export class CombatResolver {
       defenderBonuses.airAttackBonus += defCmdBonuses.airAttackBonus;
     }
 
+    const attackerFleetBonus = getFleetCompositionBonus(combat.attackers);
+    const defenderFleetBonus = getFleetCompositionBonus(combat.defenders);
+    attackerBonuses.attackBonus += attackerFleetBonus.attack;
+    defenderBonuses.defenseBonus += defenderFleetBonus.defense;
+    defenderBonuses.attackBonus += defenderFleetBonus.attack;
+
     // Roll for attackers
     const attackerRolls: DiceRoll[] = [];
     let attackerHits = 0;
@@ -328,6 +388,13 @@ export class CombatResolver {
 
     for (const cu of combat.attackers) {
       const activeCount = cu.count - cu.casualties;
+      if (activeCount <= 0) continue;
+
+      const engageableDefenders = combat.defenders.filter(
+        def => def.count > def.casualties && canUnitEngageTarget(cu.unitType, def.unitType),
+      );
+      if (engageableDefenders.length === 0) continue;
+
       let attackValue = cu.unitType.attack + (cu.veteranCount && cu.veteranCount > 0 ? veteranBonus : 0);
 
       // Apply faction + tech attack bonuses
@@ -364,6 +431,9 @@ export class CombatResolver {
       // Weather penalties for land / air units
       if (cu.unitType.domain === 'land') attackValue += weather.landAttackMod;
       if (cu.unitType.domain === 'air')  attackValue += weather.airAttackMod;
+      if (cu.unitType.domain === 'land' && engageableDefenders.every(d => d.unitType.domain === 'sea')) {
+        attackValue = getLandAntiNavalAttack(cu.unitType, attackValue);
+      }
       attackValue = Math.max(1, attackValue); // Always at least 1 chance to hit
 
       for (let i = 0; i < activeCount; i++) {
@@ -396,6 +466,13 @@ export class CombatResolver {
 
     for (const cu of combat.defenders) {
       const activeCount = cu.count - cu.casualties;
+      if (activeCount <= 0) continue;
+
+      const engageableAttackers = combat.attackers.filter(
+        atk => atk.count > atk.casualties && canUnitEngageTarget(cu.unitType, atk.unitType),
+      );
+      if (engageableAttackers.length === 0) continue;
+
       let defenseValue = cu.unitType.defense
         + (cu.veteranCount && cu.veteranCount > 0 ? veteranBonus : 0)
         + terrainBonus
@@ -430,6 +507,9 @@ export class CombatResolver {
       // Weather penalties for land / air units
       if (cu.unitType.domain === 'land') defenseValue += weather.landDefenseMod;
       if (cu.unitType.domain === 'air')  defenseValue += weather.airAttackMod;
+      if (cu.unitType.domain === 'land' && engageableAttackers.every(a => a.unitType.domain === 'sea')) {
+        defenseValue = getLandAntiNavalDefense(cu.unitType, defenseValue);
+      }
       defenseValue = Math.max(1, defenseValue);
 
       for (let i = 0; i < activeCount; i++) {
@@ -503,12 +583,92 @@ export class CombatResolver {
   }
 
   /**
+   * Submarine first strike — fires before regular combat when no enemy ASW escort.
+   */
+  performSubmarineStrike(combat: CombatState): BombardmentResult {
+    const diceSides = this.state.rules.diceSides;
+    const rolls: DiceRoll[] = [];
+    let hits = 0;
+
+    const subs = combat.attackers.filter(
+      cu => cu.unitType.id === 'submarine' && cu.count > cu.casualties,
+    );
+    if (subs.length === 0) {
+      return { rolls, hits, casualties: [] };
+    }
+
+    for (const cu of subs) {
+      const activeCount = cu.count - cu.casualties;
+      let attackValue = cu.unitType.attack + 1; // surprise strike bonus
+      for (let i = 0; i < activeCount; i++) {
+        const roll = this.rollDie(diceSides);
+        const isHit = roll <= attackValue;
+        const isCritical = isHit && attackValue >= 3 && this.isCriticalHit(roll);
+        rolls.push({
+          unitTypeId: cu.unitType.id,
+          unitName: cu.unitType.name,
+          targetValue: attackValue,
+          roll,
+          isHit,
+          isCritical,
+        });
+        if (isHit) hits += isCritical ? 2 : 1;
+      }
+    }
+
+    const casualties = this.applyCasualties(combat.defenders, hits);
+    this.state.emit('naval_bombardment', {
+      combat,
+      rolls,
+      hits,
+      casualties,
+      strikeType: 'submarine',
+    });
+
+    return { rolls, hits, casualties };
+  }
+
+  /**
+   * Opening phases before round 1: shore bombardment, coastal artillery, subs, air intercept.
+   * Uses the same cross-domain rules as tactical battles.
+   */
+  runPreCombatPhases(combat: CombatState): PreCombatPhaseResult {
+    const result: PreCombatPhaseResult = {};
+    const territory = this.state.territories.get(combat.territoryId);
+    if (!territory) return result;
+
+    if (territory.type !== 'sea') {
+      const bombarding = collectShoreBombardmentForCombat(this.state, combat, combat.territoryId);
+      if (bombarding.length > 0) {
+        result.shoreBombardment = this.performNavalBombardment(combat, bombarding);
+      }
+    } else {
+      const barrage = collectCoastalArtilleryBarrage(combat);
+      if (barrage.length > 0) {
+        result.coastalArtillery = this.performCoastalArtilleryBarrage(combat, barrage);
+      }
+    }
+
+    if (canSubmarinesSurpriseStrike(combat)) {
+      result.submarineStrike = this.performSubmarineStrike(combat);
+    }
+
+    const interceptResult = this.performFighterIntercept(combat);
+    if (interceptResult.hits > 0) {
+      result.airIntercept = { hits: interceptResult.hits };
+    }
+
+    return result;
+  }
+
+  /**
    * Naval pre-combat bombardment — naval units fire once before regular combat.
    * Defenders cannot fire back during bombardment.
    */
   performNavalBombardment(
     combat: CombatState,
-    bombardingUnits: { unitType: UnitType; count: number }[]
+    bombardingUnits: { unitType: UnitType; count: number }[],
+    targetDefenders?: CombatUnit[],
   ): BombardmentResult {
     const diceSides = this.state.rules.diceSides;
     const rolls: DiceRoll[] = [];
@@ -531,10 +691,56 @@ export class CombatResolver {
       }
     }
 
-    // Apply bombardment hits to defenders — cheapest first
-    const casualties = this.applyCasualties(combat.defenders, hits);
+    const territory = this.state.territories.get(combat.territoryId);
+    const bombardmentTargets = targetDefenders
+      ?? getShoreBombardmentTargets(combat, territory?.type ?? 'land');
+
+    const casualties = bombardmentTargets.length > 0
+      ? this.applyCasualties(bombardmentTargets, hits)
+      : [];
 
     this.state.emit("naval_bombardment", { combat, rolls, hits, casualties });
+
+    return { rolls, hits, casualties };
+  }
+
+  /**
+   * Coastal artillery opens on an offshore fleet before regular combat rounds.
+   * Defenders cannot return fire during the barrage.
+   */
+  performCoastalArtilleryBarrage(
+    combat: CombatState,
+    barrageUnits: { unitType: UnitType; count: number }[],
+  ): BombardmentResult {
+    const diceSides = this.state.rules.diceSides;
+    const rolls: DiceRoll[] = [];
+    let hits = 0;
+
+    for (const bu of barrageUnits) {
+      for (let i = 0; i < bu.count; i++) {
+        const roll = this.rollDie(diceSides);
+        const isHit = roll <= bu.unitType.attack;
+        const isCritical = isHit && bu.unitType.attack >= 3 && this.isCriticalHit(roll);
+        rolls.push({
+          unitTypeId: bu.unitType.id,
+          unitName: bu.unitType.name,
+          targetValue: bu.unitType.attack,
+          roll,
+          isHit,
+          isCritical,
+        });
+        if (isHit) hits += isCritical ? 2 : 1;
+      }
+    }
+
+    const navalTargets = combat.defenders.filter(
+      d => d.unitType.domain === 'sea' && d.count > d.casualties,
+    );
+    const casualties = navalTargets.length > 0
+      ? this.applyCasualties(navalTargets, hits)
+      : [];
+
+    this.state.emit('naval_bombardment', { combat, rolls, hits, casualties, strikeType: 'artillery' });
 
     return { rolls, hits, casualties };
   }
@@ -607,6 +813,8 @@ export class CombatResolver {
     const territory = this.state.territories.get(combat.territoryId);
     if (!territory) return;
 
+    const landFallbackId = combat.sourceTerritory ?? combat.territoryId;
+
     if (combat.winner === "attacker") {
       // Record history before changing owner
       this.state.recordOwnershipChange(territory.id, territory.owner, this.state.turnNumber);
@@ -615,19 +823,26 @@ export class CombatResolver {
       // Transfer ownership
       territory.owner = combat.attackingFactionId;
 
-      // Update territory units to surviving attackers (veterans: +1 attack/defense next battle)
+      // Clear land garrison; offshore fleets sync via syncNavalCombatStack
       territory.units = [];
+      for (const cu of combat.defenders) {
+        this.syncNavalCombatStack(cu, combat.defendingFactionId, landFallbackId);
+      }
+
       for (const cu of combat.attackers) {
         const surviving = cu.count - cu.casualties;
-        if (surviving > 0) {
-          const existing = territory.units.find(u => u.unitTypeId === cu.unitType.id);
-          if (existing) {
-            existing.count += surviving;
-            existing.veteranCount = (existing.veteranCount ?? 0) + surviving;
-          } else {
-            territory.units.push({ unitTypeId: cu.unitType.id, count: surviving, veteranCount: surviving });
-          }
+        if (surviving <= 0) continue;
+        if (cu.unitType.domain === 'sea') {
+          spawnUnitsOnTerritory(
+            this.state,
+            combat.attackingFactionId,
+            landFallbackId,
+            cu.unitType.id,
+            surviving,
+          );
+          continue;
         }
+        this.pushSurvivorToTerritory(territory, cu, surviving);
       }
 
       // Check if capital was captured
@@ -637,18 +852,16 @@ export class CombatResolver {
         this.state.emit("faction_defeated", { factionId: defender.id });
       }
     } else {
-      // Defender holds - update surviving defenders (veterans)
+      // Defender holds — land units on tile, fleets in adjacent sea zones
       territory.units = [];
       for (const cu of combat.defenders) {
         const surviving = cu.count - cu.casualties;
+        if (cu.stationedTerritoryId || cu.unitType.domain === 'sea') {
+          this.syncNavalCombatStack(cu, combat.defendingFactionId, combat.territoryId);
+          continue;
+        }
         if (surviving > 0) {
-          const existing = territory.units.find(u => u.unitTypeId === cu.unitType.id);
-          if (existing) {
-            existing.count += surviving;
-            existing.veteranCount = (existing.veteranCount ?? 0) + surviving;
-          } else {
-            territory.units.push({ unitTypeId: cu.unitType.id, count: surviving, veteranCount: surviving });
-          }
+          this.pushSurvivorToTerritory(territory, cu, surviving);
         }
       }
     }
@@ -697,32 +910,81 @@ export class CombatResolver {
   }
 
   /**
-   * Apply casualties to units (cheapest first)
+   * Apply casualties to units (cheapest first). Multi-HP ships absorb one hit as damage.
    */
+  private pushSurvivorToTerritory(
+    territory: import('../data/Territory').Territory,
+    cu: CombatUnit,
+    surviving: number,
+  ): void {
+    const existing = territory.units.find(u => u.unitTypeId === cu.unitType.id);
+    if (existing) {
+      existing.count += surviving;
+      existing.veteranCount = (existing.veteranCount ?? 0) + surviving;
+    } else {
+      territory.units.push({ unitTypeId: cu.unitType.id, count: surviving, veteranCount: surviving });
+    }
+  }
+
+  /** Sync offshore (or misplaced) naval stacks after combat — removes combat pool, writes survivors. */
+  private syncNavalCombatStack(cu: CombatUnit, factionId: string, fallbackTerritoryId: string): void {
+    const surviving = cu.count - cu.casualties;
+    const seaId = cu.stationedTerritoryId;
+
+    if (seaId) {
+      const sea = this.state.territories.get(seaId);
+      if (sea) {
+        sea.removeUnits(cu.unitType.id, cu.count);
+        if (surviving > 0) {
+          sea.addUnits(cu.unitType.id, surviving);
+          const stack = sea.units.find(u => u.unitTypeId === cu.unitType.id);
+          if (stack) stack.veteranCount = (stack.veteranCount ?? 0) + surviving;
+        }
+      }
+      return;
+    }
+
+    if (cu.unitType.domain === 'sea' && surviving > 0) {
+      spawnUnitsOnTerritory(this.state, factionId, fallbackTerritoryId, cu.unitType.id, surviving);
+    }
+  }
+
   private applyCasualties(
     units: CombatUnit[],
     hits: number
   ): CasualtySummary[] {
     const summaries: CasualtySummary[] = [];
     let remainingHits = hits;
-
-    // Sort by cost (cheapest first for casualties)
     const sorted = [...units].sort((a, b) => a.unitType.cost - b.unitType.cost);
+
+    const recordKill = (cu: CombatUnit) => {
+      const existing = summaries.find(s => s.unitTypeId === cu.unitType.id);
+      if (existing) existing.count += 1;
+      else summaries.push({ unitTypeId: cu.unitType.id, unitName: cu.unitType.name, count: 1 });
+    };
 
     for (const cu of sorted) {
       if (remainingHits <= 0) break;
+      cu.damagedCount = cu.damagedCount ?? 0;
+      const hp = Math.max(1, cu.unitType.hitPoints);
 
-      const activeCount = cu.count - cu.casualties;
-      const toKill = Math.min(activeCount, remainingHits);
+      while (remainingHits > 0 && cu.damagedCount > 0) {
+        cu.damagedCount -= 1;
+        cu.casualties += 1;
+        remainingHits -= 1;
+        recordKill(cu);
+      }
 
-      if (toKill > 0) {
-        cu.casualties += toKill;
-        remainingHits -= toKill;
-        summaries.push({
-          unitTypeId: cu.unitType.id,
-          unitName: cu.unitType.name,
-          count: toKill,
-        });
+      let activeUndamaged = cu.count - cu.casualties - cu.damagedCount;
+      while (remainingHits > 0 && activeUndamaged > 0) {
+        if (hp > 1) {
+          cu.damagedCount += 1;
+        } else {
+          cu.casualties += 1;
+          recordKill(cu);
+        }
+        activeUndamaged -= 1;
+        remainingHits -= 1;
       }
     }
 
@@ -733,7 +995,10 @@ export class CombatResolver {
    * Get count of active (non-casualty) units
    */
   private getActiveUnitCount(units: CombatUnit[]): number {
-    return units.reduce((sum, cu) => sum + (cu.count - cu.casualties), 0);
+    return units.reduce(
+      (sum, cu) => sum + (cu.count - cu.casualties - (cu.damagedCount ?? 0)),
+      0,
+    );
   }
 
   /**

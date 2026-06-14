@@ -63,6 +63,7 @@ export interface SystemRegistry {
     serialize(): { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] };
     restore(data: { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] }): void;
   };
+  mobilizationSystem?: import('./MobilizationSystem').MobilizationSystem;
   weatherSystem?: {
     tick(): void;
     getWeatherModifiers(terrain: import('../data/Territory').TerrainType): import('./WeatherSystem').WeatherModifiers;

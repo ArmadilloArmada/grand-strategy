@@ -38,7 +38,8 @@ import { cloudSaveManager } from './engine/CloudSaveManager';
 import { WeatherSystem } from './engine/WeatherSystem';
 import { FortificationSystem } from './engine/FortificationSystem';
 import { dragManager } from './ui/DragManager';
-import { normalizeCapitalsToWin, normalizeHumanFactions } from './engine/SetupValidation';
+import { normalizeCapitalsToWinForMatch, resolveMatchSetup, applyMatchSetupToState } from './engine/SetupValidation';
+import { sanitizeUnitPlacement } from './engine/navalPlacement';
 import { selectTrait, ALL_TRAITS } from './engine/CommanderProgression';
 import type { Commander, CommanderTraitId } from './data/Territory';
 import type { UnitTypeData } from './data/Unit';
@@ -59,10 +60,10 @@ import worldFactionsMegaData from '../assets/factions/world-factions-mega.json';
 // Unit era registry
 type UnitEraEntry = { name: string; description: string; data: UnitTypeData[] };
 const UNIT_ERAS: Record<string, UnitEraEntry> = {
-  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Limited mobility.', data: wwiUnitsData as unknown as UnitTypeData[] },
-  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Balanced gameplay.', data: wwiiUnitsData as unknown as UnitTypeData[] },
-  'coldwar': { name: 'Cold War (1970)', description: 'Faster units. Jet age warfare.', data: coldwarUnitsData as unknown as UnitTypeData[] },
-  'modern': { name: 'Modern (2020)', description: 'High-tech, fast, and expensive.', data: modernUnitsData as unknown as UnitTypeData[] },
+  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Most units move 1 tile.', data: wwiUnitsData as unknown as UnitTypeData[] },
+  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Standard mobility.', data: wwiiUnitsData as unknown as UnitTypeData[] },
+  'coldwar': { name: 'Cold War (1970)', description: 'Jet age. Armor and fleets move 3 tiles.', data: coldwarUnitsData as unknown as UnitTypeData[] },
+  'modern': { name: 'Modern (2020)', description: 'High-tech warfare. Fastest units on land, sea, and air.', data: modernUnitsData as unknown as UnitTypeData[] },
 };
 import _gridMapData from '../assets/maps/grid-world-map.json';
 import _tutorialMapData from '../assets/maps/tutorial-map.json';
@@ -555,30 +556,30 @@ class Game {
       map: mapToLoad,
     });
 
-    // Set faction AI control based on game config (from HUD setup modal)
-    const factions = this.state.factionRegistry.getInTurnOrder();
-    const humanFactions = normalizeHumanFactions(this.hud.gameConfig.humanFactions, mapFactions);
-    this.hud.gameConfig.humanFactions = humanFactions;
-    this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWin(this.hud.gameConfig.capitalsToWin, mapFactions);
-
-    // Resolve the active set for this game session.
-    // - If the New Game modal supplied an explicit list, honor it.
-    // - Otherwise (legacy / scripted starts) fall back to "every map faction is active".
-    const configuredActive = this.hud.gameConfig.activeFactionIds;
-    const activeIds = new Set<string>(
-      configuredActive && configuredActive.length > 0
-        ? configuredActive
-        : factions.map(f => f.id)
+    // Resolve match participants and apply to loaded map data.
+    const matchSetup = resolveMatchSetup({
+      mode: this.hud.gameConfig.mode ?? 'vs-ai',
+      humanFactionIds: this.hud.gameConfig.humanFactions,
+      availableFactions: mapFactions,
+      pickedOpponentIds: this.hud.gameConfig.aiOpponents,
+      opponentCountRaw: this.hud.gameConfig.aiOpponentCount === 0
+        ? 'all'
+        : String(this.hud.gameConfig.aiOpponentCount ?? 'all'),
+    });
+    this.hud.gameConfig.humanFactions = matchSetup.humanFactionIds;
+    this.hud.gameConfig.aiOpponents = matchSetup.aiOpponentIds;
+    this.hud.gameConfig.aiOpponentCount = matchSetup.aiOpponentCount;
+    this.hud.gameConfig.activeFactionIds = matchSetup.activeFactionIds;
+    this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWinForMatch(
+      this.hud.gameConfig.capitalsToWin,
+      matchSetup.activeFactionIds,
+      matchSetup.humanFactionIds,
+      mapFactions,
     );
-    // Humans are always active even if missing from the list (defensive).
-    for (const id of humanFactions) activeIds.add(id);
-    this.hud.gameConfig.activeFactionIds = Array.from(activeIds);
+    applyMatchSetupToState(this.state, matchSetup);
+    sanitizeUnitPlacement(this.state);
 
-    for (const faction of factions) {
-      // Check if this faction should be human controlled
-      faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
-      faction.isActive = activeIds.has(faction.id);
-    }
+    this.hud.syncRendererFromConfig();
 
     // Apply current difficulty and personality
     this.aiController.setDifficulty(this.hud.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty'));
@@ -641,8 +642,8 @@ class Game {
 
     this.hud.updateTurnInfo();
 
-    // Assign starting commanders to each faction's capital territory
-    for (const faction of this.state.factionRegistry.getAll()) {
+    // Assign starting commanders to each active faction's capital territory
+    for (const faction of this.state.factionRegistry.getActive()) {
       const commander = getStartingCommander(faction.id);
       if (!commander) continue;
       // Find this faction's capital territory
@@ -1941,7 +1942,9 @@ class Game {
     const turnStyle = this.hud.gameConfig.turnStyle;
     
     if (!faction) return;
-    
+
+    sanitizeUnitPlacement(this.state);
+
     // Clean up expired event effects
     this.eventsSystem.cleanupExpiredEffects();
     

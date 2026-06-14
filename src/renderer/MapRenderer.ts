@@ -5,6 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { Territory } from '../data/Territory';
+import type { UnitEra } from '../engine/GameConfig';
 
 export interface RenderOptions {
   showGrid: boolean;
@@ -49,6 +50,8 @@ export class MapRenderer {
   // Valid move highlights
   private validMoveTargets: Set<string> = new Set();
   private attackTargets: Set<string> = new Set();
+  private coastalStrikeTargets: Set<string> = new Set();
+  private unitEra: UnitEra = 'wwii';
 
   // Mobilization highlights (build phase)
   private mobilizableTargets: Set<string> = new Set();
@@ -334,7 +337,11 @@ export class MapRenderer {
       this.drawEconomicOverlay();
     } else if (this.overlayMode === 'range' && (this.validMoveTargets.size > 0 || this.attackTargets.size > 0)) {
       this.drawOverlayLayer(this.validMoveTargets, 'rgba(34, 197, 94, 0.25)');
-      this.drawOverlayLayer(this.attackTargets, 'rgba(239, 68, 68, 0.3)');
+      this.drawOverlayLayer(this.coastalStrikeTargets, 'rgba(251, 146, 60, 0.35)');
+      this.drawOverlayLayer(
+        [...this.attackTargets].filter(id => !this.coastalStrikeTargets.has(id)),
+        'rgba(239, 68, 68, 0.3)',
+      );
     } else if (this.overlayMode === 'threat' && this.threatTerritoryIds.size > 0) {
       this.drawOverlayLayer(this.threatTerritoryIds, 'rgba(239, 68, 68, 0.35)');
     }
@@ -664,6 +671,32 @@ export class MapRenderer {
   }
 
   /**
+   * Resolve which faction color to use for unit counters on this territory.
+   * Sea zones often have no owner even when a fleet is present.
+   */
+  private resolveTerritoryDisplayFactionId(territory: import('../data/Territory').Territory): string | null {
+    if (territory.owner) return territory.owner;
+
+    if (territory.type === 'sea' && territory.getTotalUnitCount() > 0) {
+      for (const adjId of territory.adjacentTo) {
+        const adj = this.state.territories.get(adjId);
+        if (adj?.owner && adj.isLand()) return adj.owner;
+      }
+    }
+
+    return null;
+  }
+
+  private getTerritoryDisplayUnits(territory: import('../data/Territory').Territory) {
+    return territory.units.filter(pu => {
+      const ut = this.state.unitRegistry.get(pu.unitTypeId);
+      if (!ut) return false;
+      if (ut.domain === 'sea' && territory.type !== 'sea') return false;
+      return true;
+    });
+  }
+
+  /**
    * Draw unit tokens as square NATO-style wargame counters.
    * The entire counter is clipped to the territory polygon so it
    * can never bleed into a neighbouring tile.
@@ -671,7 +704,8 @@ export class MapRenderer {
   private drawUnitTokens(): void {
     const simplified = this.isLargeMap();
     for (const territory of this.state.territories.values()) {
-      const unitCount = territory.getTotalUnitCount();
+      const displayUnits = this.getTerritoryDisplayUnits(territory);
+      const unitCount = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
       if (unitCount === 0) continue;
 
       const isVisible = this.options.fogOfWarCallback
@@ -681,7 +715,8 @@ export class MapRenderer {
 
       const [cx, cy] = territory.center;
       if (simplified) {
-        const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+        const displayFactionId = this.resolveTerritoryDisplayFactionId(territory);
+        const faction = displayFactionId ? this.state.factionRegistry.get(displayFactionId) : null;
         const color = faction?.color ?? '#666666';
         this.ctx.beginPath();
         this.ctx.arc(cx, cy, 5, 0, Math.PI * 2);
@@ -699,7 +734,8 @@ export class MapRenderer {
         }
         continue;
       }
-      const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+      const displayFactionId = this.resolveTerritoryDisplayFactionId(territory);
+      const faction = displayFactionId ? this.state.factionRegistry.get(displayFactionId) : null;
       const factionColor = faction?.color ?? '#666666';
 
       // Counter size: 55% of the territory's bounding box, capped at 36×26
@@ -741,8 +777,13 @@ export class MapRenderer {
       this.ctx.lineWidth = 1;
       this.ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
 
-      // Role sprite + count
-      const primaryUnit = territory.units.reduce((max, pu) => pu.count > max.count ? pu : max, territory.units[0]);
+      // Role sprite + count — on sea zones prefer showing a ship icon over mixed stacks
+      const primaryUnit = territory.type === 'sea'
+        ? (displayUnits.find(pu => {
+            const ut = this.state.unitRegistry.get(pu.unitTypeId);
+            return ut?.domain === 'sea';
+          }) ?? displayUnits[0])
+        : displayUnits.reduce((max, pu) => pu.count > max.count ? pu : max, displayUnits[0]);
       const primaryType = primaryUnit ? this.state.unitRegistry.get(primaryUnit.unitTypeId) : null;
 
       if (primaryType && w >= 18 && h >= 14) {
@@ -873,7 +914,7 @@ export class MapRenderer {
     if (domain === 'air') {
       this.drawAircraftSprite(cx, cy, w, h, id, factionColor);
     } else if (domain === 'sea') {
-      this.drawShipSprite(cx, cy, w, h, id, factionColor);
+      this.drawShipSprite(cx, cy, w, h, id, factionColor, this.unitEra);
     } else if (id.includes('armor') || id.includes('tank') || id.includes('panzer') || id.includes('mech')) {
       this.drawTankSprite(cx, cy, w, h, factionColor);
     } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
@@ -1015,20 +1056,162 @@ export class MapRenderer {
     ctx.restore();
   }
 
-  private drawShipSprite(cx: number, cy: number, w: number, h: number, unitTypeId: string, factionColor: string): void {
+  private drawShipSprite(
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    unitTypeId: string,
+    factionColor: string,
+    era: UnitEra = 'wwii',
+  ): void {
     const ctx = this.ctx;
     const submarine = unitTypeId.includes('sub');
     const carrier = unitTypeId.includes('carrier');
     const transport = unitTypeId.includes('transport');
+    const battleship = unitTypeId.includes('battle');
+    const cruiser = unitTypeId.includes('cruiser');
+    const destroyer = unitTypeId.includes('destroy');
     ctx.save();
     ctx.fillStyle = this.lightenColor(factionColor, 28);
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 1;
+
     if (submarine) {
+      this.drawSubmarineSprite(cx, cy, w, h, era);
+    } else if (carrier) {
+      this.drawCarrierSprite(cx, cy, w, h, era);
+    } else if (transport) {
+      this.drawTransportSprite(cx, cy, w, h, era);
+    } else if (battleship) {
+      this.drawBattleshipSprite(cx, cy, w, h, era);
+    } else if (cruiser) {
+      this.drawCruiserSprite(cx, cy, w, h, era);
+    } else if (destroyer) {
+      this.drawDestroyerSprite(cx, cy, w, h, era);
+    } else {
+      this.drawDestroyerSprite(cx, cy, w, h, era);
+    }
+    ctx.restore();
+  }
+
+  private drawBattleshipSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const long = era === 'wwi' || era === 'wwii';
+    const bow = long ? w * 0.48 : w * 0.40;
+    const stern = long ? w * 0.46 : w * 0.36;
+    ctx.beginPath();
+    ctx.moveTo(cx - stern, cy - h * 0.02);
+    ctx.lineTo(cx + bow * 0.72, cy - h * 0.06);
+    ctx.lineTo(cx + bow, cy + h * 0.02);
+    ctx.lineTo(cx + bow * 0.55, cy + h * 0.28);
+    ctx.lineTo(cx - stern * 0.82, cy + h * 0.26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const turretCount = era === 'wwi' ? 2 : era === 'modern' ? 1 : 3;
+    for (let i = 0; i < turretCount; i++) {
+      const tx = cx - stern * 0.35 + i * (stern + bow) * 0.22;
+      ctx.fillRect(tx - w * 0.05, cy - h * 0.24, w * 0.10, h * 0.10);
+      ctx.strokeRect(tx - w * 0.05, cy - h * 0.24, w * 0.10, h * 0.10);
+    }
+    if (era === 'wwi') {
+      ctx.fillRect(cx - w * 0.06, cy - h * 0.34, w * 0.05, h * 0.12);
+      ctx.fillRect(cx + w * 0.02, cy - h * 0.36, w * 0.05, h * 0.14);
+    }
+  }
+
+  private drawDestroyerSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const slim = era === 'modern' || era === 'coldwar';
+    const bow = slim ? w * 0.34 : w * 0.40;
+    const stern = slim ? w * 0.30 : w * 0.36;
+    ctx.beginPath();
+    if (era === 'modern') {
+      ctx.moveTo(cx - stern, cy + h * 0.08);
+      ctx.lineTo(cx + bow * 0.55, cy - h * 0.10);
+      ctx.lineTo(cx + bow, cy + h * 0.04);
+      ctx.lineTo(cx - stern * 0.7, cy + h * 0.22);
+    } else {
+      ctx.moveTo(cx - stern, cy - h * 0.04);
+      ctx.lineTo(cx + bow * 0.72, cy - h * 0.06);
+      ctx.lineTo(cx + bow, cy + h * 0.04);
+      ctx.lineTo(cx - stern * 0.75, cy + h * 0.24);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (era === 'wwi') {
       ctx.beginPath();
-      ctx.ellipse(cx, cy + h * 0.04, w * 0.42, h * 0.24, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(cx + bow * 0.35, cy - h * 0.12);
+      ctx.lineTo(cx + bow * 0.55, cy - h * 0.28);
       ctx.stroke();
+    } else if (era === 'coldwar' || era === 'modern') {
+      ctx.strokeRect(cx - w * 0.04, cy - h * 0.22, w * 0.14, h * 0.08);
+    }
+  }
+
+  private drawCruiserSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.38, cy - h * 0.03);
+    ctx.lineTo(cx + w * 0.30, cy - h * 0.05);
+    ctx.lineTo(cx + w * 0.36, cy + h * 0.05);
+    ctx.lineTo(cx - w * 0.30, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillRect(cx - w * 0.08, cy - h * 0.22, w * 0.08, h * 0.08);
+    if (era === 'coldwar' || era === 'modern') {
+      ctx.beginPath();
+      ctx.moveTo(cx + w * 0.08, cy - h * 0.10);
+      ctx.lineTo(cx + w * 0.24, cy - h * 0.24);
+      ctx.stroke();
+    }
+  }
+
+  private drawCarrierSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const deckW = era === 'modern' ? w * 0.50 : era === 'coldwar' ? w * 0.46 : w * 0.38;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.40, cy + h * 0.04);
+    ctx.lineTo(cx + w * 0.28, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.34, cy + h * 0.22);
+    ctx.lineTo(cx - w * 0.34, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.28, deckW, h * 0.16);
+    if (era === 'modern') {
+      ctx.beginPath();
+      ctx.moveTo(cx + deckW * 0.15, cy - h * 0.28);
+      ctx.lineTo(cx + deckW * 0.28, cy - h * 0.42);
+      ctx.stroke();
+    }
+  }
+
+  private drawTransportSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.34, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.26, cy - h * 0.04);
+    ctx.lineTo(cx + w * 0.20, cy + h * 0.24);
+    ctx.lineTo(cx - w * 0.30, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const deckW = era === 'modern' ? w * 0.30 : w * 0.24;
+    ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.20, deckW, h * 0.10);
+  }
+
+  private drawSubmarineSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const elongated = era === 'coldwar' || era === 'modern';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + h * 0.04, w * (elongated ? 0.46 : 0.40), h * (elongated ? 0.22 : 0.24), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (era === 'wwi' || era === 'wwii') {
       ctx.beginPath();
       ctx.moveTo(cx - w * 0.04, cy - h * 0.18);
       ctx.lineTo(cx - w * 0.04, cy - h * 0.36);
@@ -1036,23 +1219,10 @@ export class MapRenderer {
       ctx.stroke();
     } else {
       ctx.beginPath();
-      ctx.moveTo(cx - w * 0.44, cy - h * 0.04);
-      ctx.lineTo(cx + w * 0.34, cy - h * 0.04);
-      ctx.lineTo(cx + w * 0.18, cy + h * 0.26);
-      ctx.lineTo(cx - w * 0.34, cy + h * 0.26);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(cx + w * 0.06, cy - h * 0.10);
+      ctx.lineTo(cx + w * 0.10, cy - h * 0.18);
       ctx.stroke();
-      const deckW = carrier ? w * 0.42 : transport ? w * 0.28 : w * 0.20;
-      ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.28, deckW, h * 0.16);
-      if (!transport) {
-        ctx.beginPath();
-        ctx.moveTo(cx + w * 0.10, cy - h * 0.14);
-        ctx.lineTo(cx + w * 0.34, cy - h * 0.24);
-        ctx.stroke();
-      }
     }
-    ctx.restore();
   }
 
   /** Draw subtle terrain texture clipped to polygon. */
@@ -1247,6 +1417,7 @@ export class MapRenderer {
     if (this.hoveredTerritoryId) ids.add(this.hoveredTerritoryId);
     for (const id of this.validMoveTargets) ids.add(id);
     for (const id of this.attackTargets) ids.add(id);
+    for (const id of this.coastalStrikeTargets) ids.add(id);
     for (const id of this.mobilizableTargets) ids.add(id);
     for (const id of this.mobilizedTargets) ids.add(id);
     for (const id of this.captureAnimations.keys()) ids.add(id);
@@ -1289,10 +1460,20 @@ export class MapRenderer {
       }
 
       if (!isSea && this.options.highlightValidMoves) {
-        if (this.attackTargets.has(territory.id)) {
+        if (this.coastalStrikeTargets.has(territory.id)) {
+          overlayColor = 'rgba(251, 146, 60, 0.52)';
+        } else if (this.attackTargets.has(territory.id)) {
           overlayColor = 'rgba(255,68,68,0.50)';
         } else if (this.validMoveTargets.has(territory.id)) {
           overlayColor = 'rgba(68,255,68,0.40)';
+        }
+      } else if (isSea && this.options.highlightValidMoves) {
+        if (this.coastalStrikeTargets.has(territory.id)) {
+          overlayColor = 'rgba(251, 146, 60, 0.62)';
+        } else if (this.attackTargets.has(territory.id)) {
+          overlayColor = 'rgba(255,96,96,0.58)';
+        } else if (this.validMoveTargets.has(territory.id)) {
+          overlayColor = 'rgba(56,189,248,0.52)';
         }
       }
 
@@ -1309,6 +1490,7 @@ export class MapRenderer {
       // ZOC tint for non-move, non-attack land territories when move-highlights active
       if (!isSea && this.options.highlightValidMoves && currentFaction
           && !this.attackTargets.has(territory.id)
+          && !this.coastalStrikeTargets.has(territory.id)
           && !this.validMoveTargets.has(territory.id)) {
         const inZOC = territory.adjacentTo.some(adjId => {
           const adj = this.state.territories.get(adjId);
@@ -1476,9 +1658,17 @@ export class MapRenderer {
   /**
    * Set valid move targets for highlighting
    */
-  setValidMoveTargets(moves: string[], attacks: string[]): void {
+  setValidMoveTargets(moves: string[], attacks: string[], coastalStrikes: string[] = []): void {
     this.validMoveTargets = new Set(moves);
     this.attackTargets = new Set(attacks);
+    this.coastalStrikeTargets = new Set(coastalStrikes);
+    this.render();
+  }
+
+  /** Sync naval/land unit art to the selected game era. */
+  setUnitEra(era: UnitEra): void {
+    this.unitEra = era;
+    this.markStaticDirty();
     this.render();
   }
 
@@ -1488,6 +1678,7 @@ export class MapRenderer {
   clearValidMoveTargets(): void {
     this.validMoveTargets.clear();
     this.attackTargets.clear();
+    this.coastalStrikeTargets.clear();
     this.render();
   }
 

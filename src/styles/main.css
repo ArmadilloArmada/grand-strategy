@@ -5991,6 +5991,11 @@ kbd.kbd-hint {
   color: #bae6fd;
 }
 
+.target-preview-list button.coastal-strike {
+  border-color: rgba(251, 146, 60, 0.55);
+  color: #fed7aa;
+}
+
 .target-preview-list button:hover {
   background: rgba(30, 41, 59, 0.88);
 }
@@ -6014,6 +6019,13 @@ kbd.kbd-hint {
 .naval-status span {
   margin-top: 0.15rem;
   color: #cbd5e1;
+}
+
+.naval-status .naval-roles {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-style: italic;
 }
 
 .naval-status.danger {
@@ -6093,6 +6105,7 @@ kbd.kbd-hint {
 
 .legend-swatch.selected { background: #facc15; }
 .legend-swatch.move { background: #22c55e; }
+.legend-swatch.naval-move { background: #38bdf8; }
 .legend-swatch.attack { background: #ef4444; }
 .legend-swatch.build { background: #f59e0b; }
 
@@ -9723,28 +9736,6 @@ body:not(.theme-dark) #action-buttons #btn-theme-toggle:hover:not(:disabled) {
 }
 
 /* Simple Mode: keep the turn surface focused on move, attack, build, and phase flow. */
-body:not(.simple-mode) #action-buttons #btn-simple-advanced {
-  display: none !important;
-}
-
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-research,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-diplomacy,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-espionage,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-nuclear,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-stats,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-strategic-bomb,
-body.simple-mode:not(.simple-advanced-visible) #action-buttons #btn-fortify,
-body.simple-mode:not(.simple-advanced-visible) #faction-ability-container {
-  display: none !important;
-}
-
-body.simple-mode #action-buttons #btn-simple-advanced {
-  border-color: rgba(148, 163, 184, 0.26) !important;
-  background: rgba(15, 23, 42, 0.78) !important;
-  color: #cbd5e1 !important;
-  font-weight: 700 !important;
-}
-
 body.simple-mode #action-buttons #btn-move,
 body.simple-mode #action-buttons #btn-attack,
 body.simple-mode #action-buttons #btn-build,
@@ -9762,12 +9753,18 @@ body.move-for-move-mode #phase-progress {
   display: none !important;
 }
 
+.mfm-mode-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  letter-spacing: 0.03em;
+}
+
 .mfm-progress {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 0.15rem;
 }
 
 .mfm-step {

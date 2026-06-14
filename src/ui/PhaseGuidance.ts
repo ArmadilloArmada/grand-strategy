@@ -175,25 +175,29 @@ export class PhaseGuidance {
         const targetIds = new Set<string>();
         const attackIds = new Set<string>();
         const transportIds = new Set<string>();
+        const coastalStrikeIds = new Set<string>();
         for (const pu of territory.units) {
           for (const move of this.movementValidator.getValidMoves(pu.unitTypeId, territory.id, allowAttacks)) {
             if (move.isAttack) attackIds.add(move.territoryId);
             else targetIds.add(move.territoryId);
             if (move.viaTransport) transportIds.add(move.viaTransport);
+            if (move.coastalStrike) coastalStrikeIds.add(move.territoryId);
           }
         }
         const moveCount = targetIds.size;
         const attackCount = attackIds.size;
         const transportCount = transportIds.size;
+        const coastalCount = coastalStrikeIds.size;
         const targetText = attackCount > 0
           ? `${moveCount} move target${moveCount !== 1 ? 's' : ''}, ${attackCount} attack target${attackCount !== 1 ? 's' : ''}`
           : `${moveCount} move target${moveCount !== 1 ? 's' : ''}`;
         const transportText = transportCount > 0 ? `, ${transportCount} amphib route${transportCount !== 1 ? 's' : ''}` : '';
+        const coastalText = coastalCount > 0 ? `, ${coastalCount} coastal strike${coastalCount !== 1 ? 's' : ''}` : '';
         return {
-          text: `${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText})`,
+          text: `${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText}${coastalText})`,
           className,
           tipId: 'movement',
-          tipMessage: 'Units can act once per turn. Green highlights are moves; attack highlights start a battle preview.',
+          tipMessage: 'Green = moves, red = attacks, orange = coastal strikes (bombardment / shore fire without entering the tile).',
         };
       }
       return {
