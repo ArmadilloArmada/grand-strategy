@@ -10,6 +10,7 @@
     "generate-icons": "node scripts/generate-icons.cjs",
     "validate:maps": "node scripts/validate-maps.js",
     "generate:mega-map": "node scripts/generate-mega-world-map.cjs",
+    "update:world-map": "node scripts/update-world-map-wrap.cjs && node scripts/fix-southeast-asia-geography.cjs",
     "release:check": "npm test -- --run && npm run validate:maps && npm run build",
     "build": "tsc && vite build",
     "preview": "vite preview",

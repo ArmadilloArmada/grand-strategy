@@ -308,7 +308,7 @@ export class MobilizationSystem {
     units: { unitTypeId: string; count: number }[],
     territory: Territory,
   ): void {
-    units.push({ unitTypeId: 'transport', count: 1 });
+    units.push({ unitTypeId: 'marines', count: 1 });
     if (territory.production >= 2) {
       units.push({ unitTypeId: 'destroyer', count: 1 });
     }

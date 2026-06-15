@@ -106,6 +106,7 @@ function main() {
 
   const maxGx = Math.floor(data.width / SUB) - 1;
   const maxGy = Math.floor(data.height / SUB) - 1;
+  const wrapHorizontal = Boolean(data.wrapHorizontal);
 
   for (const nt of newTerritories) {
     const x0 = nt.polygon[0][0];
@@ -114,9 +115,14 @@ function main() {
     const gy = Math.floor(y0 / SUB);
     const adj = [];
     const tryN = (dgx, dgy) => {
-      const ngx = gx + dgx;
+      let ngx = gx + dgx;
       const ngy = gy + dgy;
-      if (ngx < 0 || ngx > maxGx || ngy < 0 || ngy > maxGy) return;
+      if (ngy < 0 || ngy > maxGy) return;
+      if (wrapHorizontal) {
+        ngx = ((ngx % (maxGx + 1)) + (maxGx + 1)) % (maxGx + 1);
+      } else if (ngx < 0 || ngx > maxGx) {
+        return;
+      }
       const nid = gridToId.get(cellKey(ngx, ngy));
       if (nid && nid !== nt.id) adj.push(nid);
     };
@@ -188,6 +194,7 @@ function main() {
     width: data.width,
     height: data.height,
     gridSize: SUB,
+    wrapHorizontal: Boolean(data.wrapHorizontal),
     backgroundColor: data.backgroundColor,
     territories: newTerritories,
     startingUnits: [],

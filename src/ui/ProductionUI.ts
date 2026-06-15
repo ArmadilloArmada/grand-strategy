@@ -45,9 +45,9 @@ const QUICK_BUILD_PLANS: Record<QuickBuildPlanId, QuickBuildPlan> = {
   naval: {
     id: 'naval',
     label: 'Naval',
-    unitPriority: ['destroyer', 'transport', 'submarine', 'carrier', 'battleship', 'fighter'],
+    unitPriority: ['destroyer', 'marines', 'submarine', 'carrier', 'battleship', 'fighter'],
     fallbackDomains: ['sea', 'air'],
-    summary: 'builds sea control and transport capacity',
+    summary: 'builds sea control and expeditionary forces',
   },
   air: {
     id: 'air',
@@ -206,7 +206,7 @@ export class ProductionUI {
 
   private getQuickBuildCandidates(plan: QuickBuildPlan, factionId: string): Array<{ id: string; cost: number; name?: string; domain?: string }> {
     const units = this.state.unitRegistry.getAll()
-      .filter((unit: any) => (!unit.factionId || unit.factionId === factionId) && unit.cost > 0);
+      .filter((unit: any) => (!unit.factionId || unit.factionId === factionId) && unit.cost > 0 && unit.id !== 'transport');
     const byId = new Map(units.map((unit: any) => [unit.id, unit]));
     const prioritized = plan.unitPriority
       .map(id => byId.get(id))
@@ -294,7 +294,7 @@ export class ProductionUI {
     if (!faction) return;
 
     const units = this.state.unitRegistry.getByDomain(this.fhActiveDomain)
-      .filter(u => !u.factionId || u.factionId === faction.id);
+      .filter(u => u.id !== 'transport' && (!u.factionId || u.factionId === faction.id));
 
     if (units.length === 0) {
       listEl.innerHTML = `<p class="fh-empty-msg">No ${this.fhActiveDomain} units available</p>`;
@@ -450,7 +450,7 @@ export class ProductionUI {
     if (!faction) return;
 
     const units = this.state.unitRegistry.getByDomain(this.fhActiveDomain)
-      .filter(u => (!u.factionId || u.factionId === faction.id) && u.cost > 0)
+      .filter(u => u.id !== 'transport' && (!u.factionId || u.factionId === faction.id) && u.cost > 0)
       .sort((a, b) => a.cost - b.cost);
 
     if (units.length === 0) return;

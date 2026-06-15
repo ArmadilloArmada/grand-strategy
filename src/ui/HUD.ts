@@ -5,7 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { TurnManager } from '../engine/TurnManager';
-import { MovementValidator, ValidMove } from '../engine/MovementValidator';
+import { MovementValidator, ValidMove, usesImplicitAmphibious } from '../engine/MovementValidator';
 import { ProductionManager } from '../engine/ProductionManager';
 import { MobilizationSystem } from '../engine/MobilizationSystem';
 import { CombatResolver } from '../engine/CombatResolver';
@@ -44,8 +44,9 @@ import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgress
 import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
 import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
-import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement } from '../engine/navalPlacement';
+import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
 import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
+import { areTerritoriesNeighbors } from '../engine/gridAdjacency';
 import type { SpawnedUnit } from '../engine/MobilizationSystem';
 import { dragManager } from './DragManager';
 import { toastManager } from './ToastManager';
@@ -58,17 +59,17 @@ import { AbilityPanel } from './AbilityPanel';
 import { AI_PERSONALITIES } from '../engine/AIPersonalities';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
 import {
-  getAttackButtonState,
   getBuildButtonState,
   getEndPhaseButtonState,
   getFortifyButtonState,
   getHudPhaseFlags,
-  getMoveButtonState,
   getNuclearButtonState,
   getStrategicBombButtonState,
 } from './hud/ActionButtonState';
-import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
-import { isAttackMovePhase, isBuildPhase, isMovementPhase } from './hud/PhaseHelpers';
+import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, splitMoveAndAttackTargets, isRangedStrikeUnit, getRangedUnitActionHint } from './hud/MovementSelection';
+import { renderUnitStackSelector, countReadyUnitStacks } from './hud/UnitStackSelector';
+import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase, isNonCombatMovePhase, resolveMovePhaseContext } from './hud/PhaseHelpers';
+import { MapMoveDragController, type UnitDropKind } from './MapMoveDragController';
 import { MoveForMoveHUD, buildMoveForMoveView } from './hud/MoveForMoveHUD';
 
 export class HUD {
@@ -96,6 +97,48 @@ export class HUD {
 
   // Current UI state
   private selectedUnitType: string | null = null;
+  private stackPopoverDismissListener: (() => void) | null = null;
+
+  /** Pick the active unit stack when a territory is selected. */
+  private autoSelectUnitType(territory: import('../data/Territory').Territory): void {
+    const ready = territory.units.filter(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
+    if (ready.length === 0) {
+      this.selectedUnitType = null;
+      return;
+    }
+    if (this.selectedUnitType && ready.some(pu => pu.unitTypeId === this.selectedUnitType)) {
+      return;
+    }
+    this.selectedUnitType = ready[0].unitTypeId;
+  }
+
+  /** Player chose which unit type to move/attack with this turn. */
+  selectUnitType(unitTypeId: string): void {
+    const territory = this.state.getSelectedTerritory();
+    if (!territory) return;
+    const available = territory.getAvailableUnitCount(unitTypeId);
+    if (available <= 0) {
+      this.showToast('Those units already acted this turn.', 'info');
+      return;
+    }
+    this.selectedUnitType = unitTypeId;
+    this.hideStackCommandPopover();
+    this.refreshUnitStackSelector();
+    this.updateSelectionInfo();
+    this.updateValidMoves();
+    const unitType = this.state.unitRegistry.get(unitTypeId);
+    const name = unitType?.name ?? unitTypeId;
+    const hint = unitType && isRangedStrikeUnit(unitType)
+      ? getRangedUnitActionHint(unitType)
+      : `drag to move (M${unitType?.movement ?? 1})`;
+    this.showToast(`Selected ${name} — ${hint}`, 'info');
+  }
+
+  getSelectedUnitType(): string | null {
+    return this.selectedUnitType;
+  }
+  /** Unit type the current map highlights were computed for. */
+  private validMovesUnitTypeId: string | null = null;
   private validMoves: ValidMove[] = [];
 
   // Extracted sub-controllers
@@ -201,6 +244,10 @@ export class HUD {
       updateSelectionInfo: () => this.updateSelectionInfo(),
       updateActionButtons: () => this.updateActionButtons(),
       afterUnitAction: () => this.handleMoveForMovePass(),
+      getSelectedUnitType: () => resolveHighlightedMoveUnitType({
+        validMovesUnitTypeId: this.validMovesUnitTypeId,
+        selectedUnitType: this.selectedUnitType,
+      }),
     };
     this.combatUI = new CombatUI(state, renderer, this.combatResolver, combatCallbacks);
 
@@ -300,6 +347,7 @@ export class HUD {
     this.supplySystem = new SupplySystem(state);
 
     this.setupEventListeners();
+    this.setupUnitDrag();
     this.subscribeToGameEvents();
   }
   
@@ -375,8 +423,6 @@ export class HUD {
       });
     });
     window.addEventListener('resize', () => this.scheduleHQLayoutEnsure());
-    document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
-    document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
     document.getElementById('btn-end-phase')?.addEventListener('click', () => this.onEndPhaseClick());
     this.ensureMoveForMovePassListener();
@@ -396,7 +442,7 @@ export class HUD {
     document.getElementById('btn-close-combat')?.addEventListener('click', () => this.combatUI.onCloseCombat());
 
     // Strategic bombing button
-    document.getElementById('btn-strategic-bomb')?.addEventListener('click', () => this.combatUI.showStrategicBombingModal());
+    document.getElementById('btn-strategic-bomb')?.addEventListener('click', () => this.combatUI.executeStrategicBombing());
 
     // Fortify button
     document.getElementById('btn-fortify')?.addEventListener('click', () => this.onFortifyClick());
@@ -533,6 +579,7 @@ export class HUD {
 
     // Territory hover tooltip
     this.setupTerritoryTooltip();
+    this.setupUnitStackSelectorListeners();
 
     // New game modal handlers
     document.getElementById('game-mode')?.addEventListener('change', (e) => {
@@ -700,6 +747,19 @@ export class HUD {
     document.body.appendChild(panel);
 
     const content = panel.querySelector('#war-room-content');
+    const unitSlot = document.createElement('div');
+    unitSlot.id = 'war-room-unit-slot';
+    unitSlot.className = 'war-room-section unit-stack-selector hidden';
+    unitSlot.setAttribute('aria-label', 'Unit stack selector');
+    const unitTitle = document.createElement('div');
+    unitTitle.className = 'war-room-section-title';
+    unitTitle.textContent = 'Command Stack';
+    const unitBody = document.createElement('div');
+    unitBody.className = 'unit-stack-selector-body';
+    unitSlot.appendChild(unitTitle);
+    unitSlot.appendChild(unitBody);
+    content?.appendChild(unitSlot);
+
     const advisor = document.getElementById('strategic-advisor-panel') ?? document.createElement('section');
     advisor.id = 'strategic-advisor-panel';
     advisor.classList.add('war-room-section', 'hidden');
@@ -744,6 +804,11 @@ export class HUD {
     panel.querySelector('#btn-toggle-war-room')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
     });
+
+    const unitSlotEl = document.getElementById('war-room-unit-slot');
+    if (unitSlotEl && content?.firstChild !== unitSlotEl) {
+      content?.prepend(unitSlotEl);
+    }
   }
 
   private scheduleHQLayoutEnsure(): void {
@@ -959,8 +1024,12 @@ export class HUD {
 
     switch (key) {
       case 'F': if (e.shiftKey) { e.preventDefault(); this.resetUIToCommandLayout(); } break;
-      case 'm': case 'M': if (isHumanTurn) this.onMoveClick(); break;
-      case 'a': case 'A': if (isHumanTurn) this.onAttackShortcut(); break;
+      case 'a': case 'A':
+        if (isHumanTurn) {
+          if (isCombatPhase(this.state.currentPhase)) this.resolveCombat();
+          else this.onAttackShortcut();
+        }
+        break;
       case 'r': case 'R': if (isHumanTurn) this.techUI.show(); break;
       case 'd': case 'D': if (isHumanTurn) this.diplomacyUI.showModal(); break;
       case 's': case 'S': if (isHumanTurn) this.showAISpeedMenu(); break;
@@ -1087,11 +1156,7 @@ export class HUD {
 
       const unitBreakdown = showUnits
         ? (territory.units.length > 0
-            ? `<div class="territory-unit-list">${territory.units.map(u => {
-                const icon = this.unitIcon(u.unitTypeId);
-                const name = this.state.unitRegistry.get(u.unitTypeId)?.name ?? u.unitTypeId;
-                return `<span class="territory-unit-chip">${icon} ${u.count}× ${this.escapeHtml(name)}</span>`;
-              }).join('')}</div>`
+            ? `<div class="territory-tooltip-muted">Units: ${unitCount} — select territory for stack command in HQ</div>`
             : '<span class="territory-tooltip-muted">None</span>')
         : '<span class="territory-tooltip-muted">🌫️ Hidden by fog of war</span>';
 
@@ -1129,6 +1194,77 @@ export class HUD {
       el.style.top = `${clientY + 15}px`;
       el.classList.remove('hidden');
     });
+  }
+
+  private setupUnitStackSelectorListeners(): void {
+    const onChipClick = (event: Event) => {
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-unit-type-id]');
+      if (!target) return;
+      const unitTypeId = target.getAttribute('data-unit-type-id');
+      if (unitTypeId) this.selectUnitType(unitTypeId);
+    };
+
+    document.getElementById('territory-unit-selector')?.addEventListener('click', onChipClick);
+    document.getElementById('war-room-unit-slot')?.addEventListener('click', onChipClick);
+    document.getElementById('stack-command-popover')?.addEventListener('click', onChipClick);
+  }
+
+  private refreshUnitStackSelector(): void {
+    renderUnitStackSelector(this.state, this.state.getSelectedTerritory(), {
+      selectedUnitType: this.selectedUnitType,
+      unitIcon: (id) => this.unitIcon(id),
+      escapeHtml: (value) => this.escapeHtml(value),
+    });
+  }
+
+  private hideStackCommandPopover(): void {
+    document.getElementById('stack-command-popover')?.classList.add('hidden');
+    if (this.stackPopoverDismissListener) {
+      document.removeEventListener('pointerdown', this.stackPopoverDismissListener);
+      this.stackPopoverDismissListener = null;
+    }
+  }
+
+  /** Quick map-side picker when a territory has multiple ready stacks. */
+  private maybeShowStackCommandPopover(territoryId: string): void {
+    const territory = this.state.territories.get(territoryId);
+    const popover = document.getElementById('stack-command-popover');
+    if (!territory || !popover) return;
+
+    if (countReadyUnitStacks(this.state, territory) < 2) {
+      this.hideStackCommandPopover();
+      return;
+    }
+
+    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+    const left = rect.left + screen.x;
+    const top = rect.top + screen.y;
+
+    popover.innerHTML = `
+      <div class="stack-command-popover-title">Choose stack</div>
+      ${document.getElementById('territory-unit-selector')?.querySelector('.unit-stack-chips')?.innerHTML ?? ''}
+      <div class="stack-command-popover-foot">Or use HQ / War Room</div>
+    `;
+    popover.style.left = `${Math.min(left + 12, window.innerWidth - 280)}px`;
+    popover.style.top = `${Math.max(top - 20, 72)}px`;
+    popover.classList.remove('hidden');
+
+    if (this.stackPopoverDismissListener) {
+      document.removeEventListener('pointerdown', this.stackPopoverDismissListener);
+    }
+    this.stackPopoverDismissListener = (event: Event) => {
+      if ((event.target as Node) && popover.contains(event.target as Node)) return;
+      this.hideStackCommandPopover();
+    };
+    setTimeout(() => {
+      if (this.stackPopoverDismissListener) {
+        document.addEventListener('pointerdown', this.stackPopoverDismissListener);
+      }
+    }, 0);
   }
 
   /**
@@ -1887,11 +2023,11 @@ export class HUD {
    */
   private onTerritorySelected(data: { territoryId: string | null; previousTerritoryId?: string | null }): void {
     const { territoryId, previousTerritoryId } = data;
-    this.updateSelectionInfo();
-    // Start the animation loop so the selection glow animates
-    this.renderer.startContinuousRender();
 
     if (!territoryId) {
+      this.hideStackCommandPopover();
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.updateValidMoves();
       this.updateStrategicAdvisor();
       return;
@@ -1906,6 +2042,8 @@ export class HUD {
 
     // Handle commander move mode
     if (this.commanderMoveSource !== null) {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       if (territoryId === this.commanderMoveSource) {
         this.commanderMoveSource = null;
         this.showToast('Commander move cancelled.', 'info');
@@ -1917,6 +2055,8 @@ export class HUD {
 
     // Handle placement mode (placing purchased units)
     if (this.isPlacementMode) {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.handlePlacementClick(territoryId);
       return;
     }
@@ -1930,37 +2070,46 @@ export class HUD {
     if (canMobilizeOnClick && !this.mobilizationSystem.wasMobilized(territoryId)) {
       const mobilizeOption = this.mobilizationSystem.getTerritoryMobilization(territory);
       if (mobilizeOption.canMobilize) {
+        this.updateSelectionInfo();
+        this.renderer.startContinuousRender();
         this.productionUI.handleMapMobilization(territoryId);
         return;
       }
     }
 
-    // Check if clicking on a valid move target
-    // Handle all movement-capable phases across different turn styles
+    // Resolve move/attack against highlighted targets BEFORE changing the active unit stack.
     const movementPhase = isMovementPhase(phase);
-    
     const moveResolution = resolveTerritorySelectionMove({
       phaseIsMovement: movementPhase,
       territoryId,
       previousTerritoryId,
       validMoves: this.validMoves,
     });
+
     if (moveResolution.kind === 'refresh') {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.updateValidMoves();
+      this.updateStrategicAdvisor();
       return;
     }
     if (moveResolution.kind === 'previewAttack') {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.combatUI.showBattlePreview(moveResolution.fromId, moveResolution.toId);
       return;
     }
-    if (moveResolution.kind === 'executeMove') {
-      this.executePlayerMove(moveResolution.fromId, moveResolution.toId, false);
-      return;
-    }
 
-    // Update valid moves for newly selected territory
+    // Selecting a new territory — pick a default stack only here.
+    this.updateSelectionInfo();
+    this.renderer.startContinuousRender();
+    if (territoryId !== previousTerritoryId) {
+      this.autoSelectUnitType(territory);
+    }
     this.updateValidMoves();
     this.updateStrategicAdvisor();
+    this.refreshUnitStackSelector();
+    this.maybeShowStackCommandPopover(territoryId);
   }
 
   /**
@@ -1994,7 +2143,7 @@ export class HUD {
       this.showToast('Commanders can only move to friendly territory.', 'error');
       return;
     }
-    if (!from.adjacentTo.includes(toId) && from.id !== toId) {
+    if (!areTerritoriesNeighbors(this.state, from, to)) {
       this.showToast('Commander must move to an adjacent territory.', 'error');
       return;
     }
@@ -2065,31 +2214,59 @@ export class HUD {
       return;
     }
 
-    // Collect only units that CAN move (haven't acted yet this turn)
-    const unitsToMove: { unitTypeId: string; count: number }[] = [];
-    
-    for (const pu of fromTerritory.units) {
-      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (!unitType) continue;
-      if (!unitType.canEnter(toTerritory.type)) continue;
-      if (fromTerritory.type === 'sea' && unitType.domain === 'land') continue;
-      
-      // Only count units that haven't moved this turn
-      const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
-      if (availableCount <= 0) continue;
-      
-      unitsToMove.push({ unitTypeId: pu.unitTypeId, count: availableCount });
+    // Move the unit stack whose highlights were shown (not whatever stack auto-select picks on click).
+    const unitTypeId = resolveHighlightedMoveUnitType({
+      validMovesUnitTypeId: this.validMovesUnitTypeId,
+      selectedUnitType: this.selectedUnitType,
+    }) ?? (() => {
+      this.autoSelectUnitType(fromTerritory);
+      return this.selectedUnitType;
+    })();
+    if (!unitTypeId) {
+      this.showToast('No units available to move.', 'info');
+      return;
     }
 
-    if (unitsToMove.length === 0) {
+    const unitType = this.state.unitRegistry.get(unitTypeId);
+    if (!unitType) return;
+
+    const availableCount = fromTerritory.getAvailableUnitCount(unitTypeId);
+    if (availableCount <= 0) {
       this.showToast('No available units can move there! (Units can only act once per turn)', 'info');
       return;
     }
+
+    const validMove = this.validMoves.find(m => m.territoryId === toId);
+    if (!validMove || validMove.isAttack) {
+      this.showToast('That destination is not reachable by the selected unit.', 'info');
+      return;
+    }
+
+    const moveContext = resolveMovePhaseContext(this.state.currentPhase);
+    const validation = this.movementValidator.validateMove(
+      unitTypeId,
+      availableCount,
+      fromId,
+      toId,
+      moveContext !== 'noncombat',
+    );
+    if (!validation.valid) {
+      this.showToast(validation.reason ?? 'Invalid move.', 'info');
+      return;
+    }
+
+    const unitsToMove: { unitTypeId: string; count: number }[] = [
+      { unitTypeId, count: availableCount },
+    ];
 
     // Capture neutral/unowned territory when moving in
     const wasNeutral = !toTerritory.owner;
     if (!toTerritory.owner) {
       toTerritory.owner = faction.id;
+    }
+    const unitTypeForEmbark = this.state.unitRegistry.get(unitTypeId);
+    if (unitTypeForEmbark && toTerritory.type === 'sea' && usesImplicitAmphibious(unitTypeForEmbark)) {
+      claimSeaZoneForFaction(this.state, toTerritory, faction.id);
     }
 
     // SIMPLE: Move units from source to destination
@@ -2118,7 +2295,8 @@ export class HUD {
       const screen = this.renderer.worldToScreen(toTerritory.center[0], toTerritory.center[1]);
       visualEffects.captureEffect(screen.x, screen.y, faction.color);
     } else {
-      this.showToast(`Moved ${totalMoved} units to ${toTerritory.name}. They are done until next turn.`, 'success');
+      const unitLabel = unitType?.name ?? unitTypeId;
+      this.showToast(`Moved ${totalMoved} ${unitLabel} to ${toTerritory.name}. They are done until next turn.`, 'success');
       const movedDomain = this.state.unitRegistry.get(unitsToMove[0]?.unitTypeId)?.domain ?? 'land';
       soundManager.play(movedDomain === 'sea' ? 'naval_horn' : movedDomain === 'air' ? 'aircraft' : 'move');
     }
@@ -2140,6 +2318,8 @@ export class HUD {
     this.renderMinimap();
     this.renderer.clearValidMoveTargets();
     this.validMoves = [];
+    this.validMovesUnitTypeId = null;
+    this.selectedUnitType = null;
     this.state.selectedTerritoryId = null;
     this.updateSelectionInfo();
     this.updateActionButtons();
@@ -2632,8 +2812,8 @@ export class HUD {
     this.updateActionButtons();
     this.renderer.clearValidMoveTargets();
     this.validMoves = [];
+    this.validMovesUnitTypeId = null;
     this.selectedUnitType = null;
-    void this.selectedUnitType; // used when building unit selection
 
     // Update IPC display
     const faction = this.state.getCurrentFaction();
@@ -2904,8 +3084,10 @@ export class HUD {
       if (detailsEl) {
         detailsEl.innerHTML = this.buildFactionSummaryHtml();
       }
+      this.refreshUnitStackSelector();
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
+      this.validMovesUnitTypeId = null;
       this.selectedUnitType = null;
       this.updateMapReadabilityLegend();
       this.updateActionButtons();
@@ -2913,6 +3095,7 @@ export class HUD {
     }
 
     if (nameEl) nameEl.textContent = territory.name;
+    this.refreshUnitStackSelector();
 
     if (territory.type !== 'sea' && territory.units.some(pu => {
       const ut = this.state.unitRegistry.get(pu.unitTypeId);
@@ -2928,6 +3111,7 @@ export class HUD {
         detailsEl.innerHTML = this.buildSimpleTerritoryDetails(territory);
         detailsEl.classList.add('content-refresh');
       }
+      this.refreshUnitStackSelector();
       this.updateActionButtons();
       return;
     }
@@ -2990,17 +3174,15 @@ export class HUD {
     // Units with icons - show available/total for owned territories
     const isOwnedTerritory = territory.owner === this.state.currentFactionId;
     const phase = this.state.currentPhase;
-    const isMovementPhase = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
+    const movementPhaseActive = isMovementPhase(phase);
     
-    if (territory.units.length > 0) {
-      const displayUnits = territory.units.filter(pu => {
-        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-        return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
-      });
+    const displayUnits = territory.units.filter(pu => {
+      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+      return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
+    });
 
-      if (displayUnits.length > 0) {
-      // Show unit summary for owned territories
-      if (isOwnedTerritory && isMovementPhase) {
+    if (displayUnits.length > 0) {
+      if (isOwnedTerritory && movementPhaseActive) {
         const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
         const availableUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
         const actedUnits = totalUnits - availableUnits;
@@ -3012,52 +3194,11 @@ export class HUD {
           </div>`;
         }
       }
-      
-      html += `<div class="unit-list">`;
-      for (const pu of displayUnits) {
-        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-        if (unitType) {
-          const icon = this.unitIcon(pu.unitTypeId);
-          const moveIcon = unitType.movement === 1 ? '🚶' : unitType.movement >= 3 ? '✈️' : '🚗';
-          const availableCount = territory.getAvailableUnitCount(pu.unitTypeId);
-          const movedCount = (pu.movedCount || 0);
-          
-          // Show available/total for owned territories during movement phases
-          let countDisplay = `×${pu.count}`;
-          let statusBadge = '';
-          let rowStyle = '';
-          
-          if (isOwnedTerritory && isMovementPhase) {
-            if (movedCount > 0 && availableCount > 0) {
-              countDisplay = `${availableCount}/${pu.count}`;
-              statusBadge = `<span style="font-size:0.65rem; color:#22c55e; margin-left:0.25rem;">✓${availableCount}</span>`;
-            } else if (availableCount === 0) {
-              countDisplay = `×${pu.count}`;
-              statusBadge = `<span style="font-size:0.65rem; color:#666; margin-left:0.25rem;">⏸</span>`;
-              rowStyle = 'opacity: 0.5;';
-            }
-          }
-
-          const isBattered = (pu as any).batteredUntilTurn && (pu as any).batteredUntilTurn > this.state.turnNumber;
-          const batteredBadge = isBattered
-            ? `<span style="font-size:0.6rem;color:#f97316;margin-left:0.3rem;font-weight:600;" title="Battered: -1 attack this turn">⚠ battered</span>`
-            : '';
-
-          html += `<div class="unit-item" style="${rowStyle}">
-            <span>${icon} ${unitType.name}${statusBadge}${batteredBadge}</span>
-            <span class="unit-count" title="${availableCount} available, ${movedCount} already acted">${countDisplay}</span>
-            <span class="unit-stats" style="font-size:0.7rem;color:#666" title="Attack/Defense/Movement">${unitType.attack}/${unitType.defense}/${moveIcon}${unitType.movement}</span>
-          </div>`;
-        }
-      }
-      html += `</div>`;
-      } // displayUnits
 
       if (isOwnedTerritory && territory.units.some(pu => territory.getAvailableUnitCount(pu.unitTypeId) < pu.count)) {
         html += `<div class="acted-explainer">Moved or newly built units have acted and refresh on your next turn.</div>`;
       }
 
-      // Commander card — show if any unit in this territory has a named general
       const commanderUnit = territory.units.find((u: any) => u.commander);
       if (commanderUnit?.commander) {
         const cmd = commanderUnit.commander;
@@ -3105,7 +3246,7 @@ export class HUD {
       </div>`;
 
       // Attack range preview (enemies reachable from this territory)
-      if (isOwnedTerritory && isMovementPhase && this.validMoves.length > 0) {
+      if (isOwnedTerritory && movementPhaseActive && this.validMoves.length > 0) {
         const enemyIds = Array.from(new Set(this.validMoves.filter(m => m.isAttack).map(m => m.territoryId)));
         const moveIds = Array.from(new Set(this.validMoves.filter(m => !m.isAttack).map(m => m.territoryId)));
         if (enemyIds.length > 0) {
@@ -3128,7 +3269,7 @@ export class HUD {
                 ? (coastalStrike ? (t?.type === 'sea' ? 'Coastal fire' : 'Bombard') : 'Attack')
                 : viaTransport ? 'Amphibious' : 'Move';
               const className = viaTransport ? 'transport' : coastalStrike ? 'coastal-strike' : target.type;
-              return `<button class="${className}" onclick="window.__hudInstance?.focusTerritory('${target.id}')">${label}: ${this.escapeHtml(t?.name ?? target.id)}</button>`;
+              return `<span class="drag-target-hint ${className}">${label}: ${this.escapeHtml(t?.name ?? target.id)}</span>`;
             }).join('')}
           </div>`;
         }
@@ -3168,7 +3309,7 @@ export class HUD {
     const faction = this.state.getCurrentFaction();
     const isOwned = territory.owner === faction?.id;
     const phase = this.state.currentPhase;
-    const isMovement = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
+    const isMovement = isMovementPhase(phase);
     const displayUnits = territory.units.filter(pu => {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
@@ -3184,15 +3325,6 @@ export class HUD {
       if (!isOwned && owner) return owner.isEnemyOf(faction?.id ?? '') ? 'Enemy territory. Attack from an adjacent friendly territory.' : 'Not controlled by you.';
       return 'No immediate action here.';
     })();
-    const unitSummary = displayUnits.length
-      ? displayUnits.slice(0, 5).map(pu => {
-          const unit = this.state.unitRegistry.get(pu.unitTypeId);
-          const icon = this.unitIcon(pu.unitTypeId);
-          const available = territory.getAvailableUnitCount(pu.unitTypeId);
-          const acted = available < pu.count ? ' (acted)' : '';
-          return `${icon} ${unit?.name ?? pu.unitTypeId} x${pu.count}${acted}`;
-        }).join(', ')
-      : 'No units stationed';
     const tags = [
       territory.isCapital ? 'Capital' : '',
       territory.hasFactory ? 'Factory' : '',
@@ -3215,21 +3347,7 @@ export class HUD {
           <div><small>Ready</small><strong>${readyUnits}</strong></div>
           <div><small>Income</small><strong>${territory.isLand() ? `+${territory.production}` : '-'}</strong></div>
         </div>
-        <div class="simple-unit-summary">${this.escapeHtml(unitSummary)}</div>
         ${isOwned && readyUnits < totalUnits ? '<div class="acted-explainer">Acted units are already here, but cannot move again until your next turn.</div>' : ''}
-        <details class="simple-territory-details">
-          <summary>Details</summary>
-          <div class="unit-list">
-            ${displayUnits.map(pu => {
-              const unit = this.state.unitRegistry.get(pu.unitTypeId);
-              const available = territory.getAvailableUnitCount(pu.unitTypeId);
-              return `<div class="unit-item">
-                <span>${this.unitIcon(pu.unitTypeId)} ${this.escapeHtml(unit?.name ?? pu.unitTypeId)}</span>
-                <span class="unit-count">${available}/${pu.count}</span>
-              </div>`;
-            }).join('') || '<p style="color:#888;">No units stationed.</p>'}
-          </div>
-        </details>
       </div>
     `;
   }
@@ -3244,57 +3362,16 @@ export class HUD {
     const turnStyle = this.gameConfig.turnStyle;
     const isHumanTurn = faction?.controlledBy === 'human';
 
-    const moveBtn = document.getElementById('btn-move') as HTMLButtonElement;
-    const attackBtn = document.getElementById('btn-attack') as HTMLButtonElement;
     const buildBtn = document.getElementById('btn-build') as HTMLButtonElement;
     const endBtn = document.getElementById('btn-end-phase') as HTMLButtonElement;
 
     // Determine which phases allow which actions based on turn style
     const phaseStr = phase as string;
-    const { movementPhase, buildPhase, combatPhase, endPhase: isEndPhase } = getHudPhaseFlags(phaseStr);
-    const hasAttackTargets = movementPhase && this.validMoves.some(m => m.isAttack);
+    const { buildPhase, combatPhase, endPhase: isEndPhase } = getHudPhaseFlags(phaseStr);
+    const movementPhase = isMovementPhase(phase);
 
-    // Move button - enabled during movement phases with owned territory selected that has available units
-    if (moveBtn) {
-      // Check for units that haven't acted yet this turn
-      const hasAvailableUnits = territory && canIssueOrdersFromTerritory(territory, faction?.id ?? '') &&
-        territoryHasAvailableUnits(territory);
-      const moveState = getMoveButtonState({
-        movementPhase,
-        isHumanTurn,
-        hasAvailableUnits: Boolean(hasAvailableUnits),
-      });
-      const canMove = moveState.canMove;
-      moveBtn.disabled = !canMove;
-      moveBtn.innerHTML = moveState.labelHtml;
-      moveBtn.title = moveState.title;
-    }
-
-    // Attack button - opens battle preview when selected territory has attack targets
-    if (attackBtn) {
-      const attackState = getAttackButtonState({
-        movementPhase,
-        combatPhase,
-        isHumanTurn,
-        hasAttackTargets,
-        pendingMoveCount: this.state.pendingMoves.length,
-      });
-      attackBtn.innerHTML = attackState.labelHtml;
-      attackBtn.disabled = attackState.disabled;
-      attackBtn.title = attackState.title;
-    }
-
-    // Phase-active class: highlight buttons relevant to the current phase
-    const allActionBtns = [moveBtn, attackBtn, buildBtn];
-    for (const b of allActionBtns) b?.classList.remove('phase-active');
-    if (movementPhase) {
-      moveBtn?.classList.add('phase-active');
-      if (hasAttackTargets) attackBtn?.classList.add('phase-active');
-    }
+    buildBtn?.classList.remove('phase-active');
     if (buildPhase || (turnStyle === 'move_for_move' && isHumanTurn)) buildBtn?.classList.add('phase-active');
-    if (combatPhase) attackBtn?.classList.add('phase-active');
-
-    // Build/Mobilize button - enabled during purchase/build/production phase
     if (buildBtn) {
       buildBtn.textContent = '🏭 Mobilize';
       
@@ -3461,6 +3538,7 @@ export class HUD {
     if (!territory || !faction || !canIssueOrdersFromTerritory(territory, faction.id)) {
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
+      this.validMovesUnitTypeId = null;
       this.updateMapReadabilityLegend();
       return;
     }
@@ -3469,27 +3547,39 @@ export class HUD {
     if (!isMovementPhase(phase)) {
       this.renderer.clearValidMoveTargets();
       this.validMoves = [];
+      this.validMovesUnitTypeId = null;
       this.updateMapReadabilityLegend();
       return;
     }
 
-    // Get valid moves for all unit types in territory
+    // Get valid moves for the selected unit stack (each type has its own range)
     const allMoves: ValidMove[] = [];
-    // Determine if attacks are allowed based on phase and turn style
-    const isCombatMove = isAttackMovePhase(phase);
-
-    for (const pu of territory.units) {
-      const moves = this.movementValidator.getValidMoves(
-        pu.unitTypeId,
-        territory.id,
-        isCombatMove
-      );
-      allMoves.push(...moves);
+    const moveContext = resolveMovePhaseContext(phase);
+    const selectedStillReady = this.selectedUnitType
+      && territory.getAvailableUnitCount(this.selectedUnitType) > 0;
+    if (!selectedStillReady) {
+      this.autoSelectUnitType(territory);
     }
+
+    if (!this.selectedUnitType) {
+      this.renderer.clearValidMoveTargets();
+      this.validMoves = [];
+      this.validMovesUnitTypeId = null;
+      this.updateMapReadabilityLegend();
+      return;
+    }
+
+    const moves = this.movementValidator.getValidMoves(
+      this.selectedUnitType,
+      territory.id,
+      moveContext
+    );
+    allMoves.push(...moves);
 
     const { moveTargets, attackTargets, coastalStrikeTargets } = splitMoveAndAttackTargets(allMoves);
 
     this.validMoves = allMoves;
+    this.validMovesUnitTypeId = this.selectedUnitType;
     this.renderer.setValidMoveTargets(moveTargets, attackTargets, coastalStrikeTargets);
     this.applyOverlay();
     this.updateActionButtons();
@@ -3525,7 +3615,12 @@ export class HUD {
     const attackCount = this.validMoves.filter(m => m.isAttack).length;
     const mobilizeCount = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize).length;
     const selected = this.state.getSelectedTerritory();
-    const selectedText = selected ? selected.name : 'No territory selected';
+    const selectedUnitName = this.selectedUnitType
+      ? this.state.unitRegistry.get(this.selectedUnitType)?.name
+      : null;
+    const selectedText = selected
+      ? (selectedUnitName ? `${selected.name} · ${selectedUnitName}` : selected.name)
+      : 'No territory selected';
     const showNavalLegend = Boolean(selected?.isSea() && moveCount > 0);
     const modeLabels: Record<string, string> = {
       off: 'Overlay Off',
@@ -3545,21 +3640,103 @@ export class HUD {
   }
 
   /**
-   * Handle move button click
+   * Resolve queued combat (combat phase).
    */
-  private onMoveClick(): void {
-    this.showToast('Click a highlighted territory to move units there', 'info');
+  resolveCombat(): void {
+    this.combatUI.onAttackClick();
   }
 
-  /**
-   * Handle attack button click - START COMBAT RESOLUTION
-   */
-  private onAttackClick(): void {
-    if (isAttackMovePhase(this.state.currentPhase)) {
-      this.onAttackShortcut();
+  private setupUnitDrag(): void {
+    new MapMoveDragController(this.renderer, () => this.state, {
+      canDragFrom: (territoryId) => this.canStartUnitDragFrom(territoryId),
+      onDragStart: (fromTerritoryId) => {
+        if (this.state.selectedTerritoryId !== fromTerritoryId) {
+          this.state.selectTerritory(fromTerritoryId);
+          this.updateSelectionInfo();
+        }
+        this.prepareUnitDrag(fromTerritoryId);
+      },
+      onDragHover: () => undefined,
+      onDragDrop: (fromTerritoryId, toTerritoryId) => this.handleUnitDragDrop(fromTerritoryId, toTerritoryId),
+      onDragCancel: () => undefined,
+      getDropKind: (fromTerritoryId, toTerritoryId) => this.getUnitDropKind(fromTerritoryId, toTerritoryId),
+    });
+  }
+
+  private canStartUnitDragFrom(territoryId: string): boolean {
+    if (!MapMoveDragController.canDragFromTerritory(this.state, territoryId)) return false;
+    const territory = this.state.territories.get(territoryId);
+    if (!territory) return false;
+
+    const ready = territory.units.filter(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
+    if (ready.length === 0) return false;
+
+    if (this.selectedUnitType && ready.some(pu => pu.unitTypeId === this.selectedUnitType)) {
+      const unitType = this.state.unitRegistry.get(this.selectedUnitType);
+      if (unitType && isRangedStrikeUnit(unitType)) return false;
+      return true;
+    }
+
+    return ready.some(pu => {
+      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+      return unitType && !isRangedStrikeUnit(unitType);
+    });
+  }
+
+  private prepareUnitDrag(fromTerritoryId: string): void {
+    const territory = this.state.territories.get(fromTerritoryId);
+    if (territory) this.autoSelectUnitType(territory);
+    this.updateValidMoves();
+  }
+
+  private getUnitDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind {
+    if (fromTerritoryId === toTerritoryId) return 'invalid';
+    if (this.state.selectedTerritoryId !== fromTerritoryId || this.validMoves.length === 0) {
+      this.prepareUnitDrag(fromTerritoryId);
+    }
+    const move = this.validMoves.find(m => m.territoryId === toTerritoryId);
+    if (!move) return 'invalid';
+    // Movement rules trump fog display — adjacent "?" tiles can still be valid move/attack targets.
+    return move.isAttack ? 'attack' : 'move';
+  }
+
+  private explainInvalidUnitDrop(fromTerritoryId: string, toTerritoryId: string): void {
+    const toTerritory = this.state.territories.get(toTerritoryId);
+    const faction = this.state.getCurrentFaction();
+    if (toTerritory && faction && toTerritory.owner && faction.isEnemyOf(toTerritory.owner)) {
+      if (isNonCombatMovePhase(this.state.currentPhase)) {
+        this.showToast('Cannot attack during Non-Combat Movement — advance to Combat Movement first.', 'info');
+        return;
+      }
+    }
+
+    const fromTerritory = this.state.territories.get(fromTerritoryId);
+    const unitTypeId = this.selectedUnitType ?? this.validMovesUnitTypeId;
+    if (fromTerritory && unitTypeId) {
+      const available = fromTerritory.getAvailableUnitCount(unitTypeId);
+      if (available <= 0) {
+        this.showToast('That unit already moved this turn.', 'info');
+        return;
+      }
+    }
+
+    this.showToast('That destination is out of range or not reachable by the selected unit.', 'info');
+  }
+
+  private handleUnitDragDrop(fromTerritoryId: string, toTerritoryId: string): void {
+    const kind = this.getUnitDropKind(fromTerritoryId, toTerritoryId);
+    if (kind === 'invalid') {
+      this.explainInvalidUnitDrop(fromTerritoryId, toTerritoryId);
       return;
     }
-    this.combatUI.onAttackClick();
+    if (kind === 'move') {
+      this.executePlayerMove(fromTerritoryId, toTerritoryId, false);
+    } else if (kind === 'attack') {
+      this.combatUI.showBattlePreview(fromTerritoryId, toTerritoryId);
+      if (this.gameConfig.simpleMode && this.gameConfig.turnStyle !== 'move_for_move') {
+        this.combatUI.confirmAttackFromPreview(true);
+      }
+    }
   }
 
   /**
@@ -5183,23 +5360,11 @@ export class HUD {
 
   private getNavalMobilizationAdvice(): string | null {
     const mapId = this.gameConfig.mapId ?? 'grid';
-    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island')) return null;
-    const faction = this.state.getCurrentFaction();
-    if (!faction) return null;
-
-    let hasTransport = false;
-    for (const t of this.state.territories.values()) {
-      if (t.owner !== faction.id) continue;
-      for (const pu of t.units) {
-        if (pu.unitTypeId === 'transport' && pu.count > 0) hasTransport = true;
-      }
-    }
-    if (hasTransport) return null;
-
+    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island') && !mapId.includes('world')) return null;
     const coastal = this.mobilizationSystem.getMobilizationOptions()
       .find(o => o.canMobilize && o.type === 'coastal');
     if (!coastal) return null;
-    return `Build a transport at ${coastal.territory.name} (${coastal.cost} IPC) — you need lift to reach enemy islands.`;
+    return `Mobilize marines at ${coastal.territory.name} (${coastal.cost} IPC) for island assaults. Ground units can cross oceans automatically.`;
   }
 
   private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {

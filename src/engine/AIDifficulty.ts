@@ -40,7 +40,7 @@ export const MOBILIZATION_LIMITS: Record<AIDifficultyLevel, DifficultyMobilizati
 };
 
 const NAVAL_UNIT_IDS = new Set([
-  'battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'transport',
+  'battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines',
 ]);
 
 export function clonePersonality(p: AIPersonality): AIPersonality {

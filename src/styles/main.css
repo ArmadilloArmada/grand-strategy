@@ -200,6 +200,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  background: #1e3252;
   border: 2px solid var(--bg-elevated);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
@@ -540,6 +541,18 @@ body {
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   transition: all var(--transition-fast);
+}
+
+#territory-details .unit-item.selected {
+  background: rgba(184, 134, 11, 0.22);
+  border: 1px solid rgba(184, 134, 11, 0.55);
+  box-shadow: 0 0 0 1px rgba(184, 134, 11, 0.25);
+}
+
+#territory-details .unit-select-hint {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0.25rem 0 0.5rem;
 }
 
 #territory-details .unit-item:hover {
@@ -3908,6 +3921,142 @@ body.theme-dark .preview-odds-caption {
   font-size: 0.78rem;
   line-height: 1.4;
   color: #4a5568;
+}
+
+/* ==================== Unit stack selector (HQ / War Room) ==================== */
+
+.unit-stack-selector {
+  margin: 0.55rem 0 0.75rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(184, 134, 11, 0.28);
+}
+
+.unit-stack-selector-hint {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 0.5rem;
+  line-height: 1.35;
+}
+
+.unit-stack-selector-hint.muted {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.unit-stack-selector-empty {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+.unit-stack-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.unit-stack-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.unit-stack-chip:hover:not(:disabled) {
+  border-color: rgba(184, 134, 11, 0.55);
+  background: rgba(184, 134, 11, 0.12);
+}
+
+.unit-stack-chip.selected {
+  border-color: rgba(72, 220, 120, 0.75);
+  background: rgba(72, 220, 120, 0.14);
+  box-shadow: 0 0 0 1px rgba(72, 220, 120, 0.25);
+}
+
+.unit-stack-chip.acted,
+.unit-stack-chip.readonly {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.unit-stack-chip-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.unit-stack-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.unit-stack-chip-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.unit-stack-chip-meta {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.unit-stack-chip-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #86efac;
+  flex-shrink: 0;
+}
+
+#hq-panel #territory-unit-selector {
+  margin-top: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+#war-room-panel #war-room-unit-slot .unit-stack-selector-body {
+  margin-top: 0.35rem;
+}
+
+.stack-command-popover {
+  position: fixed;
+  z-index: 450;
+  width: min(260px, 88vw);
+  padding: 0.65rem 0.7rem 0.55rem;
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(184, 134, 11, 0.45);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.stack-command-popover-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 0.45rem;
+}
+
+.stack-command-popover-foot {
+  margin-top: 0.45rem;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
 }
 
 .territory-tooltip-muted {

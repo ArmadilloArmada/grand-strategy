@@ -3,6 +3,7 @@ import type { UnitEra } from '../engine/GameConfig';
 export const UNIT_ICONS: Record<string, string> = {
   infantry: '🚶',
   mech_infantry: '🏃',
+  marines: '🪖',
   tank: '🛡️',
   artillery: '💥',
   anti_air: '🎯',

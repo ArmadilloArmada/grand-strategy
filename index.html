@@ -179,9 +179,7 @@
           <button id="btn-undo" disabled title="Undo last move" aria-label="Undo last move">↩️<span class="btn-label"> Undo</span></button>
           <button id="btn-redo" disabled title="Redo" aria-label="Redo">↪️<span class="btn-label"> Redo</span></button>
           <div class="btn-separator"></div>
-          <button id="btn-move" disabled aria-label="Move selected units">🚶 Move</button>
-          <button id="btn-attack" disabled aria-label="Attack with selected units">⚔️ Attack</button>
-          <button id="btn-strategic-bomb" disabled class="hidden" title="Strategic bombing" aria-label="Strategic bombing">💣 Bomb</button>
+          <button id="btn-strategic-bomb" disabled class="hidden" title="Bomb all enemy factories" aria-label="Strategic bombing">💣 Bomb</button>
           <button id="btn-build" disabled aria-label="Build new units">🏭 Build</button>
           <button id="btn-fortify" disabled class="hidden" title="Build fortification" aria-label="Fortify">🏰 Fortify</button>
         </div>
@@ -211,6 +209,7 @@
       <!-- hidden legacy containers kept for JS compatibility -->
       <div id="selection-info" class="hidden">
         <div id="territory-name">Select a Territory</div>
+        <div id="territory-unit-selector" class="unit-stack-selector hidden" aria-label="Unit stack selector"></div>
         <div id="territory-details"></div>
       </div>
 
@@ -1103,24 +1102,10 @@
     <div id="territory-tooltip" class="tooltip hidden" style="pointer-events: none;">
       <div id="territory-tooltip-content"></div>
     </div>
+    <div id="stack-command-popover" class="stack-command-popover hidden" aria-label="Quick stack picker"></div>
 
-    <!-- Strategic Bombing Modal -->
-    <div id="strategic-bombing-modal" class="modal hidden">
-      <div class="modal-content" style="max-width:480px;">
-        <h2>💣 Strategic Bombing Mission</h2>
-        <p style="color:#aaa;margin:0.5rem 0 1rem;">Send bombers to destroy an enemy factory, disabling it for several turns.</p>
-        <div class="setting-row" style="margin-bottom:0.75rem;">
-          <label for="sb-target-select">Target factory territory</label>
-          <select id="sb-target-select" style="background:#1a2a3a;color:#ccc;border:1px solid #444;padding:0.35rem;border-radius:4px;flex:1;"></select>
-        </div>
-        <div id="sb-bomber-info" style="color:#888;font-size:0.85rem;margin-bottom:1rem;"></div>
-        <div id="sb-result" style="display:none;padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:6px;margin-bottom:1rem;"></div>
-        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-          <button id="btn-sb-launch" class="primary">🚀 Launch Mission</button>
-          <button id="btn-sb-cancel">Cancel</button>
-        </div>
-      </div>
-    </div>
+    <!-- Strategic Bombing Modal (legacy — bombing runs directly from the Bomb button) -->
+    <div id="strategic-bombing-modal" class="modal hidden" aria-hidden="true"></div>
 
     <!-- Combined Combat Modal: preview phase → battle phase in one window -->
     <div id="combat-modal" class="modal hidden">

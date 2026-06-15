@@ -1886,10 +1886,10 @@ class Game {
         }
       }
 
-      // A - Attack (during combat phase)
+      // A - Resolve combat (during combat phase)
       if (e.key === 'a' && this.isGameStarted) {
         if (this.state.currentPhase === 'combat') {
-          document.getElementById('btn-attack')?.click();
+          this.hud.resolveCombat();
         }
       }
 

@@ -11,6 +11,7 @@ import {
   computeEngageableDefensePower,
   canLandUnitStrikeNaval,
 } from '../engine/NavalSystem';
+import { getTerritoryNeighborIds } from '../engine/gridAdjacency';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
@@ -32,6 +33,7 @@ export interface CombatCallbacks {
   updateSelectionInfo(): void;
   updateActionButtons(): void;
   afterUnitAction?: () => void;
+  getSelectedUnitType?: () => string | null;
 }
 
 export interface BattlePreviewStats {
@@ -345,7 +347,7 @@ export class CombatUI {
     const combatTerritory = this.state.territories.get(this.activeCombat.territoryId);
     if (!combatTerritory) return;
 
-    for (const adjId of combatTerritory.adjacentTo) {
+    for (const adjId of getTerritoryNeighborIds(this.state, combatTerritory)) {
       const adj = this.state.territories.get(adjId);
       if (adj?.owner === this.activeCombat.attackingFactionId) {
         this.combatResolver.processRetreat(this.activeCombat, adjId);
@@ -391,7 +393,14 @@ export class CombatUI {
 
       this.combatResolver.finalizeCombat(combat);
 
-      if (sourceTerritory && combat.winner !== 'attacker') {
+      if (combat.stayInPlace && sourceTerritory) {
+        for (const cu of combat.attackers) {
+          const surviving = cu.count - cu.casualties;
+          if (surviving <= 0) continue;
+          sourceTerritory.addUnits(cu.unitType.id, surviving);
+          sourceTerritory.markUnitsActed(cu.unitType.id, surviving);
+        }
+      } else if (sourceTerritory && combat.winner !== 'attacker') {
         for (const cu of combat.attackers) {
           const surviving = cu.count - cu.casualties;
           if (surviving <= 0) continue;
@@ -422,11 +431,17 @@ export class CombatUI {
       const attackerLossText = this.formatLosses(attackerLosses);
       const defenderLossText = this.formatLosses(defenderLosses);
       const targetName = targetTerritory?.name ?? combat.territoryId;
-      const recap = combat.winner === 'attacker'
+      const recap = combat.stayInPlace
+        ? (combat.winner === 'attacker'
+          ? `Barrage on ${targetName} succeeded. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+          : combat.winner === 'defender'
+          ? `${targetName} held after barrage. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+          : `${targetName} emptied. Both sides destroyed.`)
+        : (combat.winner === 'attacker'
         ? `Captured ${targetName}. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
         : combat.winner === 'defender'
         ? `${targetName} held. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
-        : `${targetName} emptied. Both sides destroyed.`;
+        : `${targetName} emptied. Both sides destroyed.`);
 
       if (combat.winner === 'attacker') {
         this.callbacks.showToast(recap, 'success');
@@ -803,6 +818,7 @@ export class CombatUI {
     }
     if (territoryEl) territoryEl.textContent = territoryLabel;
 
+    const selectedUnitType = this.callbacks.getSelectedUnitType?.() ?? null;
     let artilleryCount = 0;
     let infantryCount = 0;
     const attackerUnitsEl = document.getElementById('preview-attacker-units');
@@ -812,6 +828,7 @@ export class CombatUI {
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
+        if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
         const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
         if (readyCount <= 0) continue;
         readyAttackers.push({ unitTypeId: pu.unitTypeId, count: readyCount });
@@ -1304,6 +1321,7 @@ export class CombatUI {
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
+        if (this.callbacks.getSelectedUnitType?.() && pu.unitTypeId !== this.callbacks.getSelectedUnitType?.()) continue;
         const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
         if (availableCount <= 0) continue;
         const input = attackerUnitsEl?.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
@@ -1330,17 +1348,15 @@ export class CombatUI {
     if (!hasDefenders) {
       this.closeBattlePreview();
       const movementValidator = new MovementValidator(this.state);
-      const coastalStrike = attackingUnits.some(au => {
+      const stayInPlace = attackingUnits.every(au => {
         const ut = this.state.unitRegistry.get(au.unitTypeId);
-        return ut && movementValidator.isCoastalStrike(fromTerritory, toTerritory, ut);
+        return ut && movementValidator.isRangedStrike(fromTerritory, toTerritory, ut);
       });
-      if (coastalStrike) {
-        if (toTerritory.isLand()) {
-          toTerritory.owner = faction.id;
-        }
+      if (stayInPlace) {
         for (const au of attackingUnits) {
           fromTerritory.markUnitsActed(au.unitTypeId, au.count);
         }
+        this.callbacks.showToast(`Barrage on ${toTerritory.name} complete.`, 'success');
       } else {
         for (const au of attackingUnits) {
           fromTerritory.removeUnits(au.unitTypeId, au.count);
@@ -1351,21 +1367,28 @@ export class CombatUI {
           toTerritory.addUnits(au.unitTypeId, au.count);
           toTerritory.markUnitsActed(au.unitTypeId, au.count);
         }
+        this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
+        soundManager.play('capture');
+        battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
       }
-      this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
-      soundManager.play('capture');
-      battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
       this.renderer.render();
       this.callbacks.renderMinimap();
       this.callbacks.afterUnitAction?.();
       return;
     }
 
+    const movementValidator = new MovementValidator(this.state);
+    const stayInPlace = attackingUnits.every(au => {
+      const ut = this.state.unitRegistry.get(au.unitTypeId);
+      return ut && movementValidator.isRangedStrike(fromTerritory, toTerritory, ut);
+    });
+
     const combat = this.combatResolver.initiateCombat(
       toTerritory.id,
       faction.id,
       attackingUnits,
       fromTerritory.id,
+      { stayInPlace },
     );
 
     if (!combat) {
@@ -1431,29 +1454,48 @@ export class CombatUI {
 
   // ==================== STRATEGIC BOMBING ====================
 
-  /** Show the strategic bombing dialog if the current faction has bombers. */
-  showStrategicBombingModal(): void {
-    const faction = this.state.getCurrentFaction();
-    if (!faction) return;
+  /** Split bombers evenly across factory targets (remainder to first targets). */
+  static allocateBombersAcrossTargets(totalBombers: number, targetCount: number): number[] {
+    if (targetCount <= 0) return [];
+    const base = Math.floor(totalBombers / targetCount);
+    const remainder = totalBombers % targetCount;
+    return Array.from({ length: targetCount }, (_, i) => base + (i < remainder ? 1 : 0));
+  }
 
-    // Count bombers in all owned territories
-    let totalBombers = 0;
+  private countAvailableBombers(factionId: string): number {
+    let total = 0;
     for (const t of this.state.territories.values()) {
-      if (t.owner !== faction.id) continue;
+      if (t.owner !== factionId) continue;
       for (const u of t.units) {
         const type = this.state.unitRegistry.get(u.unitTypeId);
-        if (type?.id.includes('bomber') || type?.id.includes('strategic')) {
-          totalBombers += u.count;
+        if (type?.canStrategicBomb || type?.id.includes('bomber') || type?.id.includes('strategic')) {
+          total += u.count;
         }
       }
     }
+    return total;
+  }
 
+  private countAntiAirInTerritory(territoryId: string): number {
+    const territory = this.state.territories.get(territoryId);
+    if (!territory) return 0;
+    return territory.units.reduce((sum, u) => {
+      const id = this.state.unitRegistry.get(u.unitTypeId)?.id ?? '';
+      return id.includes('aa') || id.includes('anti_air') ? sum + u.count : sum;
+    }, 0);
+  }
+
+  /** Bomb every eligible enemy factory in one action — no target selection needed. */
+  executeStrategicBombing(): void {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const totalBombers = this.countAvailableBombers(faction.id);
     if (totalBombers === 0) {
       this.callbacks.showToast('No bombers available for strategic bombing.', 'info');
       return;
     }
 
-    // Build target list: enemy territories with factories
     const targets = Array.from(this.state.territories.values()).filter(t =>
       t.owner && faction.isEnemyOf(t.owner) && t.hasFactory && !t.isFactoryDisabled(this.state.turnNumber)
     );
@@ -1463,64 +1505,42 @@ export class CombatUI {
       return;
     }
 
-    const modal = document.getElementById('strategic-bombing-modal');
-    const select = document.getElementById('sb-target-select') as HTMLSelectElement | null;
-    const infoEl = document.getElementById('sb-bomber-info');
-    const resultEl = document.getElementById('sb-result');
+    const allocations = CombatUI.allocateBombersAcrossTargets(totalBombers, targets.length);
+    let totalDamage = 0;
+    let totalLosses = 0;
+    let factoriesHit = 0;
 
-    if (!modal || !select) return;
+    for (let i = 0; i < targets.length; i++) {
+      const bombers = allocations[i];
+      if (bombers <= 0) continue;
 
-    select.innerHTML = targets.map(t =>
-      `<option value="${t.id}">${t.name} (${this.state.factionRegistry.get(t.owner ?? '')?.name ?? 'Unknown'})</option>`
-    ).join('');
+      const target = targets[i];
+      const aaCount = this.countAntiAirInTerritory(target.id);
+      const result = this.combatResolver.resolveStrategicBombing(target.id, faction.id, bombers, aaCount);
 
-    if (infoEl) infoEl.textContent = `You have ${totalBombers} bomber(s) available. Each rolls 1d6 damage. AA guns intercept on a roll of 1.`;
-    if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
-
-    modal.classList.remove('hidden');
-
-    const launchBtn = document.getElementById('btn-sb-launch');
-    const cancelBtn = document.getElementById('btn-sb-cancel');
-
-    const handleLaunch = () => {
-      const targetId = select.value;
-      const targetTerritory = this.state.territories.get(targetId);
-      if (!targetTerritory) return;
-
-      // Count AA guns in target territory
-      const aaCount = targetTerritory.units
-        .filter(u => this.state.unitRegistry.get(u.unitTypeId)?.id.includes('aa') ||
-                     this.state.unitRegistry.get(u.unitTypeId)?.id.includes('anti_air'))
-        .reduce((s, u) => s + u.count, 0);
-
-      const result = this.combatResolver.resolveStrategicBombing(targetId, faction.id, totalBombers, aaCount);
-
-      if (resultEl) {
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = result.totalDamage > 0
-          ? `<strong style="color:#ef4444;">💥 Factory hit!</strong><br>
-             Bombers: ${totalBombers - result.bomberLosses}/${totalBombers} survived.<br>
-             Damage rolls: [${result.damageRolls.join(', ')}] = <strong>${result.totalDamage}</strong> damage.<br>
-             Factory disabled for ${Math.max(1, Math.floor(result.totalDamage / 3))} turn(s).`
-          : `<strong style="color:#888;">Mission failed — all bombers intercepted (${result.bomberLosses} lost).</strong>`;
-      }
-
-      launchBtn?.removeEventListener('click', handleLaunch);
-      launchBtn!.textContent = 'Done';
-      launchBtn!.onclick = () => { modal.classList.add('hidden'); launchBtn!.textContent = '🚀 Launch Mission'; launchBtn!.onclick = null; };
+      totalDamage += result.totalDamage;
+      totalLosses += result.bomberLosses;
+      if (result.totalDamage > 0) factoriesHit++;
 
       battleLog.logCombat(
         this.state.turnNumber,
         faction.name,
         faction.color,
-        `💣 Strategic bombing of ${targetTerritory.name}: ${result.totalDamage} damage, ${result.bomberLosses} bombers lost.`
+        `💣 Strategic bombing of ${target.name}: ${result.totalDamage} damage, ${result.bomberLosses} bombers lost.`
       );
+    }
 
-      this.renderer.render();
-    };
+    const summary = factoriesHit > 0
+      ? `💣 Bombed ${factoriesHit} factor${factoriesHit === 1 ? 'y' : 'ies'} for ${totalDamage} total damage (${totalLosses} bomber${totalLosses === 1 ? '' : 's'} lost).`
+      : `💣 Bombing run complete — ${totalLosses} bomber${totalLosses === 1 ? '' : 's'} lost, no factory damage.`;
 
-    launchBtn?.removeEventListener('click', handleLaunch);
-    launchBtn?.addEventListener('click', handleLaunch);
-    cancelBtn!.onclick = () => modal.classList.add('hidden');
+    this.callbacks.showToast(summary, totalDamage > 0 ? 'success' : 'info');
+    this.renderer.render();
+    this.callbacks.updateActionButtons();
+  }
+
+  /** @deprecated Use executeStrategicBombing — kept for legacy callers. */
+  showStrategicBombingModal(): void {
+    this.executeStrategicBombing();
   }
 }

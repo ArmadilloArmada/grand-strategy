@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameState } from '../GameState';
 import { MovementValidator } from '../MovementValidator';
-import { getNavalReachNeighborIds, isNavalReachNeighbor } from '../gridAdjacency';
+import { getGridNeighborIds, getNavalReachNeighborIds, isNavalReachNeighbor } from '../gridAdjacency';
 import { makeFactionData, makeTerritory, makeUnitData } from './testHelpers';
 
 function gridPolygon(col: number, row: number, size = 50): [number, number][] {
@@ -9,6 +9,31 @@ function gridPolygon(col: number, row: number, size = 50): [number, number][] {
   const y = row * size;
   return [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
 }
+
+describe('gridAdjacency horizontal wrap', () => {
+  it('connects the west and east edges on wrap maps', () => {
+    const state = new GameState();
+    state.mapLayout = { width: 200, height: 100, wrapHorizontal: true };
+
+    const west = makeTerritory('west', 'player', {
+      type: 'coastal',
+      adjacentTo: [],
+      polygon: gridPolygon(0, 1),
+      center: [25, 75],
+    });
+    const east = makeTerritory('east', 'player', {
+      type: 'coastal',
+      adjacentTo: [],
+      polygon: gridPolygon(3, 1),
+      center: [175, 75],
+    });
+    state.territories.set('west', west);
+    state.territories.set('east', east);
+
+    expect(getGridNeighborIds(state, west)).toContain('east');
+    expect(getGridNeighborIds(state, east)).toContain('west');
+  });
+});
 
 describe('gridAdjacency naval reach', () => {
   it('includes diagonal grid neighbors beyond orthogonal adjacentTo', () => {
@@ -30,6 +55,7 @@ describe('gridAdjacency naval reach', () => {
 
     expect(isNavalReachNeighbor(state, sea, land)).toBe(true);
     expect(getNavalReachNeighborIds(state, sea)).toContain('coast');
+    expect(getGridNeighborIds(state, sea)).toContain('coast');
   });
 });
 

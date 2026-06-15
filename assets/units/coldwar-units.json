@@ -58,6 +58,7 @@
     "hitPoints": 1,
     "canBlitz": false,
     "canBombard": true,
+    "attackRange": 2,
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": true,
@@ -174,6 +175,22 @@
     "transportCapacity": 0,
     "requiredTransport": false,
     "notes": "Nuclear-powered. Silent and deadly."
+  },
+  {
+    "id": "marines",
+    "name": "Marines",
+    "attack": 2,
+    "defense": 2,
+    "movement": 1,
+    "cost": 5,
+    "domain": "land",
+    "hitPoints": 1,
+    "canBlitz": false,
+    "canBombard": false,
+    "canStrategicBomb": false,
+    "transportCapacity": 0,
+    "requiredTransport": true,
+    "notes": "Expeditionary troops for coastal landings and island assaults."
   },
   {
     "id": "transport",

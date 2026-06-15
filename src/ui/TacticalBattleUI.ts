@@ -1658,6 +1658,10 @@ export class TacticalBattleUI {
       { x: unit.x - 1, y: unit.y },
       { x: unit.x, y: unit.y + 1 },
       { x: unit.x, y: unit.y - 1 },
+      { x: unit.x + 1, y: unit.y + 1 },
+      { x: unit.x + 1, y: unit.y - 1 },
+      { x: unit.x - 1, y: unit.y + 1 },
+      { x: unit.x - 1, y: unit.y - 1 },
     ].filter(point => point.x >= 0 && point.y >= 0 && this.state && point.x < this.state.width && point.y < this.state.height
       && !this.getUnitAt(point.x, point.y) && this.tileAllowsUnit(unit, point.x, point.y));
     const wantsShore = unit.domain === 'land' && target.domain === 'sea';
@@ -1731,7 +1735,7 @@ export class TacticalBattleUI {
   }
 
   private distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   }
 
   private pushLog(entry: string): void {

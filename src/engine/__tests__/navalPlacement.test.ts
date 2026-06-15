@@ -114,18 +114,18 @@ describe('navalPlacement', () => {
     expect(sea1.getUnitCount('destroyer')).toBe(2);
   });
 
-  it('sanitizes land units stranded on sea tiles', () => {
+  it('preserves embarked land units on sea tiles', () => {
     const state = new GameState();
     state.factionRegistry.register(makeFactionData('p', { capital: 'home', allies: [], startingIPCs: 10 }));
-    state.unitRegistry.register(makeUnitData({ id: 'infantry' }));
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', requiredTransport: true }));
     const home = makeTerritory('home', 'p', { type: 'land' as any, adjacentTo: ['sea1'] });
     const sea1 = makeTerritory('sea1', 'p', { type: 'sea' as any, adjacentTo: ['home'] });
     state.territories.set('home', home);
     state.territories.set('sea1', sea1);
     sea1.addUnits('infantry', 3);
 
-    expect(sanitizeLandUnitPlacement(state)).toBe(3);
-    expect(sea1.units).toHaveLength(0);
-    expect(home.getUnitCount('infantry')).toBe(3);
+    expect(sanitizeLandUnitPlacement(state)).toBe(0);
+    expect(sea1.getUnitCount('infantry')).toBe(3);
+    expect(home.getUnitCount('infantry')).toBe(0);
   });
 });

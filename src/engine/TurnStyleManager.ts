@@ -165,7 +165,7 @@ export function getPhaseTip(phase: string, style: TurnStyle): string {
     case "purchase":
       return "Click territories to mobilize defenders";
     case "combat_move":
-      return "Move units toward enemies to attack";
+      return "Attack enemies or move toward the front — artillery bombards without advancing";
     case "combat":
       return "Roll dice to resolve battles";
     case "noncombat_move":

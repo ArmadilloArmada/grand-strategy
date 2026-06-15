@@ -1,6 +1,7 @@
 /**
- * Grid helpers for naval range — ships can engage shore tiles diagonally
- * on square grid maps even when map data only lists orthogonal adjacency.
+ * Grid helpers — square grid maps use 8-directional adjacency (orthogonal + diagonal).
+ * Map JSON may only list orthogonal links; these helpers infer diagonals from cell layout.
+ * World maps may set wrapHorizontal so the Pacific connects left↔right edges.
  */
 
 import { GameState } from './GameState';
@@ -10,8 +11,39 @@ const DIAGONAL_OFFSETS: Array<[number, number]> = [
   [-1, -1], [1, -1], [-1, 1], [1, 1],
 ];
 
+const ORTHOGONAL_OFFSETS: Array<[number, number]> = [
+  [0, -1], [1, 0], [0, 1], [-1, 0],
+];
+
+const ALL_OFFSETS: Array<[number, number]> = [...ORTHOGONAL_OFFSETS, ...DIAGONAL_OFFSETS];
+
 function gridCoords(x: number, y: number, cellSize: number): [number, number] {
   return [Math.round(x / cellSize), Math.round(y / cellSize)];
+}
+
+function resolveGridDimensions(state: GameState, cellSize: number): { cols: number; rows: number } | null {
+  const layout = state.mapLayout;
+  if (layout?.width && layout?.height) {
+    return {
+      cols: Math.round(layout.width / cellSize),
+      rows: Math.round(layout.height / cellSize),
+    };
+  }
+
+  let maxCol = 0;
+  let maxRow = 0;
+  for (const territory of state.territories.values()) {
+    if (territory.polygon.length === 0) continue;
+    const [col, row] = gridCoords(territory.polygon[0][0], territory.polygon[0][1], cellSize);
+    maxCol = Math.max(maxCol, col);
+    maxRow = Math.max(maxRow, row);
+  }
+  if (maxCol === 0 && maxRow === 0) return null;
+  return { cols: maxCol + 1, rows: maxRow + 1 };
+}
+
+export function mapWrapsHorizontally(state: GameState): boolean {
+  return Boolean(state.mapLayout?.wrapHorizontal);
 }
 
 /** Infer uniform square cell size from loaded territory polygons. */
@@ -45,8 +77,45 @@ function buildGridIndex(state: GameState, cellSize: number): Map<string, string>
   return index;
 }
 
-/** Orthogonal map adjacency plus diagonal grid neighbors (for naval gun range). */
-export function getNavalReachNeighborIds(state: GameState, territory: Territory): string[] {
+function neighborGridCells(
+  col: number,
+  row: number,
+  dims: { cols: number; rows: number } | null,
+  wrapHorizontal: boolean,
+): Array<[number, number]> {
+  const cells: Array<[number, number]> = [];
+  for (const [dc, dr] of ALL_OFFSETS) {
+    const nr = row + dr;
+    if (dims && (nr < 0 || nr >= dims.rows)) continue;
+    let nc = col + dc;
+    if (dims) {
+      if (wrapHorizontal) {
+        nc = ((nc % dims.cols) + dims.cols) % dims.cols;
+      } else if (nc < 0 || nc >= dims.cols) {
+        continue;
+      }
+    }
+    cells.push([nc, nr]);
+  }
+  return cells;
+}
+
+/** Orthogonal map adjacency plus diagonal grid neighbors on uniform square grid maps. */
+export function getTerritoryNeighborIds(state: GameState, territory: Territory): string[] {
+  return getGridNeighborIds(state, territory);
+}
+
+/** Whether two territories share an edge or diagonal on a grid map (or explicit link otherwise). */
+export function areTerritoriesNeighbors(
+  state: GameState,
+  from: Territory,
+  to: Territory,
+): boolean {
+  if (from.id === to.id) return true;
+  return getGridNeighborIds(state, from).includes(to.id);
+}
+
+export function getGridNeighborIds(state: GameState, territory: Territory): string[] {
   const reachable = new Set(territory.adjacentTo);
   const cellSize = inferGridCellSize(state);
   if (!cellSize || territory.polygon.length === 0) {
@@ -55,13 +124,20 @@ export function getNavalReachNeighborIds(state: GameState, territory: Territory)
 
   const index = buildGridIndex(state, cellSize);
   const [col, row] = gridCoords(territory.polygon[0][0], territory.polygon[0][1], cellSize);
+  const dims = resolveGridDimensions(state, cellSize);
+  const wrapHorizontal = mapWrapsHorizontally(state);
 
-  for (const [dc, dr] of DIAGONAL_OFFSETS) {
-    const neighborId = index.get(`${col + dc},${row + dr}`);
+  for (const [nc, nr] of neighborGridCells(col, row, dims, wrapHorizontal)) {
+    const neighborId = index.get(`${nc},${nr}`);
     if (neighborId) reachable.add(neighborId);
   }
 
   return Array.from(reachable);
+}
+
+/** @deprecated Use getGridNeighborIds — kept for existing naval combat call sites. */
+export function getNavalReachNeighborIds(state: GameState, territory: Territory): string[] {
+  return getGridNeighborIds(state, territory);
 }
 
 export function isNavalReachNeighbor(

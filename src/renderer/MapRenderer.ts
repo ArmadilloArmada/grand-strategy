@@ -29,6 +29,26 @@ interface PerfRoot {
   [metric: string]: PerfBucket;
 }
 
+export type UnitDropKind = 'move' | 'attack' | 'invalid';
+
+export interface UnitDragController {
+  canDragFrom(territoryId: string): boolean;
+  onDragStart(fromTerritoryId: string): void;
+  onDragHover(toTerritoryId: string | null): void;
+  onDragDrop(fromTerritoryId: string, toTerritoryId: string): void;
+  onDragCancel(): void;
+  getDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind;
+}
+
+interface ActiveUnitDrag {
+  fromId: string;
+  startScreenX: number;
+  startScreenY: number;
+  currentScreenX: number;
+  currentScreenY: number;
+  committed: boolean;
+}
+
 export class MapRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -46,6 +66,11 @@ export class MapRenderer {
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
   private hoveredTerritoryId: string | null = null;
+  private unitDragController: UnitDragController | null = null;
+  private unitDrag: ActiveUnitDrag | null = null;
+  private dragHoverTerritoryId: string | null = null;
+  private dragHoverKind: UnitDropKind = 'invalid';
+  private static readonly UNIT_DRAG_THRESHOLD = 8;
 
   // Valid move highlights
   private validMoveTargets: Set<string> = new Set();
@@ -228,6 +253,7 @@ export class MapRenderer {
     // Keep loop alive while a territory is selected or mobilizable targets are pulsing
     if (this.state.selectedTerritoryId !== null) anyActive = true;
     if (this.mobilizableTargets.size > 0) anyActive = true;
+    if (this.unitDrag?.committed) anyActive = true;
     // Use drawFrame() directly — the animation loop already owns the RAF cadence
     this.renderPending = false;
     const start = performance.now();
@@ -309,7 +335,10 @@ export class MapRenderer {
 
   /** Immediate synchronous draw — used internally and by the capture animation loop. */
   private drawFrame(): void {
-    if (this.state.territories.size === 0) return;
+    if (this.state.territories.size === 0) {
+      this.fillCanvasBackdrop();
+      return;
+    }
 
     const scaleChanged = this.scale !== this.staticLastScale;
     const panChanged = this.offsetX !== this.staticLastOffsetX
@@ -323,6 +352,8 @@ export class MapRenderer {
     this.ctx.clearRect(0, 0, this.width, this.height);
     if (this.staticCanvas) {
       this.ctx.drawImage(this.staticCanvas, 0, 0);
+    } else {
+      this.fillCanvasBackdrop();
     }
 
     // Draw dynamic layer: interaction highlights, animations, map overlays
@@ -332,6 +363,7 @@ export class MapRenderer {
 
     this.drawDynamicTerritoryOverlays();
     this.drawSelectionGlow();
+    this.drawUnitDragOverlay();
 
     if (this.overlayMode === 'economic') {
       this.drawEconomicOverlay();
@@ -402,14 +434,17 @@ export class MapRenderer {
   /**
    * Draw aged parchment / military map background
    */
-  private drawBackground(): void {
-    // Parchment base — diagonal gradient for aged-paper warmth
+  private fillCanvasBackdrop(): void {
     const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height);
     gradient.addColorStop(0, '#243a5e');
     gradient.addColorStop(0.55, '#1e3252');
     gradient.addColorStop(1, '#14243d');
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, this.width, this.height);
+  }
+
+  private drawBackground(): void {
+    this.fillCanvasBackdrop();
 
     this.ctx.save();
     this.ctx.strokeStyle = 'rgba(180, 210, 255, 0.08)';
@@ -1452,9 +1487,16 @@ export class MapRenderer {
 
       const isSelected = territory.id === selectedId;
       const isHovered = territory.id === this.hoveredTerritoryId;
+      const isDragHover = territory.id === this.dragHoverTerritoryId;
 
       if (this.options.highlightSelected && isSelected) {
         overlayColor = 'rgba(255,255,255,0.18)';
+      } else if (isDragHover) {
+        overlayColor = this.dragHoverKind === 'attack'
+          ? 'rgba(255,68,68,0.62)'
+          : this.dragHoverKind === 'move'
+            ? 'rgba(68,255,68,0.55)'
+            : 'rgba(255,255,255,0.12)';
       } else if (isHovered) {
         overlayColor = 'rgba(255,255,255,0.10)';
       }
@@ -1655,6 +1697,17 @@ export class MapRenderer {
     return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
   }
 
+  setUnitDragController(controller: UnitDragController | null): void {
+    this.unitDragController = controller;
+  }
+
+  clearUnitDrag(): void {
+    this.unitDrag = null;
+    this.dragHoverTerritoryId = null;
+    this.dragHoverKind = 'invalid';
+    this.render();
+  }
+
   /**
    * Set valid move targets for highlighting
    */
@@ -1799,19 +1852,47 @@ export class MapRenderer {
 
   // Event handlers
   private onMouseDown(e: MouseEvent): void {
-    if (e.button === 0) {
-      this.isDragging = true;
-      this.didDrag = false;
+    if (e.button !== 0) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    const territory = this.getTerritoryAtPoint(world.x, world.y);
+
+    if (territory && this.unitDragController?.canDragFrom(territory.id)) {
+      this.unitDrag = {
+        fromId: territory.id,
+        startScreenX: e.clientX,
+        startScreenY: e.clientY,
+        currentScreenX: e.clientX,
+        currentScreenY: e.clientY,
+        committed: false,
+      };
       this.lastMouseX = e.clientX;
       this.lastMouseY = e.clientY;
+      this.didDrag = false;
       this.canvas.style.cursor = 'grabbing';
+      return;
     }
+
+    if (territory) {
+      // Territory clicks are handled by onClick (select / attack) — don't pan the map.
+      this.didDrag = false;
+      return;
+    }
+
+    this.isDragging = true;
+    this.didDrag = false;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
+    this.canvas.style.cursor = 'grabbing';
   }
 
   private onMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    if (this.unitDrag) return;
 
     if (this.isDragging) return;
 
@@ -1821,13 +1902,59 @@ export class MapRenderer {
 
     if (newHoveredId !== this.hoveredTerritoryId) {
       this.hoveredTerritoryId = newHoveredId;
-      this.canvas.style.cursor = newHoveredId ? 'pointer' : 'grab';
+      const canDrag = newHoveredId && this.unitDragController?.canDragFrom(newHoveredId);
+      this.canvas.style.cursor = canDrag ? 'grab' : newHoveredId ? 'pointer' : 'grab';
       this.territoryHoverCallback?.(newHoveredId, e.clientX, e.clientY);
       this.render();
     }
   }
 
   private onWindowMouseMove(e: MouseEvent): void {
+    if (this.unitDrag) {
+      this.unitDrag.currentScreenX = e.clientX;
+      this.unitDrag.currentScreenY = e.clientY;
+
+      const dx = e.clientX - this.unitDrag.startScreenX;
+      const dy = e.clientY - this.unitDrag.startScreenY;
+      if (!this.unitDrag.committed) {
+        const panDx = e.clientX - this.lastMouseX;
+        const panDy = e.clientY - this.lastMouseY;
+        if (panDx !== 0 || panDy !== 0) {
+          this.didDrag = true;
+          this.offsetX += panDx;
+          this.offsetY += panDy;
+          this.lastMouseX = e.clientX;
+          this.lastMouseY = e.clientY;
+          this.render();
+        }
+        if (Math.hypot(dx, dy) >= MapRenderer.UNIT_DRAG_THRESHOLD) {
+          this.unitDrag.committed = true;
+          this.unitDragController?.onDragStart(this.unitDrag.fromId);
+          this.startContinuousRender();
+        } else {
+          return;
+        }
+      }
+
+      if (this.unitDrag.committed) {
+        this.didDrag = true;
+        const rect = this.canvas.getBoundingClientRect();
+        const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+        const hoverTerritory = this.getTerritoryAtPoint(world.x, world.y);
+        const hoverId = hoverTerritory?.id ?? null;
+        const kind = hoverId && hoverId !== this.unitDrag.fromId
+          ? this.unitDragController?.getDropKind(this.unitDrag.fromId, hoverId) ?? 'invalid'
+          : 'invalid';
+        if (hoverId !== this.dragHoverTerritoryId || kind !== this.dragHoverKind) {
+          this.dragHoverTerritoryId = hoverId;
+          this.dragHoverKind = kind;
+          this.unitDragController?.onDragHover(hoverId);
+        }
+        this.render();
+      }
+      return;
+    }
+
     if (!this.isDragging) return;
 
     const dx = e.clientX - this.lastMouseX;
@@ -1842,9 +1969,83 @@ export class MapRenderer {
     this.render();
   }
 
-  private onMouseUp(_e: MouseEvent): void {
+  private onMouseUp(e: MouseEvent): void {
+    if (this.unitDrag) {
+      const drag = this.unitDrag;
+      const rect = this.canvas.getBoundingClientRect();
+      const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      const target = this.getTerritoryAtPoint(world.x, world.y);
+
+      if (drag.committed && target && target.id !== drag.fromId) {
+        const kind = this.unitDragController?.getDropKind(drag.fromId, target.id) ?? 'invalid';
+        if (kind !== 'invalid') {
+          this.unitDragController?.onDragDrop(drag.fromId, target.id);
+        } else {
+          this.unitDragController?.onDragCancel();
+        }
+      } else if (!drag.committed && target) {
+        this.state.selectTerritory(target.id);
+        this.render();
+      } else if (drag.committed) {
+        this.unitDragController?.onDragCancel();
+      }
+
+      this.unitDrag = null;
+      this.dragHoverTerritoryId = null;
+      this.dragHoverKind = 'invalid';
+      this.isDragging = false;
+      this.canvas.style.cursor = this.hoveredTerritoryId ? 'grab' : 'grab';
+      this.render();
+      return;
+    }
+
     this.isDragging = false;
-    this.canvas.style.cursor = this.hoveredTerritoryId ? 'pointer' : 'grab';
+    this.canvas.style.cursor = this.hoveredTerritoryId ? 'grab' : 'grab';
+  }
+
+  private drawUnitDragOverlay(): void {
+    if (!this.unitDrag?.committed) return;
+
+    const from = this.state.territories.get(this.unitDrag.fromId);
+    if (!from) return;
+
+    const fromScreen = this.worldToScreen(from.center[0], from.center[1]);
+    const rect = this.canvas.getBoundingClientRect();
+    const startX = fromScreen.x;
+    const startY = fromScreen.y;
+
+    let endX = this.unitDrag.currentScreenX - rect.left;
+    let endY = this.unitDrag.currentScreenY - rect.top;
+    if (this.dragHoverTerritoryId && this.dragHoverKind !== 'invalid') {
+      const hover = this.state.territories.get(this.dragHoverTerritoryId);
+      if (hover) {
+        const hoverScreen = this.worldToScreen(hover.center[0], hover.center[1]);
+        endX = hoverScreen.x;
+        endY = hoverScreen.y;
+      }
+    }
+
+    const stroke = this.dragHoverKind === 'attack'
+      ? 'rgba(255, 80, 80, 0.9)'
+      : this.dragHoverKind === 'move'
+        ? 'rgba(72, 220, 120, 0.9)'
+        : 'rgba(240, 224, 168, 0.75)';
+
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.strokeStyle = stroke;
+    this.ctx.lineWidth = 3;
+    this.ctx.setLineDash([8, 6]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(startX, startY);
+    this.ctx.lineTo(endX, endY);
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = stroke;
+    this.ctx.beginPath();
+    this.ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
   }
 
   private onWheel(e: WheelEvent): void {

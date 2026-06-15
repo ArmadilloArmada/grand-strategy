@@ -149,38 +149,12 @@ export function spawnUnitsOnTerritory(
   return { success: true, territoryId: preferred.id };
 }
 
-/** Remove land-domain units sitting on pure sea tiles (bad auto-deploy / legacy saves). */
-export function sanitizeLandUnitPlacement(state: GameState): number {
-  let relocated = 0;
-
-  for (const territory of state.territories.values()) {
-    if (territory.type !== 'sea') continue;
-
-    const landStacks = territory.units.filter(pu => {
-      const ut = state.unitRegistry.get(pu.unitTypeId);
-      return ut?.domain === 'land';
-    });
-    if (landStacks.length === 0) continue;
-
-    const ownerId = territory.owner ?? territory.adjacentTo
-      .map(id => state.territories.get(id))
-      .find(t => t?.owner)?.owner ?? null;
-    if (!ownerId) continue;
-
-    for (const stack of landStacks) {
-      const count = stack.count;
-      territory.removeUnits(stack.unitTypeId, count);
-      const target = resolveAdjacentLandForUnitPlacement(state, territory, ownerId);
-      if (target) {
-        target.addUnits(stack.unitTypeId, count);
-        relocated += count;
-      } else {
-        territory.addUnits(stack.unitTypeId, count);
-      }
-    }
-  }
-
-  return relocated;
+/**
+ * Land-domain units on sea tiles are valid when embarked (implicit amphibious movement).
+ * Legacy bad spawns are left in place; players can disembark on their next move.
+ */
+export function sanitizeLandUnitPlacement(_state: GameState): number {
+  return 0;
 }
 
 /** Pick a friendly land tile adjacent to a sea zone for relocating stranded land units. */

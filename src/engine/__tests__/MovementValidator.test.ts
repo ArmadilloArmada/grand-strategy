@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MovementValidator } from '../MovementValidator';
+import { sanitizeLandUnitPlacement } from '../navalPlacement';
 import { buildMovementState, makeTerritory, makeUnitData } from './testHelpers';
 import { GameState } from '../GameState';
 
@@ -64,7 +65,7 @@ describe('MovementValidator', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('rejects land unit entering sea territory', () => {
+    it('rejects land unit without transport requirement entering sea territory', () => {
       // Add a sea territory adjacent to 'a'
       const sea = makeTerritory('sea1', 'player', { type: 'sea', adjacentTo: ['a'] });
       state.territories.set('sea1', sea);
@@ -74,6 +75,20 @@ describe('MovementValidator', () => {
       const result = validator.validateMove('infantry', 1, 'a', 'sea1', false);
       expect(result.valid).toBe(false);
       expect(result.reason).toMatch(/cannot enter/i);
+    });
+
+    it('allows transport-required infantry to embark into neutral sea', () => {
+      state.unitRegistry.register({
+        ...state.unitRegistry.get('infantry')!.serialize(),
+        requiredTransport: true,
+      });
+      const sea = makeTerritory('sea1', null, { type: 'sea', adjacentTo: ['a'] });
+      state.territories.set('sea1', sea);
+      const a = state.territories.get('a')!;
+      (a.adjacentTo as string[]).push('sea1');
+
+      const result = validator.validateMove('infantry', 1, 'a', 'sea1', false);
+      expect(result.valid).toBe(true);
     });
 
     it('allows air unit to enter any territory type', () => {
@@ -139,97 +154,49 @@ describe('MovementValidator', () => {
       expect(moves).toHaveLength(0);
     });
 
-    it('allows transport movement through neutral sea with friendly transport capacity', () => {
+    it('allows implicit amphibious movement through neutral sea without transport ships', () => {
       state.unitRegistry.register({
-        ...state.unitRegistry.get('infantry')!.serialize(),
+        ...state.unitRegistry.get('tank')!.serialize(),
         requiredTransport: true,
-      });
-      state.unitRegistry.register({
-        id: 'transport',
-        name: 'Transport',
-        attack: 0,
-        defense: 0,
-        movement: 2,
-        cost: 8,
-        domain: 'sea',
-        hitPoints: 1,
-        canBlitz: false,
-        canBombard: false,
-        canStrategicBomb: false,
-        transportCapacity: 2,
-        requiredTransport: false,
       });
 
       const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
       const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
-      sea.units.push({ unitTypeId: 'transport', count: 1 });
       state.territories.set('island', island);
       state.territories.set('sea1', sea);
       (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
 
-      const combatMoves = validator.getValidMoves('infantry', 'a', true);
-      const nonCombatMoves = validator.getValidMoves('infantry', 'a', false);
+      const combatMoves = validator.getValidMoves('tank', 'a', true);
+      const nonCombatMoves = validator.getValidMoves('tank', 'a', false);
 
       expect(combatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
       expect(nonCombatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
     });
 
-    it('allows transport movement using capacity on adjacent friendly coastal', () => {
+    it('allows amphibious movement using coastal ports without transport ships', () => {
       state.unitRegistry.register({
-        ...state.unitRegistry.get('infantry')!.serialize(),
+        ...state.unitRegistry.get('tank')!.serialize(),
         requiredTransport: true,
-      });
-      state.unitRegistry.register({
-        id: 'transport',
-        name: 'Transport',
-        attack: 0,
-        defense: 0,
-        movement: 2,
-        cost: 8,
-        domain: 'sea',
-        hitPoints: 1,
-        canBlitz: false,
-        canBombard: false,
-        canStrategicBomb: false,
-        transportCapacity: 2,
-        requiredTransport: false,
       });
 
       const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
       const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
-      island.units.push({ unitTypeId: 'transport', count: 1 });
       state.territories.set('island', island);
       state.territories.set('sea1', sea);
       (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
 
-      const combatMoves = validator.getValidMoves('infantry', 'a', true);
+      const combatMoves = validator.getValidMoves('tank', 'a', true);
       expect(combatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
     });
 
-    it('does not use transport routes through enemy-controlled seas', () => {
+    it('does not allow amphibious routes through enemy-controlled seas', () => {
       state.unitRegistry.register({
         ...state.unitRegistry.get('infantry')!.serialize(),
         requiredTransport: true,
       });
-      state.unitRegistry.register({
-        id: 'transport',
-        name: 'Transport',
-        attack: 0,
-        defense: 0,
-        movement: 2,
-        cost: 8,
-        domain: 'sea',
-        hitPoints: 1,
-        canBlitz: false,
-        canBombard: false,
-        canStrategicBomb: false,
-        transportCapacity: 2,
-        requiredTransport: false,
-      });
 
       const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
       const sea = makeTerritory('sea1', 'enemy', { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
-      sea.units.push({ unitTypeId: 'transport', count: 1 });
       state.territories.set('island', island);
       state.territories.set('sea1', sea);
       (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
@@ -238,13 +205,42 @@ describe('MovementValidator', () => {
       expect(moves.find(m => m.territoryId === 'island')).toBeUndefined();
     });
 
-    it('returns no moves for land units stranded on a sea tile', () => {
+    it('lets embarked infantry disembark to adjacent land', () => {
+      state.unitRegistry.register({
+        ...state.unitRegistry.get('infantry')!.serialize(),
+        requiredTransport: true,
+      });
       const sea = makeTerritory('sea1', 'player', { type: 'sea', production: 0, adjacentTo: ['a', 'b'] });
       sea.units.push({ unitTypeId: 'infantry', count: 2 });
       state.territories.set('sea1', sea);
 
       const moves = validator.getValidMoves('infantry', 'sea1', true);
-      expect(moves).toHaveLength(0);
+      expect(moves.map(m => m.territoryId)).toContain('b');
+      expect(validator.validateMove('infantry', 1, 'sea1', 'b', false).valid).toBe(true);
+    });
+
+    it('executeMove keeps embarked infantry on sea until they disembark', () => {
+      state.unitRegistry.register({
+        ...state.unitRegistry.get('infantry')!.serialize(),
+        requiredTransport: true,
+      });
+      const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a'] });
+      const a = state.territories.get('a')!;
+      (a.adjacentTo as string[]).push('sea1');
+      state.territories.set('sea1', sea);
+
+      const embarked = validator.executeMove({
+        unitTypeId: 'infantry',
+        count: 1,
+        fromTerritoryId: 'a',
+        toTerritoryId: 'sea1',
+        viaTransport: 'sea1',
+      });
+      expect(embarked).toBe(true);
+      expect(sea.getUnitCount('infantry')).toBe(1);
+
+      sanitizeLandUnitPlacement(state);
+      expect(sea.getUnitCount('infantry')).toBe(1);
     });
 
     it('returns sea move targets for destroyers in a neutral sea zone', () => {
@@ -419,6 +415,23 @@ describe('MovementValidator', () => {
       expect(strike?.coastalStrike).toBe(true);
     });
 
+    it('lets land artillery barrage adjacent enemy land without entering it', () => {
+      state.unitRegistry.register(makeUnitData({ id: 'artillery', domain: 'land', movement: 1, attack: 2, defense: 2, cost: 4, canBombard: true, attackRange: 2 }));
+      const home = makeTerritory('home', 'player', { type: 'land', adjacentTo: ['enemy'] });
+      const enemy = makeTerritory('enemy', 'enemy', { type: 'land', adjacentTo: ['home'] });
+      state.territories.set('home', home);
+      state.territories.set('enemy', enemy);
+      home.units.push({ unitTypeId: 'artillery', count: 2 });
+
+      const rangedMoves = validator.getValidMoves('artillery', 'home', true);
+      const strike = rangedMoves.find(m => m.territoryId === 'enemy');
+      expect(strike?.isAttack).toBe(true);
+      expect(strike?.rangedStrike).toBe(true);
+
+      const nonCombatMoves = validator.getValidMoves('artillery', 'home', false);
+      expect(nonCombatMoves.some(m => m.territoryId === 'enemy' && m.isAttack)).toBe(false);
+    });
+
     it('does not let inland infantry coastal-fire a sea zone', () => {
       const inland = makeTerritory('inland', 'player', { type: 'land', adjacentTo: ['port'] });
       const coast = makeTerritory('port', 'player', { type: 'coastal', adjacentTo: ['inland', 'sea1'] });
@@ -431,6 +444,36 @@ describe('MovementValidator', () => {
 
       const moves = validator.getValidMoves('infantry', 'inland', true);
       expect(moves.some(m => m.territoryId === 'sea1')).toBe(false);
+    });
+
+    it('lets infantry move diagonally on a square grid map', () => {
+      const gridPolygon = (col: number, row: number): [number, number][] => {
+        const size = 50;
+        const x = col * size;
+        const y = row * size;
+        return [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
+      };
+
+      state.territories.clear();
+      const g0 = makeTerritory('g0', 'player', {
+        type: 'land',
+        adjacentTo: [],
+        polygon: gridPolygon(0, 0),
+        center: [25, 25],
+      });
+      const g1 = makeTerritory('g1', 'player', {
+        type: 'land',
+        adjacentTo: [],
+        polygon: gridPolygon(1, 1),
+        center: [75, 75],
+      });
+      state.territories.set('g0', g0);
+      state.territories.set('g1', g1);
+      g0.units.push({ unitTypeId: 'infantry', count: 3 });
+
+      const moves = validator.getValidMoves('infantry', 'g0', false);
+      expect(moves.some(m => m.territoryId === 'g1' && !m.isAttack)).toBe(true);
+      expect(validator.validateMove('infantry', 1, 'g0', 'g1', false).valid).toBe(true);
     });
   });
 });

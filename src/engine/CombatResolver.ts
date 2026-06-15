@@ -74,9 +74,11 @@ export interface CombatState {
   winner: "attacker" | "defender" | "draw" | null;
   /** +1 attack bonus when attackers converge from multiple territories */
   flankingBonus?: number;
-  /** Resolved via tactical mini-battle (player grid or AI assault doctrine) */
-  resolvedTactically?: boolean;
-  tacticalCleanWin?: boolean;
+  /** Shore / land barrage — attackers stay on the source tile */
+  rangedStrike?: boolean;
+  coastalStrike?: boolean;
+  /** Ranged-only combat — no territory capture even if defenders are eliminated */
+  stayInPlace?: boolean;
 }
 
 export interface BombardmentResult {
@@ -180,6 +182,7 @@ export class CombatResolver {
     attackingFactionId: string,
     attackingUnits: PlacedUnit[],
     sourceTerritoryId?: string,
+    options?: { stayInPlace?: boolean },
   ): CombatState | null {
     const territory = this.state.territories.get(territoryId);
     if (!territory || !territory.owner) {
@@ -264,6 +267,7 @@ export class CombatResolver {
       winner: null,
       flankingBonus: 0,
       sourceTerritory: sourceTerritoryId,
+      stayInPlace: options?.stayInPlace ?? false,
     };
 
     this.state.emit("combat_start", { combat });
@@ -816,6 +820,19 @@ export class CombatResolver {
     const landFallbackId = combat.sourceTerritory ?? combat.territoryId;
 
     if (combat.winner === "attacker") {
+      if (combat.stayInPlace) {
+        territory.units = [];
+        for (const cu of combat.defenders) {
+          const surviving = cu.count - cu.casualties;
+          if (cu.stationedTerritoryId || cu.unitType.domain === 'sea') {
+            this.syncNavalCombatStack(cu, combat.defendingFactionId, landFallbackId);
+            continue;
+          }
+          if (surviving > 0) {
+            this.pushSurvivorToTerritory(territory, cu, surviving);
+          }
+        }
+      } else {
       // Record history before changing owner
       this.state.recordOwnershipChange(territory.id, territory.owner, this.state.turnNumber);
       // Degrade fortification on capture (blasted through or partially inherited)
@@ -850,6 +867,7 @@ export class CombatResolver {
       if (defender && defender.capital === combat.territoryId) {
         defender.defeat();
         this.state.emit("faction_defeated", { factionId: defender.id });
+      }
       }
     } else {
       // Defender holds — land units on tile, fleets in adjacent sea zones

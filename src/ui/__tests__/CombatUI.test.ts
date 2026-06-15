@@ -19,6 +19,14 @@ function makeCombatUI(): CombatUI {
   );
 }
 
+describe('CombatUI strategic bombing', () => {
+  it('splits bombers evenly across factory targets', () => {
+    expect(CombatUI.allocateBombersAcrossTargets(10, 3)).toEqual([4, 3, 3]);
+    expect(CombatUI.allocateBombersAcrossTargets(5, 2)).toEqual([3, 2]);
+    expect(CombatUI.allocateBombersAcrossTargets(2, 5)).toEqual([1, 1, 0, 0, 0]);
+  });
+});
+
 describe('CombatUI preview stats', () => {
   it('labels overwhelming attacks and estimates first-round hits', () => {
     const ui = makeCombatUI();

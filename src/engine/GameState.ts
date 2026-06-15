@@ -142,6 +142,9 @@ export interface PendingMove {
   toTerritoryId: string;
   path: string[];
   viaTransport?: string; // sea zone ID of the transport being used, if any
+  /** Shore / land barrage — attackers stay on the source tile */
+  rangedStrike?: boolean;
+  coastalStrike?: boolean;
 }
 
 export interface PurchaseOrder {
@@ -168,7 +171,16 @@ export interface GameStateSnapshot {
   weather?: { condition: string; name: string; description: string; duration: number; expiresAtTurn: number };
 }
 
+export interface MapLayout {
+  width: number;
+  height: number;
+  wrapHorizontal: boolean;
+}
+
 export class GameState {
+  // Map topology (set when a map loads)
+  public mapLayout: MapLayout | null = null;
+
   // Core game data
   public territories: Map<string, Territory> = new Map();
   public unitRegistry: UnitRegistry = new UnitRegistry();

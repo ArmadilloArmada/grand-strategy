@@ -271,13 +271,13 @@ export function calculateUnitPriority(
   }
   
   // Apply personality weights
-  if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'transport'].includes(unitType)) {
+  if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(unitType)) {
     priority *= personality.naval;
 
     let navalTotal = 0;
     let landTotal = 0;
     for (const [id, count] of currentComposition) {
-      if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'transport'].includes(id)) {
+      if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(id)) {
         navalTotal += count;
       } else if (id !== 'fighter' && id !== 'bomber') {
         landTotal += count;

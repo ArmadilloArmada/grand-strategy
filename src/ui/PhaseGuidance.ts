@@ -33,14 +33,14 @@ export class PhaseGuidance {
     const tips: Record<string, string> = {
       purchase: 'Click Mobilize to buy units',
       build: 'Click Mobilize to buy and place units',
-      combat_move: 'Click your territory, then click an enemy to attack',
-      move: 'Click your territory, then click a highlighted destination',
+      combat_move: 'Click your territory to select units; drag to move or click an enemy to attack',
+      move: 'Click your territory to select units; drag to move',
       combat: 'Resolving queued battles...',
       noncombat_move: 'Move units without attacking',
       production: 'Placing your purchased units...',
       collect_income: 'Collecting income...',
       end: 'Collecting income...',
-      orders: 'Click a territory, then click a destination',
+      orders: 'Click your territory to select units; drag to move or click an enemy to attack',
       resolve: 'Resolving all actions...',
       action: 'Make one move or attack',
     };
@@ -53,9 +53,9 @@ export class PhaseGuidance {
     const tips: Record<string, string> = {
       purchase: 'First turn: mobilize your capital or factory first. Those territories usually produce the strongest opening forces.',
       build: 'First turn: click a highlighted territory to mobilize defenders. Start with your capital or factory if you can afford it.',
-      combat_move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
-      move: 'First turn: select one of your territories with units, then click a highlighted neighbor to move or attack.',
-      orders: 'First turn: select a territory with units, then click a highlighted destination to issue orders.',
+      combat_move: 'First turn: drag from one of your territories with units to a highlighted neighbor.',
+      move: 'First turn: drag from one of your territories with units to a highlighted neighbor.',
+      orders: 'First turn: drag from a territory with units to a highlighted destination.',
       action: 'First turn: make one strong move or attack, then click End Turn.',
       combat: 'Combat only happens after you move into enemy territory. If no battles are queued, continue to the next phase.',
       resolve: 'Resolve queued battles, then continue once the map is quiet.',
@@ -138,7 +138,7 @@ export class PhaseGuidance {
     if (isCombatPhase) {
       if (this.state.pendingMoves.length > 0) {
         return {
-          text: `${this.state.pendingMoves.length} battle${this.state.pendingMoves.length !== 1 ? 's' : ''} to resolve. Click "Resolve Combat".`,
+          text: `${this.state.pendingMoves.length} battle${this.state.pendingMoves.length !== 1 ? 's' : ''} to resolve. Press A to resolve.`,
           className,
           tipId: 'combat',
           tipMessage: 'Battles are resolved by dice rolls. Higher attack/defense = better odds!',
@@ -194,10 +194,10 @@ export class PhaseGuidance {
         const transportText = transportCount > 0 ? `, ${transportCount} amphib route${transportCount !== 1 ? 's' : ''}` : '';
         const coastalText = coastalCount > 0 ? `, ${coastalCount} coastal strike${coastalCount !== 1 ? 's' : ''}` : '';
         return {
-          text: `${territory.name}: click a highlighted neighbor for ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} (${targetText}${transportText}${coastalText})`,
+          text: `${territory.name}: ${availableUnits} ready unit${availableUnits !== 1 ? 's' : ''} — drag to move, click enemy to attack (${targetText}${transportText}${coastalText})`,
           className,
           tipId: 'movement',
-          tipMessage: 'Green = moves, red = attacks, orange = coastal strikes (bombardment / shore fire without entering the tile).',
+          tipMessage: 'Green = reposition (drag). Red/orange = strike targets (click). Artillery, ships, and anti-air bombard without entering the target tile.',
         };
       }
       return {
@@ -208,7 +208,7 @@ export class PhaseGuidance {
 
     const navalMove = this.getNavalMovementHint(faction?.id);
     return {
-      text: `Select one of your territories with ready units, then click a highlighted neighbor to move or attack.${navalMove}`,
+      text: `Click one of your territories with ready units. Drag to move; click an enemy to attack.${navalMove}`,
       className,
     };
   }
@@ -223,27 +223,16 @@ export class PhaseGuidance {
     return sea > 0 && sea / (sea + land) >= 0.12;
   }
 
-  private factionHasTransport(factionId: string | undefined): boolean {
-    if (!factionId) return false;
-    for (const t of this.state.territories.values()) {
-      if (t.owner !== factionId) continue;
-      for (const pu of t.units) {
-        if (pu.unitTypeId === 'transport' && pu.count > 0) return true;
-      }
-    }
-    return false;
-  }
-
   private getNavalMobilizeHint(factionId: string | undefined): string {
-    if (!this.mapHasSignificantSea() || this.factionHasTransport(factionId)) return '';
+    if (!this.mapHasSignificantSea()) return '';
     const coastal = this.mobilizationSystem.getMobilizationOptions()
       .find(o => o.canMobilize && o.type === 'coastal');
     if (!coastal) return '';
-    return ` Island maps: mobilize a transport at ${coastal.territory.name} (${coastal.cost} IPC) to cross water.`;
+    return ` Island maps: ground units self-embark across oceans; mobilize marines at ${coastal.territory.name} for assaults.`;
   }
 
-  private getNavalMovementHint(factionId: string | undefined): string {
-    if (!this.mapHasSignificantSea() || !this.factionHasTransport(factionId)) return '';
-    return ' Use transports from coastal ports to reach islands.';
+  private getNavalMovementHint(_factionId: string | undefined): string {
+    if (!this.mapHasSignificantSea()) return '';
+    return ' Drag ground units across sea tiles to reach islands — no transport ship required.';
   }
 }

@@ -6,6 +6,7 @@
 import { GameState } from "./GameState";
 import { TurnManager } from "./TurnManager";
 import { MovementValidator } from "./MovementValidator";
+import { resolveMovePhaseContext } from './movePhaseContext';
 import { MobilizationOption, MobilizationSystem } from "./MobilizationSystem";
 import { CombatResolver } from "./CombatResolver";
 import { settings } from '../ui/Settings';
@@ -1047,12 +1048,17 @@ export class AIController {
         const available = this.movementValidator.getAvailableUnits(att.fromId, att.unitTypeId);
         const toMove = Math.min(att.count, available);
         if (toMove > 0) {
+          const moveContext = resolveMovePhaseContext(this.state.currentPhase as string);
+          const strike = this.movementValidator.getValidMoves(att.unitTypeId, att.fromId, moveContext)
+            .find(m => m.territoryId === plan.targetId);
           this.state.pendingMoves.push({
             unitTypeId: att.unitTypeId,
             count: toMove,
             fromTerritoryId: att.fromId,
             toTerritoryId: plan.targetId,
-            path: [att.fromId, plan.targetId],
+            path: strike?.path ?? [att.fromId, plan.targetId],
+            rangedStrike: strike?.rangedStrike,
+            coastalStrike: strike?.coastalStrike,
           });
           usedUnits.add(`${att.fromId}-${att.unitTypeId}`);
           totalCommitted += toMove;
@@ -1204,7 +1210,7 @@ export class AIController {
         for (const pu of t.units) {
           const ut = this.state.unitRegistry.get(pu.unitTypeId);
           if (!ut || ut.attack === 0) continue;
-          if (!ut.canEnter(target.type) && !this.movementValidator.isCoastalStrike(t, target, ut)) continue;
+          if (!ut.canEnter(target.type) && !this.movementValidator.isRangedStrike(t, target, ut)) continue;
           const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
           if (availableCount <= 0) continue;
           candidates.push({
@@ -1322,8 +1328,7 @@ export class AIController {
     return plans;
   }
 
-  private canStrikeTarget(from: Territory, target: Territory, targetId: string): boolean {
-    if (from.adjacentTo.includes(targetId)) return true;
+  private canStrikeTarget(from: Territory, target: Territory, _targetId: string): boolean {
     return isNavalReachNeighbor(this.state, from, target);
   }
 
@@ -1494,28 +1499,42 @@ export class AIController {
 
       if (attackingUnits.length === 0) continue;
 
-      for (const move of attackingMoves) {
-        this.state.territories.get(move.fromTerritoryId)?.removeUnits(move.unitTypeId, move.count);
-      }
+      const stayInPlace = attackingMoves.every(m => m.rangedStrike || m.coastalStrike);
+      const sourceTerritoryId = attackingMoves[0]?.fromTerritoryId;
+      const sourceTerritory = sourceTerritoryId ? this.state.territories.get(sourceTerritoryId) : null;
 
       if (!territory.owner || territory.getTotalUnitCount() === 0) {
+        if (stayInPlace) {
+          for (const move of attackingMoves) {
+            this.state.territories.get(move.fromTerritoryId)?.markUnitsActed(move.unitTypeId, move.count);
+          }
+          continue;
+        }
         territory.owner = this.state.currentFactionId;
         territory.units = [];
         for (const unit of attackingUnits) territory.addUnits(unit.unitTypeId, unit.count);
         continue;
       }
 
-      const sourceTerritoryId = attackingMoves[0]?.fromTerritoryId;
+      if (sourceTerritory) {
+        for (const move of attackingMoves) {
+          sourceTerritory.removeUnits(move.unitTypeId, move.count);
+        }
+      }
+
       const combat = this.combatResolver.initiateCombat(
         territoryId,
         this.state.currentFactionId,
         attackingUnits,
         sourceTerritoryId,
+        { stayInPlace },
       );
 
       if (!combat) {
-        for (const move of attackingMoves) {
-          this.state.territories.get(move.fromTerritoryId)?.addUnits(move.unitTypeId, move.count);
+        if (sourceTerritory) {
+          for (const move of attackingMoves) {
+            sourceTerritory.addUnits(move.unitTypeId, move.count);
+          }
         }
         continue;
       }
@@ -1580,6 +1599,25 @@ export class AIController {
       }
 
       this.combatResolver.finalizeCombat(combat);
+
+      if (stayInPlace && sourceTerritory) {
+        for (const cu of combat.attackers) {
+          const surviving = cu.count - cu.casualties;
+          if (surviving <= 0) continue;
+          sourceTerritory.addUnits(cu.unitType.id, surviving);
+          sourceTerritory.markUnitsActed(cu.unitType.id, surviving);
+        }
+      } else if (sourceTerritory && combat.winner !== 'attacker') {
+        for (const move of attackingMoves) {
+          const ut = this.state.unitRegistry.get(move.unitTypeId);
+          const pu = combat.attackers.find(a => a.unitType.id === move.unitTypeId);
+          const surviving = pu ? pu.count - pu.casualties : move.count;
+          if (surviving > 0) {
+            sourceTerritory.addUnits(move.unitTypeId, surviving);
+            sourceTerritory.markUnitsActed(move.unitTypeId, surviving);
+          }
+        }
+      }
     }
 
     this.state.pendingMoves = [];
