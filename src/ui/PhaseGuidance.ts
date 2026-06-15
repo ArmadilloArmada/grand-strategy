@@ -18,6 +18,9 @@ export interface ContextGuidanceInput {
   isMovementPhase: boolean;
   isCombatPhase: boolean;
   isEndPhase: boolean;
+  activeStackLabel?: string | null;
+  selectAllTypes?: boolean;
+  readyStackCount?: number;
 }
 
 export class PhaseGuidance {
@@ -96,7 +99,10 @@ export class PhaseGuidance {
     tipId?: string;
     tipMessage?: string;
   } {
-    const { phase, faction, territory, isHumanTurn, isBuildPhase, isMovementPhase, isCombatPhase, isEndPhase } = input;
+    const {
+      phase, faction, territory, isHumanTurn, isBuildPhase, isMovementPhase, isCombatPhase, isEndPhase,
+      selectAllTypes, readyStackCount,
+    } = input;
     let className = 'context-helper';
 
     if (!isHumanTurn) {
@@ -132,7 +138,9 @@ export class PhaseGuidance {
     }
 
     if (isMovementPhase) {
-      return this.getMovementGuidance(phase, faction, territory, className);
+      return this.getMovementGuidance(
+        phase, faction, territory, className, input.activeStackLabel, selectAllTypes, readyStackCount,
+      );
     }
 
     if (isCombatPhase) {
@@ -167,10 +175,27 @@ export class PhaseGuidance {
     faction: Faction | undefined,
     territory: Territory | undefined,
     className: string,
+    activeStackLabel?: string | null,
+    selectAllTypes?: boolean,
+    readyStackCount?: number,
   ): { text: string; className: string; tipId?: string; tipMessage?: string } {
+    const mixedStackTip = selectAllTypes
+      ? 'All unit types selected — each stack moves once. Drag to reposition, click enemies to attack.'
+      : (readyStackCount ?? 0) >= 2
+        ? 'Multiple stacks here — use Tab to cycle, or pick "All Unit Types" to command every ready stack.'
+        : 'Use Tab to cycle stacks. Drag to move, click enemy to attack.';
+
     if (territory && territory.owner === faction?.id) {
       const availableUnits = territory.units.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
       if (availableUnits > 0) {
+        if (activeStackLabel) {
+          return {
+            text: activeStackLabel,
+            className,
+            tipId: 'movement',
+            tipMessage: mixedStackTip,
+          };
+        }
         const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
         const targetIds = new Set<string>();
         const attackIds = new Set<string>();

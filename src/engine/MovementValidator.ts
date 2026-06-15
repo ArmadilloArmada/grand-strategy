@@ -8,7 +8,12 @@ import { Territory } from '../data/Territory';
 import { canIssueOrdersFromTerritory } from './territoryControl';
 import { canLandUnitStrikeNaval, canLandUnitEngageNaval } from './NavalSystem';
 import { claimSeaZoneForFaction, hasSeaAccess } from './navalPlacement';
-import { getGridNeighborIds, getNavalReachNeighborIds, isNavalReachNeighbor } from './gridAdjacency';
+import {
+  getGridNeighborIds,
+  getNavalReachNeighborIds,
+  isNavalReachNeighbor,
+  shouldAllowHorizontalWrap,
+} from './gridAdjacency';
 import { normalizeMoveContext, type MovePhaseContext } from './movePhaseContext';
 
 export interface MovementResult {
@@ -27,19 +32,21 @@ export interface ValidMove {
   /** Shore bombardment / coastal artillery / land barrage — attackers stay in the source tile */
   coastalStrike?: boolean;
   rangedStrike?: boolean;
+  /** Set when merging moves from multiple stacks in all-types command mode. */
+  unitTypeId?: string;
 }
 
-/** Ground units that self-embark across friendly/neutral seas (no transport ship required). */
-export function usesImplicitAmphibious(unitType: UnitType): boolean {
-  return unitType.domain === 'land' && unitType.requiredTransport;
-}
+import { usesImplicitAmphibious } from './unitMovementRules';
+
+export { usesImplicitAmphibious } from './unitMovementRules';
 
 export class MovementValidator {
   constructor(private state: GameState) {}
 
   /** Grid maps use 8-way adjacency; hand-drawn maps keep explicit adjacentTo links. */
-  private getTerritoryNeighbors(territory: Territory): string[] {
-    return getGridNeighborIds(this.state, territory);
+  private getTerritoryNeighbors(territory: Territory, unitType?: UnitType): string[] {
+    const allowWrap = unitType ? shouldAllowHorizontalWrap(this.state, unitType, territory) : false;
+    return getGridNeighborIds(this.state, territory, { allowHorizontalWrap: allowWrap });
   }
 
   /**
@@ -221,7 +228,7 @@ export class MovementValidator {
       const currentTerritory = this.state.territories.get(current.territoryId);
       if (!currentTerritory) continue;
 
-      for (const adjId of this.getTerritoryNeighbors(currentTerritory)) {
+      for (const adjId of this.getTerritoryNeighbors(currentTerritory, unitType)) {
         if (visited.has(adjId)) continue;
 
         const adjTerritory = this.state.territories.get(adjId);
@@ -369,7 +376,7 @@ export class MovementValidator {
       const onCoast = fromTerritory.type === 'coastal' || hasSeaAccess(this.state, fromTerritory);
       if (!onCoast) return moves;
 
-      for (const adjId of this.getTerritoryNeighbors(fromTerritory)) {
+      for (const adjId of this.getTerritoryNeighbors(fromTerritory, unitType)) {
         const adj = this.state.territories.get(adjId);
         if (!adj || adj.type !== 'sea') continue;
         const hasEnemyFleet = adj.units.some(pu => {
@@ -411,7 +418,7 @@ export class MovementValidator {
     }
     if (unitType.domain === 'land' && from.isLand() && to.type === 'sea' && canLandUnitEngageNaval(unitType) && !canLandUnitStrikeNaval(unitType)) {
       const onCoast = from.type === 'coastal' || hasSeaAccess(this.state, from);
-      return onCoast && this.getTerritoryNeighbors(from).includes(to.id);
+      return onCoast && this.getTerritoryNeighbors(from, unitType).includes(to.id);
     }
     return false;
   }
@@ -481,7 +488,7 @@ export class MovementValidator {
       const territory = this.state.territories.get(current.id);
       if (!territory) continue;
 
-      for (const adjId of this.getTerritoryNeighbors(territory)) {
+      for (const adjId of this.getTerritoryNeighbors(territory, unitType)) {
         if (visited.has(adjId)) continue;
         visited.add(adjId);
 
@@ -526,7 +533,7 @@ export class MovementValidator {
     const currentFaction = this.state.getCurrentFaction();
     if (!currentFaction) return sum;
 
-    for (const adjId of this.getTerritoryNeighbors(seaZone)) {
+    for (const adjId of getNavalReachNeighborIds(this.state, seaZone)) {
       const t = this.state.territories.get(adjId);
       if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
       sum += t.units.reduce((acc, pu) => {
@@ -548,11 +555,8 @@ export class MovementValidator {
     return Math.max(0, total - alreadyLoaded);
   }
 
-  /** Sea legs are free once embarked; land↔sea transitions cost 1 step. */
-  private getMovementStepCost(from: Territory, to: Territory, unitType: UnitType): number {
-    if (this.usesImplicitAmphibious(unitType) && (from.type === 'sea' || to.type === 'sea')) {
-      return from.type === 'sea' && to.type === 'sea' ? 0 : 1;
-    }
+  /** Each map step costs 1 MP, including sea legs for amphibious units. */
+  private getMovementStepCost(_from: Territory, _to: Territory, _unitType: UnitType): number {
     return 1;
   }
 
@@ -613,7 +617,7 @@ export class MovementValidator {
    * Find all coastal territories reachable via sea transports from a land territory.
    * @deprecated Superseded by implicit amphibious movement in the main BFS.
    */
-  private getTransportMoves(fromTerritoryId: string, _unitType: UnitType): ValidMove[] {
+  private getTransportMoves(fromTerritoryId: string, unitType: UnitType): ValidMove[] {
     const moves: ValidMove[] = [];
     const currentFaction = this.state.getCurrentFaction();
     if (!currentFaction) return moves;
@@ -622,16 +626,16 @@ export class MovementValidator {
     if (!fromTerritory || !fromTerritory.isLand()) return moves;
 
     // Look in every adjacent sea zone for friendly transports with spare capacity
-    for (const seaId of this.getTerritoryNeighbors(fromTerritory)) {
+    for (const seaId of this.getTerritoryNeighbors(fromTerritory, unitType)) {
       const seaZone = this.state.territories.get(seaId);
       if (!seaZone || seaZone.type !== 'sea') continue;
       const hasFriendlyFleetInSea = seaZone.units.some(pu => {
-        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-        return !!unitType && unitType.domain === 'sea' && pu.count > 0;
+        const ut = this.state.unitRegistry.get(pu.unitTypeId);
+        return !!ut && ut.domain === 'sea' && pu.count > 0;
       });
       let hasFriendlyFleetNear = hasFriendlyFleetInSea;
       if (!hasFriendlyFleetNear) {
-        for (const adjId of this.getTerritoryNeighbors(seaZone)) {
+        for (const adjId of this.getTerritoryNeighbors(seaZone, unitType)) {
           const t = this.state.territories.get(adjId);
           if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
           if (t.units.some(pu => {
@@ -650,7 +654,7 @@ export class MovementValidator {
       if (capacity <= 0) continue;
 
       // Every coastal territory adjacent to this sea zone is a valid unload point
-      for (const destId of this.getTerritoryNeighbors(seaZone)) {
+      for (const destId of this.getTerritoryNeighbors(seaZone, unitType)) {
         if (destId === fromTerritoryId) continue;
         const dest = this.state.territories.get(destId);
         if (!dest || !dest.isLand()) continue;
@@ -719,7 +723,7 @@ export class MovementValidator {
       const territory = this.state.territories.get(current.id);
       if (!territory) continue;
 
-      for (const adjId of this.getTerritoryNeighbors(territory)) {
+      for (const adjId of this.getTerritoryNeighbors(territory, unitType)) {
         if (visited.has(adjId)) continue;
 
         const adjTerritory = this.state.territories.get(adjId);

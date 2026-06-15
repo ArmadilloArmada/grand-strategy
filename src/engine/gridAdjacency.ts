@@ -6,6 +6,8 @@
 
 import { GameState } from './GameState';
 import { Territory } from '../data/Territory';
+import type { UnitType } from '../data/Unit';
+import { usesImplicitAmphibious } from './unitMovementRules';
 
 const DIAGONAL_OFFSETS: Array<[number, number]> = [
   [-1, -1], [1, -1], [-1, 1], [1, 1],
@@ -44,6 +46,22 @@ function resolveGridDimensions(state: GameState, cellSize: number): { cols: numb
 
 export function mapWrapsHorizontally(state: GameState): boolean {
   return Boolean(state.mapLayout?.wrapHorizontal);
+}
+
+/** Whether horizontal wrap applies for this unit leaving the given territory. */
+export function shouldAllowHorizontalWrap(
+  state: GameState,
+  unitType: UnitType,
+  fromTerritory: Territory,
+): boolean {
+  if (!mapWrapsHorizontally(state)) return false;
+  if (unitType.domain === 'air' || unitType.domain === 'sea') return true;
+  if (fromTerritory.type === 'sea' && usesImplicitAmphibious(unitType)) return true;
+  return false;
+}
+
+export interface GridNeighborOptions {
+  allowHorizontalWrap?: boolean;
 }
 
 /** Infer uniform square cell size from loaded territory polygons. */
@@ -115,7 +133,11 @@ export function areTerritoriesNeighbors(
   return getGridNeighborIds(state, from).includes(to.id);
 }
 
-export function getGridNeighborIds(state: GameState, territory: Territory): string[] {
+export function getGridNeighborIds(
+  state: GameState,
+  territory: Territory,
+  options: GridNeighborOptions = {},
+): string[] {
   const reachable = new Set(territory.adjacentTo);
   const cellSize = inferGridCellSize(state);
   if (!cellSize || territory.polygon.length === 0) {
@@ -125,7 +147,7 @@ export function getGridNeighborIds(state: GameState, territory: Territory): stri
   const index = buildGridIndex(state, cellSize);
   const [col, row] = gridCoords(territory.polygon[0][0], territory.polygon[0][1], cellSize);
   const dims = resolveGridDimensions(state, cellSize);
-  const wrapHorizontal = mapWrapsHorizontally(state);
+  const wrapHorizontal = Boolean(options.allowHorizontalWrap && mapWrapsHorizontally(state));
 
   for (const [nc, nr] of neighborGridCells(col, row, dims, wrapHorizontal)) {
     const neighborId = index.get(`${nc},${nr}`);
@@ -135,9 +157,10 @@ export function getGridNeighborIds(state: GameState, territory: Territory): stri
   return Array.from(reachable);
 }
 
-/** @deprecated Use getGridNeighborIds — kept for existing naval combat call sites. */
+/** Sea zones orthogonally or diagonally adjacent — includes Pacific wrap from sea tiles. */
 export function getNavalReachNeighborIds(state: GameState, territory: Territory): string[] {
-  return getGridNeighborIds(state, territory);
+  const allowWrap = mapWrapsHorizontally(state) && territory.type === 'sea';
+  return getGridNeighborIds(state, territory, { allowHorizontalWrap: allowWrap });
 }
 
 export function isNavalReachNeighbor(

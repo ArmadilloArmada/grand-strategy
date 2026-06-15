@@ -5,7 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { TurnManager } from '../engine/TurnManager';
-import { MovementValidator, ValidMove, usesImplicitAmphibious } from '../engine/MovementValidator';
+import { MovementValidator, usesImplicitAmphibious } from '../engine/MovementValidator';
 import { ProductionManager } from '../engine/ProductionManager';
 import { MobilizationSystem } from '../engine/MobilizationSystem';
 import { CombatResolver } from '../engine/CombatResolver';
@@ -66,8 +66,13 @@ import {
   getNuclearButtonState,
   getStrategicBombButtonState,
 } from './hud/ActionButtonState';
-import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, splitMoveAndAttackTargets, isRangedStrikeUnit, getRangedUnitActionHint } from './hud/MovementSelection';
-import { renderUnitStackSelector, countReadyUnitStacks } from './hud/UnitStackSelector';
+import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, isRangedStrikeUnit, getRangedUnitActionHint, resolveValidMoveAtTarget } from './hud/MovementSelection';
+import { countReadyUnitStacks } from './hud/UnitStackSelector';
+import { buildTooltipUnitSummary, formatActiveStackLabel } from './hud/UnitStackCommand';
+import { UnitStackCommandController } from './hud/UnitStackCommandController';
+import { ValidMoveController } from './hud/ValidMoveController';
+import { AdvancedFeaturesMenu } from './hud/AdvancedFeaturesMenu';
+import { countStackGuidanceTargets, formatStackGuidanceLine } from './hud/stackGuidance';
 import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase, isNonCombatMovePhase, resolveMovePhaseContext } from './hud/PhaseHelpers';
 import { MapMoveDragController, type UnitDropKind } from './MapMoveDragController';
 import { MoveForMoveHUD, buildMoveForMoveView } from './hud/MoveForMoveHUD';
@@ -95,51 +100,10 @@ export class HUD {
   private moveForMoveHUD = new MoveForMoveHUD();
   private moveForMovePassBound = false;
 
-  // Current UI state
-  private selectedUnitType: string | null = null;
-  private stackPopoverDismissListener: (() => void) | null = null;
-
-  /** Pick the active unit stack when a territory is selected. */
-  private autoSelectUnitType(territory: import('../data/Territory').Territory): void {
-    const ready = territory.units.filter(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
-    if (ready.length === 0) {
-      this.selectedUnitType = null;
-      return;
-    }
-    if (this.selectedUnitType && ready.some(pu => pu.unitTypeId === this.selectedUnitType)) {
-      return;
-    }
-    this.selectedUnitType = ready[0].unitTypeId;
-  }
-
-  /** Player chose which unit type to move/attack with this turn. */
-  selectUnitType(unitTypeId: string): void {
-    const territory = this.state.getSelectedTerritory();
-    if (!territory) return;
-    const available = territory.getAvailableUnitCount(unitTypeId);
-    if (available <= 0) {
-      this.showToast('Those units already acted this turn.', 'info');
-      return;
-    }
-    this.selectedUnitType = unitTypeId;
-    this.hideStackCommandPopover();
-    this.refreshUnitStackSelector();
-    this.updateSelectionInfo();
-    this.updateValidMoves();
-    const unitType = this.state.unitRegistry.get(unitTypeId);
-    const name = unitType?.name ?? unitTypeId;
-    const hint = unitType && isRangedStrikeUnit(unitType)
-      ? getRangedUnitActionHint(unitType)
-      : `drag to move (M${unitType?.movement ?? 1})`;
-    this.showToast(`Selected ${name} — ${hint}`, 'info');
-  }
-
-  getSelectedUnitType(): string | null {
-    return this.selectedUnitType;
-  }
-  /** Unit type the current map highlights were computed for. */
-  private validMovesUnitTypeId: string | null = null;
-  private validMoves: ValidMove[] = [];
+  // Unit stack command (HQ chips, popover, keyboard)
+  private stackCommand!: UnitStackCommandController;
+  private validMoveController!: ValidMoveController;
+  private advancedMenu = new AdvancedFeaturesMenu();
 
   // Extracted sub-controllers
   private tutorialController!: TutorialController;
@@ -218,6 +182,29 @@ export class HUD {
     this.renderer.setUnitEra(this.gameConfig.unitEra ?? 'wwii');
   }
 
+  getSelectedMoveCount(): number | null {
+    return this.stackCommand.getSelectedMoveCount();
+  }
+
+  getSelectedUnitType(): string | null {
+    return this.stackCommand.getSelectedUnitType();
+  }
+
+  selectUnitType(unitTypeId: string): void {
+    this.stackCommand.selectUnitType(unitTypeId);
+  }
+
+  private getResolvedMoveCount(territory: import('../data/Territory').Territory, unitTypeId: string): number {
+    return this.stackCommand.getResolvedMoveCount(territory, unitTypeId);
+  }
+
+  /** Keep commanding mixed stacks after a move or attack. */
+  private handoffStackAfterAction(fromId: string, toId?: string): void {
+    this.stackCommand.handoffAfterAction(fromId, toId);
+    this.updateUndoButton();
+    this.updateStrategicAdvisor();
+  }
+
   constructor(
     private state: GameState,
     private turnManager: TurnManager,
@@ -234,6 +221,19 @@ export class HUD {
     this.combatResolver = new CombatResolver(state);
     this.technologyManager = new TechnologyManager(state);
     this.phaseGuidance = new PhaseGuidance(state, this.movementValidator, this.mobilizationSystem);
+    this.stackCommand = new UnitStackCommandController({
+      getState: () => this.state,
+      renderer: this.renderer,
+      unitIcon: (id) => this.unitIcon(id),
+      escapeHtml: (value) => this.escapeHtml(value),
+      showToast: (msg, type) => this.showToast(msg, type),
+      onStackChanged: () => this.updateSelectionInfo(),
+      onValidMovesRefresh: () => this.updateValidMoves(),
+      getCanvasRect: () => {
+        const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
+        return canvas?.getBoundingClientRect() ?? null;
+      },
+    });
     this.turnRecapPanel = new TurnRecapPanel();
     this.abilityPanel = new AbilityPanel();
 
@@ -243,11 +243,20 @@ export class HUD {
       updateFactionPanel: () => this.updateFactionPanel(),
       updateSelectionInfo: () => this.updateSelectionInfo(),
       updateActionButtons: () => this.updateActionButtons(),
-      afterUnitAction: () => this.handleMoveForMovePass(),
-      getSelectedUnitType: () => resolveHighlightedMoveUnitType({
-        validMovesUnitTypeId: this.validMovesUnitTypeId,
-        selectedUnitType: this.selectedUnitType,
-      }),
+      afterUnitAction: (fromId?: string, toId?: string) => {
+        if (fromId) this.handoffStackAfterAction(fromId, toId);
+        this.handleMoveForMovePass();
+      },
+      getSelectedUnitType: () => {
+        if (this.stackCommand.isSelectAllTypes()) return null;
+        return resolveHighlightedMoveUnitType({
+          validMovesUnitTypeId: this.validMoveController.getValidMovesUnitTypeId(),
+          selectedUnitType: this.stackCommand.getSelectedUnitType(),
+        });
+      },
+      getSelectedMoveCount: () => (
+        this.stackCommand.isSelectAllTypes() ? null : this.stackCommand.getSelectedMoveCount()
+      ),
     };
     this.combatUI = new CombatUI(state, renderer, this.combatResolver, combatCallbacks);
 
@@ -315,6 +324,16 @@ export class HUD {
     });
     this.overlayController = new OverlayController(state, renderer, {
       showToast: (msg, type) => this.showToast(msg, type),
+    });
+    this.validMoveController = new ValidMoveController({
+      getState: () => this.state,
+      movementValidator: this.movementValidator,
+      renderer: this.renderer,
+      overlayController: this.overlayController,
+      mobilizationSystem: this.mobilizationSystem,
+      stackCommand: this.stackCommand,
+      escapeHtml: (value) => this.escapeHtml(value),
+      onAfterUpdate: () => this.updateActionButtons(),
     });
     this.firstWarRoom = new FirstWarRoom({
       focusTerritory: (territoryId) => this.runAdvisorAction('focus-territory', territoryId),
@@ -413,6 +432,7 @@ export class HUD {
     // Action buttons
     this.enhanceCommandBar();
     this.setupWarRoomLayout();
+    this.setupMobileStackBar();
     this.setupHQLayout();
     this.syncToastContainerDock();
     // HQ is skipped when innerWidth ≤700; if the window later widens, create the panel then.
@@ -485,6 +505,14 @@ export class HUD {
     document.getElementById('btn-espionage')?.addEventListener('click', () => this.showEspionageModal());
     document.getElementById('btn-close-espionage')?.addEventListener('click', () => {
       document.getElementById('espionage-modal')?.classList.add('hidden');
+    });
+
+    this.advancedMenu.init({
+      onTech: () => this.techUI.show(),
+      onDiplomacy: () => this.diplomacyUI.showModal(),
+      onEspionage: () => this.showEspionageModal(),
+      onStats: () => this.statsUI.show(),
+      onNuclear: () => this.showNuclearModal(),
     });
 
     // Nuclear
@@ -1035,6 +1063,20 @@ export class HUD {
       case 's': case 'S': if (isHumanTurn) this.showAISpeedMenu(); break;
       case '+': case '=': this.renderer.zoom(1.2); break;
       case '-': this.renderer.zoom(0.8); break;
+      case 'Tab':
+        if (isHumanTurn && isMovementPhase(this.state.currentPhase)) {
+          e.preventDefault();
+          this.stackCommand.cycleUnitStack(e.shiftKey ? -1 : 1);
+        }
+        break;
+      case '1': case '2': case '3':
+        if (isHumanTurn && isMovementPhase(this.state.currentPhase) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) break;
+          e.preventDefault();
+          this.stackCommand.pickStackByIndex(Number(e.key));
+        }
+        break;
     }
   }
 
@@ -1156,7 +1198,7 @@ export class HUD {
 
       const unitBreakdown = showUnits
         ? (territory.units.length > 0
-            ? `<div class="territory-tooltip-muted">Units: ${unitCount} — select territory for stack command in HQ</div>`
+            ? buildTooltipUnitSummary(this.state, territory, (id) => this.unitIcon(id), (v) => this.escapeHtml(v))
             : '<span class="territory-tooltip-muted">None</span>')
         : '<span class="territory-tooltip-muted">🌫️ Hidden by fog of war</span>';
 
@@ -1197,74 +1239,32 @@ export class HUD {
   }
 
   private setupUnitStackSelectorListeners(): void {
-    const onChipClick = (event: Event) => {
-      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-unit-type-id]');
-      if (!target) return;
-      const unitTypeId = target.getAttribute('data-unit-type-id');
-      if (unitTypeId) this.selectUnitType(unitTypeId);
-    };
-
-    document.getElementById('territory-unit-selector')?.addEventListener('click', onChipClick);
-    document.getElementById('war-room-unit-slot')?.addEventListener('click', onChipClick);
-    document.getElementById('stack-command-popover')?.addEventListener('click', onChipClick);
+    this.stackCommand.init();
   }
 
   private refreshUnitStackSelector(): void {
-    renderUnitStackSelector(this.state, this.state.getSelectedTerritory(), {
-      selectedUnitType: this.selectedUnitType,
-      unitIcon: (id) => this.unitIcon(id),
-      escapeHtml: (value) => this.escapeHtml(value),
-    });
+    this.stackCommand.refresh();
   }
 
   private hideStackCommandPopover(): void {
-    document.getElementById('stack-command-popover')?.classList.add('hidden');
-    if (this.stackPopoverDismissListener) {
-      document.removeEventListener('pointerdown', this.stackPopoverDismissListener);
-      this.stackPopoverDismissListener = null;
-    }
+    this.stackCommand.hideStackCommandPopover();
   }
 
-  /** Quick map-side picker when a territory has multiple ready stacks. */
   private maybeShowStackCommandPopover(territoryId: string): void {
-    const territory = this.state.territories.get(territoryId);
-    const popover = document.getElementById('stack-command-popover');
-    if (!territory || !popover) return;
+    this.stackCommand.maybeShowStackCommandPopover(territoryId);
+  }
 
-    if (countReadyUnitStacks(this.state, territory) < 2) {
-      this.hideStackCommandPopover();
-      return;
-    }
-
-    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
-    const left = rect.left + screen.x;
-    const top = rect.top + screen.y;
-
-    popover.innerHTML = `
-      <div class="stack-command-popover-title">Choose stack</div>
-      ${document.getElementById('territory-unit-selector')?.querySelector('.unit-stack-chips')?.innerHTML ?? ''}
-      <div class="stack-command-popover-foot">Or use HQ / War Room</div>
+  private setupMobileStackBar(): void {
+    if (document.getElementById('mobile-stack-command-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'mobile-stack-command-bar';
+    bar.className = 'mobile-stack-command-bar hidden';
+    bar.setAttribute('aria-label', 'Command stack');
+    bar.innerHTML = `
+      <div class="mobile-stack-command-title">Command Stack</div>
+      <div class="unit-stack-selector-body"></div>
     `;
-    popover.style.left = `${Math.min(left + 12, window.innerWidth - 280)}px`;
-    popover.style.top = `${Math.max(top - 20, 72)}px`;
-    popover.classList.remove('hidden');
-
-    if (this.stackPopoverDismissListener) {
-      document.removeEventListener('pointerdown', this.stackPopoverDismissListener);
-    }
-    this.stackPopoverDismissListener = (event: Event) => {
-      if ((event.target as Node) && popover.contains(event.target as Node)) return;
-      this.hideStackCommandPopover();
-    };
-    setTimeout(() => {
-      if (this.stackPopoverDismissListener) {
-        document.addEventListener('pointerdown', this.stackPopoverDismissListener);
-      }
-    }, 0);
+    document.body.appendChild(bar);
   }
 
   /**
@@ -1274,6 +1274,7 @@ export class HUD {
     this.state.on('turn_start', (e) => {
       this.updateTurnInfo();
       this.mobilizationSystem.resetForNewTurn();
+      this.stackCommand.resetForNewTurn();
       // Tick dynamic features for human factions
       const evData = e.data as { factionId?: string } | undefined;
       const fid = evData?.factionId ?? this.state.currentFactionId;
@@ -1290,9 +1291,13 @@ export class HUD {
     this.state.on('victory', (e) => this.handleVictory(e.data as { winner?: string; factionId?: string }));
     this.state.on('ai_thinking', (e) => {
       const data = e.data as { message?: string; action?: string; territory?: string; territoryId?: string };
-      if (data.message) {
-        this.updateAIActivityBanner(data.message);
-        if (data.action) this.addAIActivity(data.message, data.action);
+      let displayMessage = data.message ?? '';
+      if (data.territory) {
+        displayMessage = displayMessage ? `${displayMessage} — ${data.territory}` : data.territory;
+      }
+      if (displayMessage) {
+        this.updateAIActivityBanner(displayMessage);
+        if (data.action) this.addAIActivity(displayMessage, data.action);
       }
       if (data.territoryId) {
         this.renderer.setAIPulseTerritory(data.territoryId);
@@ -2083,7 +2088,7 @@ export class HUD {
       phaseIsMovement: movementPhase,
       territoryId,
       previousTerritoryId,
-      validMoves: this.validMoves,
+      validMoves: this.validMoveController.getValidMoves(),
     });
 
     if (moveResolution.kind === 'refresh') {
@@ -2100,16 +2105,12 @@ export class HUD {
       return;
     }
 
-    // Selecting a new territory — pick a default stack only here.
-    this.updateSelectionInfo();
+    // Selecting a new territory — auto-select largest stack with all units ready.
     this.renderer.startContinuousRender();
-    if (territoryId !== previousTerritoryId) {
-      this.autoSelectUnitType(territory);
-    }
+    this.stackCommand.onTerritorySelected(territory, territoryId !== previousTerritoryId);
+    this.updateSelectionInfo();
     this.updateValidMoves();
     this.updateStrategicAdvisor();
-    this.refreshUnitStackSelector();
-    this.maybeShowStackCommandPopover(territoryId);
   }
 
   /**
@@ -2214,13 +2215,13 @@ export class HUD {
       return;
     }
 
-    // Move the unit stack whose highlights were shown (not whatever stack auto-select picks on click).
-    const unitTypeId = resolveHighlightedMoveUnitType({
-      validMovesUnitTypeId: this.validMovesUnitTypeId,
-      selectedUnitType: this.selectedUnitType,
+    const validMove = resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toId, 'move');
+    const unitTypeId = validMove?.unitTypeId ?? resolveHighlightedMoveUnitType({
+      validMovesUnitTypeId: this.validMoveController.getValidMovesUnitTypeId(),
+      selectedUnitType: this.stackCommand.selectedUnitType,
     }) ?? (() => {
-      this.autoSelectUnitType(fromTerritory);
-      return this.selectedUnitType;
+      this.stackCommand.autoSelectUnitType(fromTerritory);
+      return this.stackCommand.selectedUnitType;
     })();
     if (!unitTypeId) {
       this.showToast('No units available to move.', 'info');
@@ -2230,13 +2231,14 @@ export class HUD {
     const unitType = this.state.unitRegistry.get(unitTypeId);
     if (!unitType) return;
 
-    const availableCount = fromTerritory.getAvailableUnitCount(unitTypeId);
-    if (availableCount <= 0) {
+    const moveCount = this.stackCommand.isSelectAllTypes()
+      ? fromTerritory.getAvailableUnitCount(unitTypeId)
+      : this.getResolvedMoveCount(fromTerritory, unitTypeId);
+    if (moveCount <= 0) {
       this.showToast('No available units can move there! (Units can only act once per turn)', 'info');
       return;
     }
 
-    const validMove = this.validMoves.find(m => m.territoryId === toId);
     if (!validMove || validMove.isAttack) {
       this.showToast('That destination is not reachable by the selected unit.', 'info');
       return;
@@ -2245,7 +2247,7 @@ export class HUD {
     const moveContext = resolveMovePhaseContext(this.state.currentPhase);
     const validation = this.movementValidator.validateMove(
       unitTypeId,
-      availableCount,
+      moveCount,
       fromId,
       toId,
       moveContext !== 'noncombat',
@@ -2256,7 +2258,7 @@ export class HUD {
     }
 
     const unitsToMove: { unitTypeId: string; count: number }[] = [
-      { unitTypeId, count: availableCount },
+      { unitTypeId, count: moveCount },
     ];
 
     // Capture neutral/unowned territory when moving in
@@ -2313,18 +2315,10 @@ export class HUD {
       data: { from: fromId, to: toId, units: unitsToMove },
     });
 
-    // Update display
+    // Update display — keep commanding from this territory when more stacks remain
     this.renderer.render();
     this.renderMinimap();
-    this.renderer.clearValidMoveTargets();
-    this.validMoves = [];
-    this.validMovesUnitTypeId = null;
-    this.selectedUnitType = null;
-    this.state.selectedTerritoryId = null;
-    this.updateSelectionInfo();
-    this.updateActionButtons();
-    this.updateUndoButton();
-    this.updateStrategicAdvisor();
+    this.handoffStackAfterAction(fromId, toId);
 
     if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
       this.handleMoveForMovePass();
@@ -2810,10 +2804,8 @@ export class HUD {
     }
     
     this.updateActionButtons();
-    this.renderer.clearValidMoveTargets();
-    this.validMoves = [];
-    this.validMovesUnitTypeId = null;
-    this.selectedUnitType = null;
+    this.validMoveController.clear();
+    this.stackCommand.selectedUnitType = null;
 
     // Update IPC display
     const faction = this.state.getCurrentFaction();
@@ -3084,18 +3076,14 @@ export class HUD {
       if (detailsEl) {
         detailsEl.innerHTML = this.buildFactionSummaryHtml();
       }
-      this.refreshUnitStackSelector();
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.validMovesUnitTypeId = null;
-      this.selectedUnitType = null;
+      this.validMoveController.clear();
+      this.stackCommand.clearSelection();
       this.updateMapReadabilityLegend();
       this.updateActionButtons();
       return;
     }
 
     if (nameEl) nameEl.textContent = territory.name;
-    this.refreshUnitStackSelector();
 
     if (territory.type !== 'sea' && territory.units.some(pu => {
       const ut = this.state.unitRegistry.get(pu.unitTypeId);
@@ -3246,9 +3234,9 @@ export class HUD {
       </div>`;
 
       // Attack range preview (enemies reachable from this territory)
-      if (isOwnedTerritory && movementPhaseActive && this.validMoves.length > 0) {
-        const enemyIds = Array.from(new Set(this.validMoves.filter(m => m.isAttack).map(m => m.territoryId)));
-        const moveIds = Array.from(new Set(this.validMoves.filter(m => !m.isAttack).map(m => m.territoryId)));
+      if (isOwnedTerritory && movementPhaseActive && this.validMoveController.getValidMoves().length > 0) {
+        const enemyIds = Array.from(new Set(this.validMoveController.getValidMoves().filter(m => m.isAttack).map(m => m.territoryId)));
+        const moveIds = Array.from(new Set(this.validMoveController.getValidMoves().filter(m => !m.isAttack).map(m => m.territoryId)));
         if (enemyIds.length > 0) {
           html += `<div class="attack-range-preview">
             🎯 <strong>${enemyIds.length}</strong> enem${enemyIds.length === 1 ? 'y' : 'ies'} in attack range
@@ -3262,7 +3250,7 @@ export class HUD {
           html += `<div class="target-preview-list">
             ${previewTargets.map(target => {
               const t = this.state.territories.get(target.id);
-              const move = this.validMoves.find(m => m.territoryId === target.id);
+              const move = this.validMoveController.getValidMoves().find(m => m.territoryId === target.id);
               const viaTransport = move?.viaTransport;
               const coastalStrike = move?.coastalStrike;
               const label = target.type === 'attack'
@@ -3299,6 +3287,7 @@ export class HUD {
       detailsEl.classList.add('content-refresh');
     }
 
+    this.refreshUnitStackSelector();
     this.updateActionButtons();
   }
 
@@ -3316,8 +3305,8 @@ export class HUD {
     });
     const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
     const readyUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
-    const attackTargets = isOwned && isMovement ? this.validMoves.filter(m => m.isAttack).length : 0;
-    const moveTargets = isOwned && isMovement ? this.validMoves.filter(m => !m.isAttack).length : 0;
+    const attackTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => m.isAttack).length : 0;
+    const moveTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => !m.isAttack).length : 0;
     const action = (() => {
       if (isOwned && ['purchase', 'production', 'build'].includes(phase)) return territory.hasFactory ? 'Good place to mobilize.' : 'Select a factory territory to build.';
       if (isOwned && attackTargets > 0) return `${attackTargets} attack target${attackTargets === 1 ? '' : 's'} in range.`;
@@ -3441,6 +3430,7 @@ export class HUD {
       nuclearBtn.disabled = nuclearState.disabled;
       nuclearBtn.title = nuclearState.title;
       nuclearBtn.innerHTML = nuclearState.labelHtml;
+      this.advancedMenu.syncNuclearVisibility(nuclearState.show);
     }
 
     // End Phase button — show next phase name and keyboard hint
@@ -3483,6 +3473,19 @@ export class HUD {
     }
 
     // Update context helper with current action guidance
+    const stackLabel = formatActiveStackLabel(
+      this.state,
+      territory ?? null,
+      this.stackCommand.getSelectedUnitType(),
+      this.stackCommand.getSelectedMoveCount(),
+      (id) => this.unitIcon(id),
+      this.stackCommand.isSelectAllTypes(),
+    );
+    const guidanceCounts = countStackGuidanceTargets(this.validMoveController.getValidMoves());
+    const readyStackCount = territory ? countReadyUnitStacks(this.state, territory) : 0;
+    const activeStackLabel = stackLabel && territory && movementPhase
+      ? formatStackGuidanceLine(territory.name, stackLabel, guidanceCounts)
+      : stackLabel;
     const contextTip = this.phaseGuidance.updateContextHelper({
       phase,
       faction,
@@ -3492,6 +3495,9 @@ export class HUD {
       isMovementPhase: movementPhase,
       isCombatPhase: combatPhase,
       isEndPhase,
+      activeStackLabel,
+      selectAllTypes: this.stackCommand.isSelectAllTypes(),
+      readyStackCount,
     });
     if (contextTip) this.showFirstTimeTip(contextTip.tipId, contextTip.message);
   }
@@ -3531,65 +3537,13 @@ export class HUD {
    * Update valid move highlights
    */
   private updateValidMoves(): void {
-    const territory = this.state.getSelectedTerritory();
-    const faction = this.state.getCurrentFaction();
-    const phase = this.state.currentPhase;
-
-    if (!territory || !faction || !canIssueOrdersFromTerritory(territory, faction.id)) {
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.validMovesUnitTypeId = null;
-      this.updateMapReadabilityLegend();
-      return;
-    }
-
-    // Check if current phase allows movement
-    if (!isMovementPhase(phase)) {
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.validMovesUnitTypeId = null;
-      this.updateMapReadabilityLegend();
-      return;
-    }
-
-    // Get valid moves for the selected unit stack (each type has its own range)
-    const allMoves: ValidMove[] = [];
-    const moveContext = resolveMovePhaseContext(phase);
-    const selectedStillReady = this.selectedUnitType
-      && territory.getAvailableUnitCount(this.selectedUnitType) > 0;
-    if (!selectedStillReady) {
-      this.autoSelectUnitType(territory);
-    }
-
-    if (!this.selectedUnitType) {
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.validMovesUnitTypeId = null;
-      this.updateMapReadabilityLegend();
-      return;
-    }
-
-    const moves = this.movementValidator.getValidMoves(
-      this.selectedUnitType,
-      territory.id,
-      moveContext
-    );
-    allMoves.push(...moves);
-
-    const { moveTargets, attackTargets, coastalStrikeTargets } = splitMoveAndAttackTargets(allMoves);
-
-    this.validMoves = allMoves;
-    this.validMovesUnitTypeId = this.selectedUnitType;
-    this.renderer.setValidMoveTargets(moveTargets, attackTargets, coastalStrikeTargets);
-    this.applyOverlay();
-    this.updateActionButtons();
-    this.updateMapReadabilityLegend();
+    this.validMoveController.updateValidMoves();
   }
 
   private applyOverlay(): void { this.overlayController.apply(); }
   cycleOverlay(): void {
     this.overlayController.cycle();
-    this.updateMapReadabilityLegend();
+    this.validMoveController.updateMapReadabilityLegend();
   }
 
   focusTerritory(territoryId: string): void {
@@ -3599,44 +3553,7 @@ export class HUD {
   }
 
   private updateMapReadabilityLegend(): void {
-    const targetParent = document.getElementById('war-room-content') ?? document.getElementById('app');
-    let legend = document.getElementById('map-readability-legend');
-    if (!legend) {
-      legend = document.createElement('div');
-      legend.id = 'map-readability-legend';
-    }
-    if (targetParent && legend.parentElement !== targetParent) {
-      targetParent.appendChild(legend);
-    }
-    legend.classList.add('war-room-section', 'overlay-legend-section');
-
-    const mode = this.overlayController?.getMode() ?? 'off';
-    const moveCount = this.validMoves.filter(m => !m.isAttack).length;
-    const attackCount = this.validMoves.filter(m => m.isAttack).length;
-    const mobilizeCount = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize).length;
-    const selected = this.state.getSelectedTerritory();
-    const selectedUnitName = this.selectedUnitType
-      ? this.state.unitRegistry.get(this.selectedUnitType)?.name
-      : null;
-    const selectedText = selected
-      ? (selectedUnitName ? `${selected.name} · ${selectedUnitName}` : selected.name)
-      : 'No territory selected';
-    const showNavalLegend = Boolean(selected?.isSea() && moveCount > 0);
-    const modeLabels: Record<string, string> = {
-      off: 'Overlay Off',
-      range: 'Range',
-      threat: 'Threats',
-      economic: 'Economy',
-    };
-
-    legend.innerHTML = `
-      <div class="map-legend-title">${this.escapeHtml(modeLabels[mode])}</div>
-      <div class="map-legend-row"><span class="legend-swatch selected"></span><span>${this.escapeHtml(selectedText)}</span></div>
-      <div class="map-legend-row"><span class="legend-swatch ${showNavalLegend ? 'naval-move' : 'move'}"></span><span>${moveCount} ${showNavalLegend ? 'naval move' : 'move'}</span></div>
-      <div class="map-legend-row"><span class="legend-swatch attack"></span><span>${attackCount} attack</span></div>
-      <div class="map-legend-row"><span class="legend-swatch build"></span><span>${mobilizeCount} mobilize</span></div>
-    `;
-    legend.classList.toggle('quiet', mode === 'off' && moveCount === 0 && attackCount === 0 && mobilizeCount === 0);
+    this.validMoveController.updateMapReadabilityLegend();
   }
 
   /**
@@ -3671,8 +3588,15 @@ export class HUD {
     const ready = territory.units.filter(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
     if (ready.length === 0) return false;
 
-    if (this.selectedUnitType && ready.some(pu => pu.unitTypeId === this.selectedUnitType)) {
-      const unitType = this.state.unitRegistry.get(this.selectedUnitType);
+    if (this.stackCommand.isSelectAllTypes()) {
+      return ready.some(pu => {
+        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+        return unitType && !isRangedStrikeUnit(unitType);
+      });
+    }
+
+    if (this.stackCommand.selectedUnitType && ready.some(pu => pu.unitTypeId === this.stackCommand.selectedUnitType)) {
+      const unitType = this.state.unitRegistry.get(this.stackCommand.selectedUnitType);
       if (unitType && isRangedStrikeUnit(unitType)) return false;
       return true;
     }
@@ -3684,17 +3608,26 @@ export class HUD {
   }
 
   private prepareUnitDrag(fromTerritoryId: string): void {
+    if (this.state.selectedTerritoryId !== fromTerritoryId) {
+      this.state.selectTerritory(fromTerritoryId);
+    }
     const territory = this.state.territories.get(fromTerritoryId);
-    if (territory) this.autoSelectUnitType(territory);
+    if (territory && !this.stackCommand.isSelectAllTypes()) {
+      this.stackCommand.autoSelectUnitType(territory);
+    }
     this.updateValidMoves();
+    if (territory && countReadyUnitStacks(this.state, territory) >= 2 && !this.stackCommand.isSelectAllTypes()) {
+      this.maybeShowStackCommandPopover(fromTerritoryId);
+    }
   }
 
   private getUnitDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind {
     if (fromTerritoryId === toTerritoryId) return 'invalid';
-    if (this.state.selectedTerritoryId !== fromTerritoryId || this.validMoves.length === 0) {
+    if (this.state.selectedTerritoryId !== fromTerritoryId || this.validMoveController.getValidMoves().length === 0) {
       this.prepareUnitDrag(fromTerritoryId);
     }
-    const move = this.validMoves.find(m => m.territoryId === toTerritoryId);
+    const move = resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toTerritoryId, 'move')
+      ?? resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toTerritoryId, 'attack');
     if (!move) return 'invalid';
     // Movement rules trump fog display — adjacent "?" tiles can still be valid move/attack targets.
     return move.isAttack ? 'attack' : 'move';
@@ -3711,7 +3644,7 @@ export class HUD {
     }
 
     const fromTerritory = this.state.territories.get(fromTerritoryId);
-    const unitTypeId = this.selectedUnitType ?? this.validMovesUnitTypeId;
+    const unitTypeId = this.stackCommand.selectedUnitType ?? this.validMoveController.getValidMovesUnitTypeId();
     if (fromTerritory && unitTypeId) {
       const available = fromTerritory.getAvailableUnitCount(unitTypeId);
       if (available <= 0) {
@@ -3758,7 +3691,7 @@ export class HUD {
       return;
     }
 
-    const attackTargets = this.validMoves.filter(m => m.isAttack);
+    const attackTargets = this.validMoveController.getValidMoves().filter(m => m.isAttack);
     if (attackTargets.length === 0) {
       this.showToast('No valid attack targets from here', 'info');
       return;
@@ -4172,6 +4105,7 @@ export class HUD {
   showNewGameModal(): void {
     const modal = document.getElementById('new-game-modal');
     const mapSelect = document.getElementById('map-select') as HTMLSelectElement;
+    this.pruneUnplaytestedTurnStyles();
     if (mapSelect) {
       const list = getMapList();
       mapSelect.innerHTML = list.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
@@ -4182,6 +4116,18 @@ export class HUD {
     this.refreshSetupFactionOptions();
     this.syncSetupHelpers();
     if (modal) modal.classList.remove('hidden');
+  }
+
+  /** Hide experimental turn styles from the setup dropdown. */
+  private pruneUnplaytestedTurnStyles(): void {
+    const select = document.getElementById('turn-style') as HTMLSelectElement | null;
+    if (!select) return;
+    for (const style of ['chess', 'action']) {
+      select.querySelector(`option[value="${style}"]`)?.remove();
+    }
+    if (!select.value || !select.querySelector(`option[value="${select.value}"]`)) {
+      select.value = 'quick';
+    }
   }
 
   /** One-click defaults for a balanced first game (world map, guided quick play). */
@@ -5544,7 +5490,7 @@ export class HUD {
       if (['purchase', 'production', 'build'].includes(phase)) {
         this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
       } else if (['combat_move', 'move', 'orders', 'action'].includes(phase)) {
-        const attacks = this.validMoves.filter(m => m.isAttack);
+        const attacks = this.validMoveController.getValidMoves().filter(m => m.isAttack);
         if (attacks.length > 0) this.onAttackShortcut();
         else this.overlayController.setMode('range');
       } else if (['combat', 'attack', 'resolve'].includes(phase)) {

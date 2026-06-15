@@ -35,16 +35,36 @@ describe('UnitStackSelector', () => {
 
     const html = buildUnitStackSelectorHtml(state, sea, {
       selectedUnitType: 'submarine',
+      selectedMoveCount: 2,
+      selectAllTypes: false,
       unitIcon: () => '🚢',
       escapeHtml: (v) => v,
     });
 
-    expect(html).toContain('Choose which stack moves or attacks this turn.');
+    expect(html).toContain('Active stack moves with all units by default');
     expect(html).toContain('Cruiser');
     expect(html).toContain('Submarine');
     expect(html).toContain('data-unit-type-id="cruiser"');
     expect(html).toContain('data-unit-type-id="submarine"');
     expect(html).toContain('unit-stack-chip selected');
+    expect(html).toContain('data-stack-count-action="all"');
+  });
+
+  it('shows All label when move count is unset', () => {
+    const state = buildNavalState();
+    const sea = makeTerritory('pacific', 'blue', { type: 'sea' });
+    sea.addUnits('cruiser', 4);
+
+    const html = buildUnitStackSelectorHtml(state, sea, {
+      selectedUnitType: 'cruiser',
+      selectedMoveCount: null,
+      selectAllTypes: false,
+      unitIcon: () => '🚢',
+      escapeHtml: (v) => v,
+    });
+
+    expect(html).toContain('All (4)');
+    expect(html).toContain('unit-stack-count-all active');
   });
 
   it('counts ready stacks only for owned territories in movement phase', () => {
@@ -72,6 +92,8 @@ describe('UnitStackSelector', () => {
 
     renderUnitStackSelector(state, sea, {
       selectedUnitType: null,
+      selectedMoveCount: null,
+      selectAllTypes: false,
       unitIcon: () => '⚓',
       escapeHtml: (v) => v,
     });
@@ -85,6 +107,8 @@ describe('UnitStackSelector', () => {
 
     renderUnitStackSelector(state, null, {
       selectedUnitType: null,
+      selectedMoveCount: null,
+      selectAllTypes: false,
       unitIcon: () => '⚓',
       escapeHtml: (v) => v,
     });
@@ -92,5 +116,25 @@ describe('UnitStackSelector', () => {
     expect(hq.classList.contains('hidden')).toBe(true);
     expect(warRoom.classList.contains('hidden')).toBe(true);
     expect(hq.innerHTML).toBe('');
+  });
+
+  it('shows All Unit Types button when multiple stacks are ready', () => {
+    const state = buildNavalState();
+    const sea = makeTerritory('pacific', 'blue', { type: 'sea' });
+    sea.addUnits('cruiser', 2);
+    sea.addUnits('submarine', 3);
+
+    const html = buildUnitStackSelectorHtml(state, sea, {
+      selectedUnitType: null,
+      selectedMoveCount: null,
+      selectAllTypes: true,
+      unitIcon: () => '🚢',
+      escapeHtml: (v) => v,
+    });
+
+    expect(html).toContain('data-stack-select-all-types');
+    expect(html).toContain('All Unit Types');
+    expect(html).toContain('unit-stack-all-types-btn selected');
+    expect(html).toContain('unit-stack-chip-badge">Ready</span>');
   });
 });

@@ -7,6 +7,7 @@ import { GameState } from "./GameState";
 import { TurnManager } from "./TurnManager";
 import { MovementValidator } from "./MovementValidator";
 import { resolveMovePhaseContext } from './movePhaseContext';
+import { pickBestReadyStackType } from './aiStackSelection';
 import { MobilizationOption, MobilizationSystem } from "./MobilizationSystem";
 import { CombatResolver } from "./CombatResolver";
 import { settings } from '../ui/Settings';
@@ -1207,7 +1208,12 @@ export class AIController {
 
       for (const t of owned) {
         if (!t.adjacentTo.includes(targetId) && !this.canStrikeTarget(t, target, targetId)) continue;
+        const readyStacks = t.units.filter(pu => t.getAvailableUnitCount(pu.unitTypeId) > 0);
+        const preferredType = t.type === 'sea' && readyStacks.length > 1
+          ? pickBestReadyStackType(this.state, t, this.personality.naval)?.unitTypeId
+          : null;
         for (const pu of t.units) {
+          if (preferredType && pu.unitTypeId !== preferredType) continue;
           const ut = this.state.unitRegistry.get(pu.unitTypeId);
           if (!ut || ut.attack === 0) continue;
           if (!ut.canEnter(target.type) && !this.movementValidator.isRangedStrike(t, target, ut)) continue;
@@ -1303,24 +1309,24 @@ export class AIController {
     if (this.hasBehavior('control_seas') || this.personality.naval > 0.7) {
       for (const t of owned) {
         if (t.type !== 'sea') continue;
-        for (const pu of t.units) {
-          const ut = this.state.unitRegistry.get(pu.unitTypeId);
-          if (!ut || ut.domain !== 'sea' || ut.attack === 0) continue;
-          const reachable = this.movementValidator.getValidMoves(pu.unitTypeId, t.id, true);
-          for (const vm of reachable) {
-            if (!vm.isAttack || !vm.coastalStrike) continue;
-            if (plans.some(p => p.targetId === vm.territoryId)) continue;
-            const eval_ = evaluations.get(vm.territoryId);
-            if (!eval_) continue;
-            const availableCount = this.getAttackAvailableCount(t, pu.unitTypeId, pu.count, evaluations, faction);
-            if (availableCount <= 0) continue;
-            plans.push({
-              targetId: vm.territoryId,
-              attackers: [{ fromId: t.id, unitTypeId: pu.unitTypeId, count: Math.min(availableCount, 3) }],
-              expectedSuccess: this.estimateSuccessRate(Math.min(availableCount, 3) * ut.attack, eval_.defenseStrength),
-              strategicValue: eval_.strategicValue + 25,
-            });
-          }
+        const best = pickBestReadyStackType(this.state, t, this.personality.naval);
+        if (!best) continue;
+        const ut = this.state.unitRegistry.get(best.unitTypeId);
+        if (!ut || ut.domain !== 'sea' || ut.attack === 0) continue;
+        const reachable = this.movementValidator.getValidMoves(best.unitTypeId, t.id, true);
+        for (const vm of reachable) {
+          if (!vm.isAttack || !vm.coastalStrike) continue;
+          if (plans.some(p => p.targetId === vm.territoryId)) continue;
+          const eval_ = evaluations.get(vm.territoryId);
+          if (!eval_) continue;
+          const availableCount = this.getAttackAvailableCount(t, best.unitTypeId, best.count, evaluations, faction);
+          if (availableCount <= 0) continue;
+          plans.push({
+            targetId: vm.territoryId,
+            attackers: [{ fromId: t.id, unitTypeId: best.unitTypeId, count: Math.min(availableCount, 3) }],
+            expectedSuccess: this.estimateSuccessRate(Math.min(availableCount, 3) * ut.attack, eval_.defenseStrength),
+            strategicValue: eval_.strategicValue + 25,
+          });
         }
       }
     }

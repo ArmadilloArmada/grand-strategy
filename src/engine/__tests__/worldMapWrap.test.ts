@@ -47,7 +47,7 @@ describe('world map horizontal wrap', () => {
     expect(moves.some(m => m.territoryId === 'wake_island')).toBe(true);
   });
 
-  it('lets infantry reach hawaii from california in multiple hops when movement allows', () => {
+  it('lets mech infantry advance into the Pacific from California in one turn', () => {
     const state = loadWorldMap();
     state.currentFactionId = 'atlantic_alliance';
     const california = state.territories.get('california')!;
@@ -55,7 +55,12 @@ describe('world map horizontal wrap', () => {
 
     const validator = new MovementValidator(state);
     const moves = validator.getValidMoves('mech_infantry', 'california', false);
-    expect(moves.some(m => m.territoryId === 'hawaii')).toBe(true);
+    const pacificSea = moves.some(m => {
+      const t = state.territories.get(m.territoryId);
+      return t?.type === 'sea' && t.center[0] > california.center[0];
+    });
+    expect(pacificSea).toBe(true);
+    expect(moves.some(m => m.territoryId === 'hawaii')).toBe(false);
   });
 
   it('includes australia and new zealand on the loaded map', () => {
@@ -80,5 +85,22 @@ describe('world map horizontal wrap', () => {
     const philippines = state.territories.get('philippines')!;
     expect(philippines.center[0]).toBeGreaterThanOrEqual(tokyo.center[0] - 50);
     expect(philippines.center[1]).toBeGreaterThan(shanghai.center[1]);
+  });
+
+  it('keeps Washington tank movement local — no world-wrap shortcuts', () => {
+    const state = loadWorldMap();
+    state.currentFactionId = 'atlantic_alliance';
+    const washington = state.territories.get('washington')!;
+    washington.units = [{ unitTypeId: 'tank', count: 1 }];
+
+    const validator = new MovementValidator(state);
+    const moves = validator.getValidMoves('tank', 'washington', false);
+    const moveIds = moves.filter(m => !m.isAttack).map(m => m.territoryId);
+
+    expect(moveIds.length).toBeGreaterThan(0);
+    expect(moveIds.length).toBeLessThan(30);
+    expect(moveIds).not.toContain('hawaii');
+    expect(moveIds).not.toContain('tokyo');
+    expect(moveIds).not.toContain('philippines');
   });
 });

@@ -65,14 +65,13 @@ describe('MovementValidator', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('rejects land unit without transport requirement entering sea territory', () => {
-      // Add a sea territory adjacent to 'a'
+    it('rejects tanks entering sea territory', () => {
       const sea = makeTerritory('sea1', 'player', { type: 'sea', adjacentTo: ['a'] });
       state.territories.set('sea1', sea);
       const a = state.territories.get('a')!;
       (a.adjacentTo as string[]).push('sea1');
 
-      const result = validator.validateMove('infantry', 1, 'a', 'sea1', false);
+      const result = validator.validateMove('tank', 1, 'a', 'sea1', false);
       expect(result.valid).toBe(false);
       expect(result.reason).toMatch(/cannot enter/i);
     });
@@ -155,10 +154,8 @@ describe('MovementValidator', () => {
     });
 
     it('allows implicit amphibious movement through neutral sea without transport ships', () => {
-      state.unitRegistry.register({
-        ...state.unitRegistry.get('tank')!.serialize(),
-        requiredTransport: true,
-      });
+      state.unitRegistry.register(makeUnitData({ id: 'mech_infantry', movement: 2, domain: 'land' }));
+      state.territories.get('a')!.units.push({ unitTypeId: 'mech_infantry', count: 1 });
 
       const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
       const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
@@ -166,18 +163,16 @@ describe('MovementValidator', () => {
       state.territories.set('sea1', sea);
       (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
 
-      const combatMoves = validator.getValidMoves('tank', 'a', true);
-      const nonCombatMoves = validator.getValidMoves('tank', 'a', false);
+      const combatMoves = validator.getValidMoves('mech_infantry', 'a', true);
+      const nonCombatMoves = validator.getValidMoves('mech_infantry', 'a', false);
 
       expect(combatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
       expect(nonCombatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
     });
 
     it('allows amphibious movement using coastal ports without transport ships', () => {
-      state.unitRegistry.register({
-        ...state.unitRegistry.get('tank')!.serialize(),
-        requiredTransport: true,
-      });
+      state.unitRegistry.register(makeUnitData({ id: 'mech_infantry', movement: 2, domain: 'land' }));
+      state.territories.get('a')!.units.push({ unitTypeId: 'mech_infantry', count: 1 });
 
       const island = makeTerritory('island', 'player', { type: 'coastal', adjacentTo: ['sea1'] });
       const sea = makeTerritory('sea1', null, { type: 'sea', production: 0, adjacentTo: ['a', 'island'] });
@@ -185,7 +180,7 @@ describe('MovementValidator', () => {
       state.territories.set('sea1', sea);
       (state.territories.get('a')!.adjacentTo as string[]).push('sea1');
 
-      const combatMoves = validator.getValidMoves('tank', 'a', true);
+      const combatMoves = validator.getValidMoves('mech_infantry', 'a', true);
       expect(combatMoves.find(m => m.territoryId === 'island')?.viaTransport).toBe('sea1');
     });
 

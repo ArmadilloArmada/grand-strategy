@@ -70,6 +70,9 @@ export class MapRenderer {
   private unitDrag: ActiveUnitDrag | null = null;
   private dragHoverTerritoryId: string | null = null;
   private dragHoverKind: UnitDropKind = 'invalid';
+  private activeCommandUnitTypeId: string | null = null;
+  private activeCommandUnitIcon: string = '';
+  private activeCommandDomain: 'land' | 'sea' | 'air' | null = null;
   private static readonly UNIT_DRAG_THRESHOLD = 8;
 
   // Valid move highlights
@@ -363,6 +366,7 @@ export class MapRenderer {
 
     this.drawDynamicTerritoryOverlays();
     this.drawSelectionGlow();
+    this.drawActiveCommandBadge();
     this.drawUnitDragOverlay();
 
     if (this.overlayMode === 'economic') {
@@ -703,6 +707,30 @@ export class MapRenderer {
     this.ctx.shadowBlur = 8 + pulse * 10;
     this.ctx.stroke();
     this.ctx.shadowBlur = 0;
+  }
+
+  /** Badge showing which unit type is armed for orders on the selected territory. */
+  private drawActiveCommandBadge(): void {
+    const id = this.state.selectedTerritoryId;
+    if (!id || !this.activeCommandUnitTypeId) return;
+    const territory = this.state.territories.get(id);
+    if (!territory) return;
+    const [cx, cy] = territory.center;
+    const label = this.activeCommandUnitIcon || '●';
+    this.ctx.save();
+    this.ctx.font = '16px sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    this.ctx.beginPath();
+    this.ctx.arc(cx + 14, cy - 14, 11, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = 'rgba(72, 220, 120, 0.9)';
+    this.ctx.lineWidth = 2;
+    this.ctx.stroke();
+    this.ctx.fillStyle = '#fff';
+    this.ctx.fillText(label, cx + 14, cy - 14);
+    this.ctx.restore();
   }
 
   /**
@@ -1507,7 +1535,7 @@ export class MapRenderer {
         } else if (this.attackTargets.has(territory.id)) {
           overlayColor = 'rgba(255,68,68,0.50)';
         } else if (this.validMoveTargets.has(territory.id)) {
-          overlayColor = 'rgba(68,255,68,0.40)';
+          overlayColor = this.getDomainMoveOverlayColor(this.activeCommandDomain, false);
         }
       } else if (isSea && this.options.highlightValidMoves) {
         if (this.coastalStrikeTargets.has(territory.id)) {
@@ -1515,7 +1543,7 @@ export class MapRenderer {
         } else if (this.attackTargets.has(territory.id)) {
           overlayColor = 'rgba(255,96,96,0.58)';
         } else if (this.validMoveTargets.has(territory.id)) {
-          overlayColor = 'rgba(56,189,248,0.52)';
+          overlayColor = this.getDomainMoveOverlayColor(this.activeCommandDomain, true);
         }
       }
 
@@ -1728,6 +1756,23 @@ export class MapRenderer {
   /**
    * Clear valid move highlights
    */
+  setActiveCommandStack(
+    unitTypeId: string | null,
+    icon = '',
+    domain: 'land' | 'sea' | 'air' | null = null,
+  ): void {
+    this.activeCommandUnitTypeId = unitTypeId;
+    this.activeCommandUnitIcon = icon;
+    this.activeCommandDomain = domain;
+    this.render();
+  }
+
+  private getDomainMoveOverlayColor(domain: 'land' | 'sea' | 'air' | null, onSea: boolean): string {
+    if (domain === 'air') return onSea ? 'rgba(167,139,250,0.58)' : 'rgba(167,139,250,0.46)';
+    if (domain === 'sea') return onSea ? 'rgba(56,189,248,0.58)' : 'rgba(34,211,238,0.42)';
+    return onSea ? 'rgba(56,189,248,0.52)' : 'rgba(68,255,68,0.40)';
+  }
+
   clearValidMoveTargets(): void {
     this.validMoveTargets.clear();
     this.attackTargets.clear();
@@ -2020,8 +2065,11 @@ export class MapRenderer {
       const hover = this.state.territories.get(this.dragHoverTerritoryId);
       if (hover) {
         const hoverScreen = this.worldToScreen(hover.center[0], hover.center[1]);
-        endX = hoverScreen.x;
-        endY = hoverScreen.y;
+        const dist = Math.hypot(hoverScreen.x - startX, hoverScreen.y - startY);
+        if (dist < rect.width * 0.55) {
+          endX = hoverScreen.x;
+          endY = hoverScreen.y;
+        }
       }
     }
 

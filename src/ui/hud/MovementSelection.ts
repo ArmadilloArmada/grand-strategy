@@ -1,4 +1,6 @@
 import type { ValidMove } from '../../engine/MovementValidator';
+import type { MovementValidator } from '../../engine/MovementValidator';
+import type { Territory } from '../../data/Territory';
 import type { UnitType } from '../../data/Unit';
 import { isFullAntiNavalStriker } from '../../engine/NavalSystem';
 
@@ -88,4 +90,58 @@ export function splitMoveAndAttackTargets(moves: ValidMove[]): {
   }
 
   return { moveTargets, attackTargets, coastalStrikeTargets };
+}
+
+function moveDedupeKey(move: ValidMove): string {
+  return [
+    move.territoryId,
+    move.isAttack ? 'a' : 'm',
+    move.coastalStrike ? 'c' : '',
+    move.rangedStrike ? 'r' : '',
+  ].join('|');
+}
+
+/** Union valid moves/attacks from every ready stack at a territory. */
+export function collectValidMovesForAllReadyStacks(
+  territory: Territory,
+  getMoves: (unitTypeId: string) => ValidMove[],
+  getAvailableCount: (unitTypeId: string) => number,
+): ValidMove[] {
+  const best = new Map<string, ValidMove>();
+
+  for (const pu of territory.units) {
+    const available = getAvailableCount(pu.unitTypeId);
+    if (available <= 0) continue;
+
+    for (const move of getMoves(pu.unitTypeId)) {
+      const tagged: ValidMove = { ...move, unitTypeId: pu.unitTypeId };
+      const key = moveDedupeKey(tagged);
+      const existing = best.get(key);
+      if (!existing) {
+        best.set(key, tagged);
+        continue;
+      }
+      const existingAvailable = existing.unitTypeId
+        ? getAvailableCount(existing.unitTypeId)
+        : 0;
+      if (available > existingAvailable || tagged.movementCost < existing.movementCost) {
+        best.set(key, tagged);
+      }
+    }
+  }
+
+  return [...best.values()];
+}
+
+export function resolveValidMoveAtTarget(
+  moves: ValidMove[],
+  territoryId: string,
+  kind: 'move' | 'attack' | 'any' = 'any',
+): ValidMove | undefined {
+  return moves.find(m => {
+    if (m.territoryId !== territoryId) return false;
+    if (kind === 'move') return !m.isAttack;
+    if (kind === 'attack') return m.isAttack;
+    return true;
+  });
 }

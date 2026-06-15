@@ -7,10 +7,13 @@ import { CombatResolver, CombatState } from '../engine/CombatResolver';
 import {
   countTerritoryDefendersIncludingOffshore,
   buildStrategicDefenderPreview,
-  computeEngageableAttackPower,
-  computeEngageableDefensePower,
   canLandUnitStrikeNaval,
 } from '../engine/NavalSystem';
+import {
+  computePreviewCombatTotals,
+  estimateVictoryChance,
+  type PreviewAttackerEntry,
+} from '../engine/combatPreviewOdds';
 import { getTerritoryNeighborIds } from '../engine/gridAdjacency';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { soundManager } from '../audio/SoundManager';
@@ -32,8 +35,9 @@ export interface CombatCallbacks {
   updateFactionPanel(): void;
   updateSelectionInfo(): void;
   updateActionButtons(): void;
-  afterUnitAction?: () => void;
+  afterUnitAction?: (fromId?: string, toId?: string) => void;
   getSelectedUnitType?: () => string | null;
+  getSelectedMoveCount?: () => number | null;
 }
 
 export interface BattlePreviewStats {
@@ -368,8 +372,12 @@ export class CombatUI {
   }
 
   finishCurrentCombat(): void {
+    let handoffFrom: string | undefined;
+    let handoffTo: string | undefined;
     if (this.activeCombat) {
       const combat = this.activeCombat;
+      handoffFrom = combat.sourceTerritory ?? undefined;
+      handoffTo = combat.territoryId;
       const sourceTerritory = combat.sourceTerritory ? this.state.territories.get(combat.sourceTerritory) : null;
       const targetTerritory = this.state.territories.get(combat.territoryId);
 
@@ -507,6 +515,11 @@ export class CombatUI {
     this.renderer.render();
     this.callbacks.renderMinimap();
     this.callbacks.updateFactionPanel();
+    if (handoffFrom) {
+      this.callbacks.afterUnitAction?.(handoffFrom, handoffTo);
+    } else {
+      this.callbacks.afterUnitAction?.();
+    }
     this.startNextCombat();
   }
 
@@ -819,41 +832,51 @@ export class CombatUI {
     if (territoryEl) territoryEl.textContent = territoryLabel;
 
     const selectedUnitType = this.callbacks.getSelectedUnitType?.() ?? null;
-    let artilleryCount = 0;
-    let infantryCount = 0;
+    const hqMoveCount = this.callbacks.getSelectedMoveCount?.() ?? null;
     const attackerUnitsEl = document.getElementById('preview-attacker-units');
-    let attackPower = 0;
     let attackerHtml = '';
-    const readyAttackers: { unitTypeId: string; count: number }[] = [];
+    const readyAttackers: PreviewAttackerEntry[] = [];
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (unitType && unitType.attack > 0) {
-        if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
-        const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
-        if (readyCount <= 0) continue;
-        readyAttackers.push({ unitTypeId: pu.unitTypeId, count: readyCount });
-        if (pu.unitTypeId === 'artillery') artilleryCount += readyCount;
-        if (pu.unitTypeId === 'infantry') infantryCount += readyCount;
-        const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
-        const actedCount = pu.count - readyCount;
-        const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
-        attackerHtml += `
+      if (!unitType || unitType.attack <= 0) continue;
+      if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
+      const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
+      if (readyCount <= 0) continue;
+      const defaultCount = selectedUnitType && pu.unitTypeId === selectedUnitType && hqMoveCount
+        ? Math.min(hqMoveCount, readyCount)
+        : readyCount;
+      readyAttackers.push({ unitTypeId: pu.unitTypeId, unitType, count: defaultCount });
+      const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
+      const actedCount = pu.count - readyCount;
+      const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
+      attackerHtml += `
           <div class="unit-select-row compact">
             <span class="unit-select-label">${icon} ${unitType.name}${actedText}<em>Atk ${unitType.attack}</em></span>
             <div class="unit-stepper compact">
               <button type="button" class="stepper-dec" data-uid="${pu.unitTypeId}">−</button>
               <input type="number" class="unit-count-input" data-unit-type-id="${pu.unitTypeId}"
-                value="${readyCount}" min="0" max="${readyCount}">
+                value="${defaultCount}" min="0" max="${readyCount}">
               <button type="button" class="stepper-inc" data-uid="${pu.unitTypeId}" data-max="${readyCount}">+</button>
             </div>
           </div>`;
-        attackPower += readyCount * unitType.attack;
-      }
     }
-    const boostedInfantry = Math.min(artilleryCount, infantryCount);
-    if (boostedInfantry > 0) {
-      attackerHtml += `<div class="preview-combat-note compact">🎯 Artillery +${boostedInfantry} atk</div>`;
-      attackPower += boostedInfantry;
+    const defendingFactionId = toTerritory.owner ?? '';
+    const defenderPreview = defendingFactionId
+      ? buildStrategicDefenderPreview(this.state, toTerritory.id, defendingFactionId)
+      : [];
+    const previewTotals = computePreviewCombatTotals(
+      this.state,
+      fromTerritory,
+      toTerritory,
+      readyAttackers,
+      defenderPreview,
+      this.state.getCurrentFaction()?.id ?? '',
+    );
+    if (previewTotals.artilleryBoost > 0) {
+      attackerHtml += `<div class="preview-combat-note compact">🎯 Artillery +${previewTotals.artilleryBoost} atk</div>`;
+    }
+    if (previewTotals.combinedArmsBonus > 0) {
+      attackerHtml += `<div class="preview-combat-note compact">⚔️ Combined arms +${previewTotals.combinedArmsBonus} atk</div>`;
     }
     if (attackerUnitsEl) {
       attackerUnitsEl.innerHTML = attackerHtml || '<em>No units</em>';
@@ -879,56 +902,29 @@ export class CombatUI {
     }
 
     const defenderUnitsEl = document.getElementById('preview-defender-units');
-    let defensePower = 0;
     let defenderHtml = '';
-    const defendingFactionId = toTerritory.owner ?? '';
-    const defenderPreview = defendingFactionId
-      ? buildStrategicDefenderPreview(this.state, toTerritory.id, defendingFactionId)
-      : [];
-    const defenderPowerUnits = defenderPreview.map(entry => ({
-      unitType: entry.unitType,
-      count: entry.count,
-    }));
-
     for (const entry of defenderPreview) {
       const icon = UNIT_ICONS[entry.unitType.id] || '⬜';
       const offshoreLabel = entry.offshore
         ? ` <small class="preview-muted">(offshore${entry.seaZoneName ? `: ${entry.seaZoneName}` : ''})</small>`
         : '';
       defenderHtml += `<div class="preview-defender-row"><span>${icon} ${entry.count}× ${entry.unitType.name}${offshoreLabel}</span><em>Def ${entry.unitType.defense}</em></div>`;
-      defensePower += entry.count * entry.unitType.defense;
     }
     if (toTerritory.isCapital || toTerritory.hasFactory) {
       defenderHtml += `<div class="preview-combat-note compact warn">🏰 +1 def round 1</div>`;
     }
     if (defenderUnitsEl) defenderUnitsEl.innerHTML = defenderHtml || '<em>Undefended!</em>';
 
-    let effectiveDefense = defensePower;
-    if (toTerritory.isCapital || toTerritory.hasFactory) {
-      effectiveDefense += defenderPreview.reduce((sum, entry) => sum + entry.count, 0);
-    }
-
-    const attackerPowerUnits = readyAttackers
-      .map(entry => {
-        const unitType = this.state.unitRegistry.get(entry.unitTypeId);
-        return unitType ? { unitType, count: entry.count } : null;
-      })
-      .filter((entry): entry is { unitType: import('../data/Unit').UnitType; count: number } => !!entry);
-
-    const engageableAttackPower = computeEngageableAttackPower(attackerPowerUnits, defenderPowerUnits);
-    const engageableDefensePower = computeEngageableDefensePower(defenderPowerUnits, attackerPowerUnits);
-    const domainNote = this.buildDomainCombatNote(attackerPowerUnits, defenderPowerUnits);
-
     const previewStats = this.calculateBattlePreviewStats(
-      readyAttackers,
+      readyAttackers.map(a => ({ unitTypeId: a.unitTypeId, count: a.count })),
       defenderPreview.map(entry => ({ unitTypeId: entry.unitType.id, count: entry.count })),
-      engageableAttackPower || attackPower,
-      engageableDefensePower || defensePower,
-      effectiveDefense,
+      previewTotals,
     );
     const attackPowerEl = document.getElementById('preview-attacker-power');
     if (attackPowerEl) {
-      const muted = engageableAttackPower < attackPower ? ` <small class="preview-muted">(${attackPower} raw)</small>` : '';
+      const muted = previewTotals.engageableAttackPower < previewTotals.rawAttackPower
+        ? ` <small class="preview-muted">(${previewTotals.rawAttackPower} raw)</small>`
+        : '';
       attackPowerEl.innerHTML = `Atk ${previewStats.attackPower}${muted} · ~${previewStats.expectedAttackerHits.toFixed(1)} hits`;
     }
 
@@ -936,9 +932,16 @@ export class CombatUI {
     if (defensePowerEl) {
       const bonusText = previewStats.effectiveDefense > previewStats.defensePower
         ? ` (${previewStats.effectiveDefense} eff.)` : '';
-      const muted = engageableDefensePower < defensePower ? ` <small class="preview-muted">(${defensePower} raw)</small>` : '';
+      const muted = previewTotals.engageableDefensePower < previewTotals.rawDefensePower
+        ? ` <small class="preview-muted">(${previewTotals.rawDefensePower} raw)</small>`
+        : '';
       defensePowerEl.innerHTML = `Def ${previewStats.defensePower}${bonusText}${muted} · ~${previewStats.expectedDefenderHits.toFixed(1)} hits`;
     }
+
+    const domainNote = this.buildDomainCombatNote(
+      readyAttackers.map(a => ({ unitType: a.unitType, count: a.count })),
+      defenderPreview.map(d => ({ unitType: d.unitType, count: d.count })),
+    );
 
     if (domainNote) {
       defenderHtml += domainNote;
@@ -960,14 +963,12 @@ export class CombatUI {
 
     function updatePreviewFromInputs(): void {
       if (!attackerUnitsEl) return;
-      const selectedAttackers: { unitTypeId: string; count: number }[] = [];
-      let recalculatedAttackPower = 0;
-      let selectedArtillery = 0;
-      let selectedInfantry = 0;
+      const selectedAttackers: PreviewAttackerEntry[] = [];
 
       for (const pu of sourceTerritory.units) {
-        const unitType = (thisRef.state.unitRegistry.get(pu.unitTypeId));
+        const unitType = thisRef.state.unitRegistry.get(pu.unitTypeId);
         if (!unitType || unitType.attack <= 0) continue;
+        if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
         const readyCount = sourceTerritory.getAvailableUnitCount(pu.unitTypeId);
         const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
         const count = input
@@ -975,39 +976,33 @@ export class CombatUI {
           : readyCount;
         if (input && Number(input.value) !== count) input.value = String(count);
         if (count <= 0) continue;
-        selectedAttackers.push({ unitTypeId: pu.unitTypeId, count });
-        recalculatedAttackPower += count * unitType.attack;
-        if (pu.unitTypeId === 'artillery') selectedArtillery += count;
-        if (pu.unitTypeId === 'infantry') selectedInfantry += count;
+        selectedAttackers.push({ unitTypeId: pu.unitTypeId, unitType, count });
       }
 
-      recalculatedAttackPower += Math.min(selectedArtillery, selectedInfantry);
-      const selectedPowerUnits = selectedAttackers
-        .map(entry => {
-          const unitType = thisRef.state.unitRegistry.get(entry.unitTypeId);
-          return unitType ? { unitType, count: entry.count } : null;
-        })
-        .filter((entry): entry is { unitType: import('../data/Unit').UnitType; count: number } => !!entry);
-      const nextEngageableAttack = computeEngageableAttackPower(selectedPowerUnits, defenderPowerUnits);
-      const nextEngageableDefense = computeEngageableDefensePower(defenderPowerUnits, selectedPowerUnits);
-      const nextStats = thisRef.calculateBattlePreviewStats(
+      const nextTotals = computePreviewCombatTotals(
+        thisRef.state,
+        sourceTerritory,
+        targetTerritory,
         selectedAttackers,
+        defenderPreview,
+        thisRef.state.getCurrentFaction()?.id ?? '',
+      );
+      const nextStats = thisRef.calculateBattlePreviewStats(
+        selectedAttackers.map(a => ({ unitTypeId: a.unitTypeId, count: a.count })),
         defenderPreview.map(entry => ({ unitTypeId: entry.unitType.id, count: entry.count })),
-        nextEngageableAttack || recalculatedAttackPower,
-        nextEngageableDefense || defensePower,
-        effectiveDefense,
+        nextTotals,
       );
       if (attackPowerEl) {
-        const muted = nextEngageableAttack < recalculatedAttackPower
-          ? ` <small class="preview-muted">(${recalculatedAttackPower} raw)</small>`
+        const muted = nextTotals.engageableAttackPower < nextTotals.rawAttackPower
+          ? ` <small class="preview-muted">(${nextTotals.rawAttackPower} raw)</small>`
           : '';
         attackPowerEl.innerHTML = `Atk ${nextStats.attackPower}${muted} · ~${nextStats.expectedAttackerHits.toFixed(1)} hits`;
       }
       if (defensePowerEl) {
         const bonusText = nextStats.effectiveDefense > nextStats.defensePower
           ? ` (${nextStats.effectiveDefense} eff.)` : '';
-        const muted = nextEngageableDefense < defensePower
-          ? ` <small class="preview-muted">(${defensePower} raw)</small>`
+        const muted = nextTotals.engageableDefensePower < nextTotals.rawDefensePower
+          ? ` <small class="preview-muted">(${nextTotals.rawDefensePower} raw)</small>`
           : '';
         defensePowerEl.innerHTML = `Def ${nextStats.defensePower}${bonusText}${muted} · ~${nextStats.expectedDefenderHits.toFixed(1)} hits`;
       }
@@ -1217,15 +1212,28 @@ export class CombatUI {
   calculateBattlePreviewStats(
     attackerUnits: { unitTypeId: string; count: number }[],
     defenderUnits: { unitTypeId: string; count: number }[],
-    attackPower: number,
-    defensePower: number,
-    effectiveDefense: number
+    totals: import('../engine/combatPreviewOdds').PreviewCombatTotals,
   ): BattlePreviewStats {
     const attackerUnitCount = attackerUnits.reduce((sum, unit) => sum + unit.count, 0);
     const defenderUnitCount = defenderUnits.reduce((sum, unit) => sum + unit.count, 0);
-    const odds = this.calculateBattleOdds(attackPower, effectiveDefense);
-    const expectedAttackerHits = attackPower / 6;
-    const expectedDefenderHits = effectiveDefense / 6;
+    const attackPower = totals.effectiveAttackPower;
+    const defensePower = totals.engageableDefensePower > 0
+      ? totals.engageableDefensePower
+      : totals.rawDefensePower;
+    const effectiveDefense = totals.effectiveDefensePower;
+    const diceSides = this.state.rules.diceSides ?? 6;
+
+    const odds = estimateVictoryChance(
+      attackPower,
+      effectiveDefense,
+      attackerUnitCount,
+      defenderUnitCount,
+      totals.expectedPreCombatDefenderHits,
+      totals.expectedPreCombatAttackerHits,
+      diceSides,
+    );
+    const expectedAttackerHits = attackPower / diceSides + totals.expectedPreCombatDefenderHits;
+    const expectedDefenderHits = effectiveDefense / diceSides + totals.expectedPreCombatAttackerHits;
 
     let riskLabel = 'Balanced fight';
     let riskClass: BattlePreviewStats['riskClass'] = 'even';
@@ -1266,9 +1274,11 @@ export class CombatUI {
         ? `Avoid unless the target is decisive or reinforced. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`
         : `Caution: this can trade either way. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`;
 
-    const swingFactors: string[] = [];
+    const swingFactors: string[] = [...totals.modifierSwingFactors];
     if (defenderUnitCount === 0) swingFactors.push('No defenders');
-    if (effectiveDefense > defensePower) swingFactors.push(`Defense bonus +${effectiveDefense - defensePower}`);
+    if (effectiveDefense > defensePower && !swingFactors.some(f => f.startsWith('Terrain/fort'))) {
+      swingFactors.push(`Defense bonus +${effectiveDefense - defensePower}`);
+    }
     if (expectedAttackerHits >= defenderUnitCount && defenderUnitCount > 0) swingFactors.push('Possible one-round clear');
     if (expectedDefenderHits >= attackerUnitCount && attackerUnitCount > 0) swingFactors.push('Attack force could be wiped');
     if (attackPower >= effectiveDefense * 2 && defenderUnitCount > 0) swingFactors.push('Power advantage');
@@ -1291,16 +1301,9 @@ export class CombatUI {
     };
   }
 
+  /** @deprecated Use estimateVictoryChance — kept for tests that pass raw power pairs. */
   calculateBattleOdds(attackPower: number, defensePower: number): number {
-    if (defensePower === 0) return 0.95;
-    const ratio = attackPower / defensePower;
-    if (ratio >= 3) return 0.95;
-    if (ratio >= 2) return 0.85;
-    if (ratio >= 1.5) return 0.70;
-    if (ratio >= 1) return 0.50;
-    if (ratio >= 0.75) return 0.35;
-    if (ratio >= 0.5) return 0.20;
-    return 0.10;
+    return estimateVictoryChance(attackPower, defensePower, 1, defensePower > 0 ? 1 : 0, 0, 0);
   }
 
   confirmAttackFromPreview(autoResolve = false, tactical = false): void {
@@ -1373,7 +1376,7 @@ export class CombatUI {
       }
       this.renderer.render();
       this.callbacks.renderMinimap();
-      this.callbacks.afterUnitAction?.();
+      this.callbacks.afterUnitAction?.(fromTerritory.id, toTerritory.id);
       return;
     }
 

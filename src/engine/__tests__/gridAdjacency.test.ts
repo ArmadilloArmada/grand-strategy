@@ -30,8 +30,9 @@ describe('gridAdjacency horizontal wrap', () => {
     state.territories.set('west', west);
     state.territories.set('east', east);
 
-    expect(getGridNeighborIds(state, west)).toContain('east');
-    expect(getGridNeighborIds(state, east)).toContain('west');
+    expect(getGridNeighborIds(state, west, { allowHorizontalWrap: true })).toContain('east');
+    expect(getGridNeighborIds(state, east, { allowHorizontalWrap: true })).toContain('west');
+    expect(getGridNeighborIds(state, west)).not.toContain('east');
   });
 });
 

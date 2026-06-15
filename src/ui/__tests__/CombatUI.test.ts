@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CombatUI } from '../CombatUI';
 import { GameState } from '../../engine/GameState';
 import { CombatResolver } from '../../engine/CombatResolver';
+import type { PreviewCombatTotals } from '../../engine/combatPreviewOdds';
 
 function makeCombatUI(): CombatUI {
   const state = new GameState();
@@ -19,6 +20,31 @@ function makeCombatUI(): CombatUI {
   );
 }
 
+function previewTotals(
+  attackPower: number,
+  defensePower: number,
+  effectiveDefense: number,
+): PreviewCombatTotals {
+  return {
+    rawAttackPower: attackPower,
+    rawDefensePower: defensePower,
+    engageableAttackPower: attackPower,
+    engageableDefensePower: defensePower,
+    artilleryBoost: 0,
+    combinedArmsBonus: 0,
+    defenderTerrainBonus: 0,
+    defenderFortBonus: 0,
+    defenderPrepBonus: 0,
+    effectiveAttackPower: attackPower,
+    effectiveDefensePower: effectiveDefense,
+    expectedPreCombatDefenderHits: 0,
+    expectedPreCombatAttackerHits: 0,
+    modifierSwingFactors: effectiveDefense > defensePower
+      ? [`Terrain/fort +${effectiveDefense - defensePower}`]
+      : [],
+  };
+}
+
 describe('CombatUI strategic bombing', () => {
   it('splits bombers evenly across factory targets', () => {
     expect(CombatUI.allocateBombersAcrossTargets(10, 3)).toEqual([4, 3, 3]);
@@ -33,12 +59,10 @@ describe('CombatUI preview stats', () => {
     const stats = ui.calculateBattlePreviewStats(
       [{ unitTypeId: 'tank', count: 3 }],
       [{ unitTypeId: 'infantry', count: 1 }],
-      9,
-      2,
-      2
+      previewTotals(9, 2, 2),
     );
 
-    expect(stats.odds).toBe(0.95);
+    expect(stats.odds).toBeGreaterThanOrEqual(0.88);
     expect(stats.riskLabel).toBe('Overwhelming attack');
     expect(stats.riskClass).toBe('good');
     expect(stats.expectedAttackerHits).toBe(1.5);
@@ -52,12 +76,10 @@ describe('CombatUI preview stats', () => {
     const stats = ui.calculateBattlePreviewStats(
       [{ unitTypeId: 'infantry', count: 1 }],
       [{ unitTypeId: 'tank', count: 3 }],
-      1,
-      9,
-      9
+      previewTotals(1, 9, 9),
     );
 
-    expect(stats.odds).toBe(0.1);
+    expect(stats.odds).toBeLessThanOrEqual(0.2);
     expect(stats.riskLabel).toBe('High-risk attack');
     expect(stats.riskClass).toBe('bad');
     expect(stats.riskDetail).toContain('first round');
@@ -70,12 +92,10 @@ describe('CombatUI preview stats', () => {
     const stats = ui.calculateBattlePreviewStats(
       [{ unitTypeId: 'infantry', count: 3 }],
       [{ unitTypeId: 'infantry', count: 2 }],
-      3,
-      4,
-      6
+      previewTotals(3, 4, 6),
     );
 
-    expect(stats.swingFactors).toContain('Defense bonus +2');
+    expect(stats.swingFactors).toContain('Terrain/fort +2');
   });
 });
 
@@ -85,9 +105,7 @@ describe('CombatUI tactical recommendations', () => {
     const stats = ui.calculateBattlePreviewStats(
       [{ unitTypeId: 'infantry', count: 2 }],
       [{ unitTypeId: 'infantry', count: 2 }],
-      2,
-      4,
-      6,
+      previewTotals(2, 4, 6),
     );
 
     expect(ui.isTacticalRecommended(stats, { isCapital: true })).toBe(true);
@@ -98,18 +116,17 @@ describe('CombatUI tactical recommendations', () => {
     const stats = ui.calculateBattlePreviewStats(
       [{ unitTypeId: 'infantry', count: 2 }],
       [{ unitTypeId: 'infantry', count: 2 }],
-      2,
-      2,
-      2,
+      previewTotals(2, 2, 2),
     );
 
-    expect(stats.odds).toBe(0.5);
+    expect(stats.odds).toBeGreaterThanOrEqual(0.4);
+    expect(stats.odds).toBeLessThanOrEqual(0.55);
     expect(ui.isTacticalRecommended(stats, {})).toBe(true);
   });
 
   it('skips tactical recommendation for unopposed captures', () => {
     const ui = makeCombatUI();
-    const stats = ui.calculateBattlePreviewStats([], [], 0, 0, 0);
+    const stats = ui.calculateBattlePreviewStats([], [], previewTotals(0, 0, 0));
 
     expect(ui.isTacticalRecommended(stats, { hasFactory: true })).toBe(false);
   });

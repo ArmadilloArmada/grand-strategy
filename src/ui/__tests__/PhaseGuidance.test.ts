@@ -122,6 +122,34 @@ describe('PhaseGuidance', () => {
     });
 
     expect(tip?.tipId).toBe('mobilize');
-    expect(document.getElementById('context-helper-text')?.textContent).toMatch(/transport/i);
+    expect(document.getElementById('context-helper-text')?.textContent).toMatch(/self-embark|marines/i);
+  });
+
+  it('hints at all-unit-types mode for mixed stacks', () => {
+    const { state, guidance } = makeGuidance();
+    document.body.innerHTML = `
+      <div id="context-helper" class="context-helper">
+        <span id="context-helper-text"></span>
+      </div>
+    `;
+    state.territories.get('washington')!.addUnits('infantry', 3);
+    state.territories.get('washington')!.addUnits('tank', 2);
+
+    const tip = guidance.updateContextHelper({
+      phase: 'move',
+      faction: state.factionRegistry.get('atlantic_alliance'),
+      territory: state.territories.get('washington'),
+      isHumanTurn: true,
+      isBuildPhase: false,
+      isMovementPhase: true,
+      isCombatPhase: false,
+      isEndPhase: false,
+      activeStackLabel: 'Washington: All unit types (2 move, 0 attack)',
+      selectAllTypes: true,
+      readyStackCount: 2,
+    });
+
+    expect(tip?.tipId).toBe('movement');
+    expect(tip?.message).toMatch(/All unit types selected/i);
   });
 });

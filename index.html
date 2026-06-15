@@ -193,11 +193,21 @@
         <div class="rba-group rba-right">
           <button id="btn-end-phase" class="rba-end-btn" aria-label="End current phase">➡️ End Phase</button>
           <div class="btn-separator"></div>
-          <button id="btn-research" title="Research technologies" aria-label="Research">🔬<span class="btn-label"> Tech</span></button>
-          <button id="btn-diplomacy" title="Diplomatic relations" aria-label="Diplomacy">🤝<span class="btn-label"> Diplo</span></button>
-          <button id="btn-espionage" title="Espionage operations" aria-label="Espionage">🕵️<span class="btn-label"> Spy</span></button>
-          <button id="btn-nuclear" class="hidden" title="Launch nuclear strike" aria-label="Nuclear">☢️<span class="btn-label"> Nuke</span></button>
-          <button id="btn-stats" title="View statistics" aria-label="Stats">📊<span class="btn-label"> Stats</span></button>
+          <div class="advanced-menu-wrap">
+            <button id="btn-advanced-menu" type="button" title="Advanced commands" aria-label="Advanced menu" aria-expanded="false" aria-haspopup="true">Advanced ▾</button>
+            <div id="advanced-menu-dropdown" class="advanced-menu-dropdown hidden" role="menu">
+              <button type="button" role="menuitem" data-advanced-action="tech">🔬 Tech</button>
+              <button type="button" role="menuitem" data-advanced-action="diplomacy">🤝 Diplomacy</button>
+              <button type="button" role="menuitem" data-advanced-action="espionage">🕵️ Espionage</button>
+              <button type="button" role="menuitem" data-advanced-action="stats">📊 Stats</button>
+              <button type="button" role="menuitem" data-advanced-action="nuclear" class="hidden">☢️ Nuclear</button>
+            </div>
+          </div>
+          <button id="btn-research" class="rba-advanced-source hidden" title="Research technologies" aria-label="Research" tabindex="-1">🔬<span class="btn-label"> Tech</span></button>
+          <button id="btn-diplomacy" class="rba-advanced-source hidden" title="Diplomatic relations" aria-label="Diplomacy" tabindex="-1">🤝<span class="btn-label"> Diplo</span></button>
+          <button id="btn-espionage" class="rba-advanced-source hidden" title="Espionage operations" aria-label="Espionage" tabindex="-1">🕵️<span class="btn-label"> Spy</span></button>
+          <button id="btn-nuclear" class="hidden rba-advanced-source" title="Launch nuclear strike" aria-label="Nuclear" tabindex="-1">☢️<span class="btn-label"> Nuke</span></button>
+          <button id="btn-stats" class="rba-advanced-source hidden" title="View statistics" aria-label="Stats" tabindex="-1">📊<span class="btn-label"> Stats</span></button>
           <button id="btn-theme-toggle" title="Toggle theme" aria-label="Theme">◑</button>
           <div class="btn-separator"></div>
           <button id="btn-menu" title="Main menu" aria-label="Menu">☰ Menu</button>
