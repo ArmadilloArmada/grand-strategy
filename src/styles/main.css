@@ -921,19 +921,28 @@ body {
 }
 
 .advanced-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 500;
+  position: fixed;
+  z-index: 400;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 10.5rem;
-  padding: 0.35rem;
+  min-width: 11.5rem;
+  padding: 0.4rem;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.96);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.advanced-menu-dropdown::before {
+  content: 'Optional commands';
+  display: block;
+  padding: 0.2rem 0.55rem 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
 }
 
 .advanced-menu-dropdown button {
@@ -4070,8 +4079,7 @@ body.theme-dark .preview-odds-caption {
 }
 
 #hq-panel #territory-unit-selector {
-  margin-top: 0.35rem;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0;
 }
 
 #war-room-panel #war-room-unit-slot .unit-stack-selector-body {
@@ -8772,12 +8780,40 @@ body.theme-dark .panel-grip {
 }
 
 #hq-content {
-  overflow-y: auto;
+  overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  min-height: 0;
+  gap: 0;
   padding: 0.6rem;
+}
+
+.hq-pinned {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+}
+
+.hq-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(201, 162, 39, 0.14);
+}
+
+#hq-scroll::-webkit-scrollbar { width: 4px; }
+#hq-scroll::-webkit-scrollbar-track { background: transparent; }
+#hq-scroll::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.3);
+  border-radius: 2px;
 }
 
 #hq-content::-webkit-scrollbar { width: 4px; }
@@ -8824,14 +8860,23 @@ body.theme-dark .panel-grip {
   z-index: auto !important;
 }
 
-/* Territory section */
+/* Territory section — name + stats always visible; only stack picker scrolls */
 #hq-panel #selection-info {
-  max-height: 32vh;
-  overflow-y: auto;
-  background: transparent;
+  max-height: none !important;
+  overflow: visible;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgba(8, 16, 32, 0.98);
   border: none;
   box-shadow: none;
   padding: 0;
+}
+
+#hq-panel #selection-info .war-room-section-title,
+#hq-panel #territory-name {
+  flex-shrink: 0;
 }
 
 #hq-panel #territory-name {
@@ -8841,6 +8886,17 @@ body.theme-dark .panel-grip {
 
 #hq-panel #territory-details {
   font-size: 0.74rem;
+  flex-shrink: 0;
+  overflow: visible;
+  max-height: none;
+}
+
+#hq-panel #territory-unit-selector {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(24vh, 220px);
+  overflow-y: auto;
+  margin-top: 0.35rem;
 }
 
 /* Ability section items */

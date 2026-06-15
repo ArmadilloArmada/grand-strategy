@@ -904,7 +904,10 @@ export class HUD {
   private setupHQLayout(): void {
     // Skip only on very narrow viewports; keep HQ Hub enabled on most laptop widths.
     if (window.innerWidth <= 700) return;
-    if (document.getElementById('hq-panel')) return;
+    if (document.getElementById('hq-panel')) {
+      this.migrateHQLayoutIfNeeded();
+      return;
+    }
 
     const panel = document.createElement('aside');
     panel.id = 'hq-panel';
@@ -919,18 +922,27 @@ export class HUD {
 
     const content = panel.querySelector('#hq-content') as HTMLElement;
 
+    const pinned = document.createElement('div');
+    pinned.id = 'hq-pinned';
+    pinned.className = 'hq-pinned';
+    const scroll = document.createElement('div');
+    scroll.id = 'hq-scroll';
+    scroll.className = 'hq-scroll';
+    content.appendChild(pinned);
+    content.appendChild(scroll);
+
     // MINIMAP — top of HQ panel, giving a tactical overview at all times
     const minimap = document.getElementById('minimap-container');
     if (minimap) {
-      content.appendChild(minimap);
+      pinned.appendChild(minimap);
     }
 
     // RECAP SLOT — turn/phase recap cards render here instead of floating over screen
     const recapSlot = document.createElement('div');
     recapSlot.id = 'hq-recap-slot';
-    content.appendChild(recapSlot);
+    pinned.appendChild(recapSlot);
 
-    // TERRITORY section — move #selection-info into HQ
+    // TERRITORY section — move #selection-info into HQ (always visible above scroll region)
     const selection = document.getElementById('selection-info');
     if (selection) {
       selection.removeAttribute('style');
@@ -941,7 +953,7 @@ export class HUD {
         t.textContent = 'Territory';
         selection.prepend(t);
       }
-      content.appendChild(selection);
+      pinned.appendChild(selection);
     }
 
     // ABILITY section — wrap supply indicator + faction ability
@@ -956,13 +968,13 @@ export class HUD {
     if (supply) { supply.removeAttribute('style'); abilityWrap.appendChild(supply); }
     const ability = document.getElementById('faction-ability-container');
     if (ability) { ability.removeAttribute('style'); abilityWrap.appendChild(ability); }
-    content.appendChild(abilityWrap);
+    scroll.appendChild(abilityWrap);
 
     // BATTLE LOG section — move #battle-log-panel into HQ, expanded by default
     const blog = document.getElementById('battle-log-panel');
     if (blog) {
       blog.removeAttribute('style');
-      content.appendChild(blog);
+      scroll.appendChild(blog);
     }
     battleLog.setCollapsed(false);
 
@@ -972,6 +984,31 @@ export class HUD {
     });
 
     this.syncToastContainerDock();
+  }
+
+  /** Move ability + battle log into the scroll region on older HQ layouts. */
+  private migrateHQLayoutIfNeeded(): void {
+    const content = document.getElementById('hq-content');
+    if (!content || document.getElementById('hq-scroll')) return;
+
+    const pinned = document.createElement('div');
+    pinned.id = 'hq-pinned';
+    pinned.className = 'hq-pinned';
+    const scroll = document.createElement('div');
+    scroll.id = 'hq-scroll';
+    scroll.className = 'hq-scroll';
+    content.appendChild(pinned);
+    content.appendChild(scroll);
+
+    for (const child of Array.from(content.children)) {
+      if (child === pinned || child === scroll) continue;
+      const el = child as HTMLElement;
+      if (el.id === 'hq-ability-section' || el.id === 'battle-log-panel') {
+        scroll.appendChild(el);
+      } else {
+        pinned.appendChild(el);
+      }
+    }
   }
 
   fitMapToCommandLayout(): void {
