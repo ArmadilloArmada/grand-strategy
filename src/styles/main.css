@@ -10096,17 +10096,9 @@ body.theme-dark .panel-grip {
 
 /* Icon-only utility buttons: emoji-square style */
 /* redo stays icon-only (JS never overwrites it with long text) */
-#action-buttons #btn-redo      .btn-label,
-#action-buttons #btn-research  .btn-label,
-#action-buttons #btn-diplomacy .btn-label,
-#action-buttons #btn-espionage .btn-label,
-#action-buttons #btn-stats     .btn-label { display: none !important; }
+#action-buttons #btn-redo .btn-label { display: none !important; }
 
 #action-buttons #btn-redo,
-#action-buttons #btn-research,
-#action-buttons #btn-diplomacy,
-#action-buttons #btn-espionage,
-#action-buttons #btn-stats,
 #action-buttons #btn-theme-toggle {
   width:  clamp(22px, 2.2vw, 28px) !important;
   height: clamp(22px, 2.2vw, 28px) !important;
@@ -10121,6 +10113,15 @@ body.theme-dark .panel-grip {
   border: 1px solid rgba(255,255,255,0.13) !important;
   color: #e5e7eb !important;
   border-radius: 5px !important;
+}
+
+/* Tech / diplo / spy / stats live only in the More menu — keep legacy buttons for JS hooks */
+#action-buttons #btn-research.rba-advanced-source,
+#action-buttons #btn-diplomacy.rba-advanced-source,
+#action-buttons #btn-espionage.rba-advanced-source,
+#action-buttons #btn-stats.rba-advanced-source,
+#action-buttons #btn-nuclear.rba-advanced-source {
+  display: none !important;
 }
 
 /* Keep icon utility buttons readable in both light and dark themes. */

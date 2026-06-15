@@ -94,6 +94,7 @@ export function splitMoveAndAttackTargets(moves: ValidMove[]): {
 
 function moveDedupeKey(move: ValidMove): string {
   return [
+    move.unitTypeId ?? '',
     move.territoryId,
     move.isAttack ? 'a' : 'm',
     move.coastalStrike ? 'c' : '',
@@ -144,4 +145,25 @@ export function resolveValidMoveAtTarget(
     if (kind === 'attack') return m.isAttack;
     return true;
   });
+}
+
+/** Every ready stack that can reach the target (all-types command mode). */
+export function resolveAllValidMovesAtTarget(
+  moves: ValidMove[],
+  territoryId: string,
+  kind: 'move' | 'attack' | 'any' = 'any',
+): ValidMove[] {
+  const seen = new Set<string>();
+  const result: ValidMove[] = [];
+
+  for (const move of moves) {
+    if (move.territoryId !== territoryId) continue;
+    if (kind === 'move' && move.isAttack) continue;
+    if (kind === 'attack' && !move.isAttack) continue;
+    if (!move.unitTypeId || seen.has(move.unitTypeId)) continue;
+    seen.add(move.unitTypeId);
+    result.push(move);
+  }
+
+  return result;
 }

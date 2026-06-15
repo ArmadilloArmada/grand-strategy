@@ -429,7 +429,7 @@ class Game {
       <div class="scenario-briefing-card">
         <div class="scenario-briefing-kicker">Simple Campaign</div>
         <h2>Your First Command</h2>
-        <p class="scenario-briefing-subtitle">Three phases per turn — Build, Move, End. The Co-Pilot will guide each step.</p>
+        <p class="scenario-briefing-subtitle">One command phase per turn — mobilize, move, attack, then End Turn. The Co-Pilot will guide each step.</p>
         <div class="scenario-briefing-goals">
           <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
           <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack.</strong></div>

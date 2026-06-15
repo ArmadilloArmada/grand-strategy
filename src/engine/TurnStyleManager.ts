@@ -32,8 +32,8 @@ export function getPhasesForStyle(style: TurnStyle): string[] {
       ];
 
     case "quick":
-      // Simplified 3-phase system - combat happens during move
-      return ["build", "move", "end"];
+      // One command phase (mobilize + move + attack), then end turn
+      return ["play", "end"];
 
     case "civilization":
       // Civ-style: units move OR attack
@@ -76,6 +76,7 @@ export function getPhaseDisplayName(phase: string, _style: TurnStyle): string {
     build: "⚔️ Mobilize Forces",
     move: "🚶 Move Units",
     attack: "⚔️ Attack Enemies",
+    play: "⚔️ Command Forces",
     end: "💵 End Turn & Collect",
 
     // Civ phases
@@ -128,6 +129,8 @@ export function isMoveForMoveStyle(style: TurnStyle): boolean {
 export function getPhaseTip(phase: string, style: TurnStyle): string {
   if (style === "quick") {
     switch (phase) {
+      case "play":
+        return "Mobilize (🏭), move units, and attack enemies — then End Turn";
       case "build":
         return "Click territories to mobilize defenders";
       case "move":

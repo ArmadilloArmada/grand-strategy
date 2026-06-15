@@ -10,7 +10,7 @@ export type GameMode = 'vs-ai' | 'hotseat';
  */
 export type TurnStyle = 
   | 'classic'      // 6-phase TripleA style
-  | 'quick'        // Simplified: Build → Move → Attack → End
+  | 'quick'        // Simplified: Command (build/move/attack) → End
   | 'spectator'    // Pause between each AI turn
   | 'action'       // Pause after every move/attack
   | 'civilization' // Each unit moves OR attacks once per turn
@@ -20,7 +20,7 @@ export type TurnStyle =
 export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: string; icon: string }> = {
   quick: {
     name: 'Simple',
-    description: '3 phases: Build → Move/Attack → End. Best for beginners!',
+    description: 'One command phase: mobilize, move, and attack freely — then End Turn.',
     icon: '⚡'
   },
   classic: {

@@ -4,6 +4,8 @@ import {
   resolveHighlightedMoveUnitType,
   isRangedStrikeUnit,
   getRangedUnitActionHint,
+  resolveAllValidMovesAtTarget,
+  collectValidMovesForAllReadyStacks,
 } from '../hud/MovementSelection';
 import type { ValidMove } from '../../engine/MovementValidator';
 
@@ -131,6 +133,56 @@ describe('MovementSelection', () => {
         validMovesUnitTypeId: null,
         selectedUnitType: 'tank',
       })).toBe('tank');
+    });
+  });
+
+  describe('resolveAllValidMovesAtTarget', () => {
+    it('returns one move per ready stack that can reach the tile', () => {
+      const moves: ValidMove[] = [
+        { territoryId: 'next', path: ['home', 'next'], movementCost: 1, isAttack: false, unitTypeId: 'infantry' },
+        { territoryId: 'next', path: ['home', 'next'], movementCost: 1, isAttack: false, unitTypeId: 'tank' },
+        { territoryId: 'far', path: ['home', 'mid', 'far'], movementCost: 2, isAttack: false, unitTypeId: 'fighter' },
+      ];
+
+      expect(resolveAllValidMovesAtTarget(moves, 'next', 'move').map(m => m.unitTypeId)).toEqual([
+        'infantry',
+        'tank',
+      ]);
+    });
+
+    it('filters by move vs attack intent', () => {
+      const moves: ValidMove[] = [
+        { territoryId: 'enemy', path: ['home', 'enemy'], movementCost: 1, isAttack: true, unitTypeId: 'infantry' },
+        { territoryId: 'enemy', path: ['home', 'enemy'], movementCost: 1, isAttack: false, unitTypeId: 'tank' },
+      ];
+
+      expect(resolveAllValidMovesAtTarget(moves, 'enemy', 'move').map(m => m.unitTypeId)).toEqual(['tank']);
+      expect(resolveAllValidMovesAtTarget(moves, 'enemy', 'attack').map(m => m.unitTypeId)).toEqual(['infantry']);
+    });
+  });
+
+  describe('collectValidMovesForAllReadyStacks', () => {
+    it('keeps one entry per unit type that can reach the same tile', () => {
+      const territory = {
+        units: [
+          { unitTypeId: 'infantry', count: 2 },
+          { unitTypeId: 'tank', count: 1 },
+        ],
+      } as import('../../data/Territory').Territory;
+
+      const moves = collectValidMovesForAllReadyStacks(
+        territory,
+        (unitTypeId) => [{
+          territoryId: 'next',
+          path: ['home', 'next'],
+          movementCost: 1,
+          isAttack: false,
+          unitTypeId,
+        }],
+        (unitTypeId) => (unitTypeId === 'infantry' ? 2 : 1),
+      );
+
+      expect(moves.map(m => m.unitTypeId).sort()).toEqual(['infantry', 'tank']);
     });
   });
 });

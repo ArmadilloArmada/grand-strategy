@@ -38,6 +38,7 @@ export class PhaseGuidance {
       build: 'Click Mobilize to buy and place units',
       combat_move: 'Click your territory to select units; drag to move or click an enemy to attack',
       move: 'Click your territory to select units; drag to move',
+      play: 'Mobilize (🏭), move units, and attack — then End Turn',
       combat: 'Resolving queued battles...',
       noncombat_move: 'Move units without attacking',
       production: 'Placing your purchased units...',
@@ -58,6 +59,7 @@ export class PhaseGuidance {
       build: 'First turn: click a highlighted territory to mobilize defenders. Start with your capital or factory if you can afford it.',
       combat_move: 'First turn: drag from one of your territories with units to a highlighted neighbor.',
       move: 'First turn: drag from one of your territories with units to a highlighted neighbor.',
+      play: 'First turn: mobilize at your capital or factory, then drag units to a highlighted neighbor.',
       orders: 'First turn: drag from a territory with units to a highlighted destination.',
       action: 'First turn: make one strong move or attack, then click End Turn.',
       combat: 'Combat only happens after you move into enemy territory. If no battles are queued, continue to the next phase.',
@@ -110,6 +112,10 @@ export class PhaseGuidance {
       // Hide the bottom helper to avoid duplicate status messaging.
       className += ' hidden';
       return { text: '', className };
+    }
+
+    if (phase === 'play') {
+      return this.getUnifiedPlayGuidance(faction, territory, className, input.activeStackLabel, selectAllTypes, readyStackCount);
     }
 
     if (isBuildPhase) {
@@ -170,6 +176,45 @@ export class PhaseGuidance {
     return { text: `${phase} phase - Click "Next Phase" when ready.`, className };
   }
 
+  private getUnifiedPlayGuidance(
+    faction: Faction | undefined,
+    territory: Territory | undefined,
+    className: string,
+    activeStackLabel?: string | null,
+    selectAllTypes?: boolean,
+    readyStackCount?: number,
+  ): { text: string; className: string; tipId?: string; tipMessage?: string } {
+    const mobilizeOptions = this.mobilizationSystem.getMobilizationOptions();
+    const canMobilize = mobilizeOptions.filter(o => o.canMobilize).length;
+    const movement = this.getMovementGuidance(
+      'play',
+      faction,
+      territory,
+      className,
+      activeStackLabel,
+      selectAllTypes,
+      readyStackCount,
+    );
+
+    if (territory && territory.owner === faction?.id) {
+      if (canMobilize > 0) {
+        movement.text = `🏭 ${canMobilize} mobilization${canMobilize === 1 ? '' : 's'} available · ${movement.text}`;
+      }
+      return movement;
+    }
+
+    if (canMobilize > 0) {
+      return {
+        text: `Mobilize forces (🏭 ${canMobilize} available), then move or attack with your units.`,
+        className,
+        tipId: 'unified-play',
+        tipMessage: 'Build, move, and fight in any order during your turn. Click End Turn when finished.',
+      };
+    }
+
+    return movement;
+  }
+
   private getMovementGuidance(
     phase: string,
     faction: Faction | undefined,
@@ -196,7 +241,7 @@ export class PhaseGuidance {
             tipMessage: mixedStackTip,
           };
         }
-        const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+        const allowAttacks = ['combat_move', 'move', 'orders', 'action', 'play'].includes(phase);
         const targetIds = new Set<string>();
         const attackIds = new Set<string>();
         const transportIds = new Set<string>();

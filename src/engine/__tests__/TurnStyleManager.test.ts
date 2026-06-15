@@ -21,9 +21,9 @@ describe('getPhasesForStyle', () => {
     ]);
   });
 
-  it('quick returns 3-phase array', () => {
+  it('quick returns 2-phase array', () => {
     const phases = getPhasesForStyle('quick');
-    expect(phases).toEqual(['build', 'move', 'end']);
+    expect(phases).toEqual(['play', 'end']);
   });
 
   it('civilization returns 4-phase array with orders/resolve', () => {
@@ -145,8 +145,8 @@ describe('isMoveForMoveStyle', () => {
 });
 
 describe('getPhaseTip', () => {
-  it('returns a non-empty string for quick/build', () => {
-    const tip = getPhaseTip('build', 'quick');
+  it('returns a non-empty string for quick/play', () => {
+    const tip = getPhaseTip('play', 'quick');
     expect(tip).toBeTruthy();
   });
 

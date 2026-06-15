@@ -761,10 +761,14 @@ export class AIController {
       case "move":
       case "play":
       case "orders":
-      case "action":
+      case "action": {
+        if (phase === "play" && this.turnManager.getTurnStyle() === "quick") {
+          this.handleMobilizationPhase(evaluations);
+        }
         this.handleCombatMovePhase(evaluations);
         await this.handleCombatPhase();
         break;
+      }
       case "resolve":
         await this.handleCombatPhase();
         break;

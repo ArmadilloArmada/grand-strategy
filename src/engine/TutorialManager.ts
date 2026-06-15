@@ -81,7 +81,7 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'turn_info',
         title: 'Turn & Phase',
-        message: 'The game is played in turns. Classic mode has 6 phases: Purchase → Combat Move → Combat → Non-Combat Move → Production → Collect Income. Quick mode simplifies to 3: Build → Move/Attack → End.',
+        message: 'The game is played in turns. Classic mode has 6 phases: Purchase → Combat Move → Combat → Non-Combat Move → Production → Collect Income. Quick mode simplifies to 2: Command (mobilize, move, attack) → End Turn.',
         target: '#turn-info',
         targetType: 'element',
         position: 'bottom',

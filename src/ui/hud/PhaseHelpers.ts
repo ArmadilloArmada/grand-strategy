@@ -3,7 +3,7 @@ export function isMovementPhase(phase: string): boolean {
 }
 
 export function isBuildPhase(phase: string): boolean {
-  return ['purchase', 'production', 'build'].includes(phase);
+  return ['purchase', 'production', 'build', 'play'].includes(phase);
 }
 
 export function isCombatPhase(phase: string): boolean {

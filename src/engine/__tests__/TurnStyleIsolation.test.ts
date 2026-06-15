@@ -43,14 +43,14 @@ describe('Turn style isolation', () => {
     }
   });
 
-  it('quick build advances to move on same faction without segment owner', () => {
+  it('quick play advances to end on same faction without segment owner', () => {
     const { state, tm } = buildTwoFactionState();
     tm.setTurnStyle('quick');
     tm.startGame();
 
-    expect(state.currentPhase).toBe('build');
+    expect(state.currentPhase).toBe('play');
     tm.advancePhase();
-    expect(state.currentPhase as string).toBe('move');
+    expect(state.currentPhase as string).toBe('end');
     expect(tm.isMoveForMoveSegmentActive()).toBe(false);
     expect(state.currentFactionId).toBe('alpha');
   });

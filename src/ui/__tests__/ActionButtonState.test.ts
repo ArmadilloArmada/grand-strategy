@@ -42,14 +42,23 @@ describe('ActionButtonState', () => {
   });
 
   it('computes build/strategic bombing states', () => {
-    const build = getBuildButtonState({
+    const buildQuick = getBuildButtonState({
       buildPhase: true,
       isHumanTurn: true,
       canMobilize: false,
       turnStyle: 'quick',
     });
-    expect(build.canBuild).toBe(true);
-    expect(build.title).toContain('Not enough IPCs');
+    expect(buildQuick.canBuild).toBe(true);
+    expect(buildQuick.title).toContain('Open the build menu anytime');
+
+    const buildClassic = getBuildButtonState({
+      buildPhase: true,
+      isHumanTurn: true,
+      canMobilize: false,
+      turnStyle: 'classic',
+    });
+    expect(buildClassic.canBuild).toBe(true);
+    expect(buildClassic.title).toContain('Not enough IPCs');
 
     const bomb = getStrategicBombButtonState({
       movementPhase: false,
