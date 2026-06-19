@@ -5,8 +5,10 @@ import {
   applyDifficultyToPersonality,
   clonePersonality,
   getMaxMobilizationsForTurn,
+  isAirForceSaturated,
   isNavalFleetSaturated,
   MOBILIZATION_LIMITS,
+  shouldSkipAirHeavyMobilization,
   shouldSkipNavalHeavyMobilization,
 } from '../AIDifficulty';
 import { getPersonality } from '../AIPersonalities';
@@ -39,6 +41,49 @@ describe('AIDifficulty', () => {
     const limits = MOBILIZATION_LIMITS.medium;
     expect(isNavalFleetSaturated(20, 40, limits)).toBe(true);
     expect(isNavalFleetSaturated(4, 40, limits)).toBe(false);
+  });
+
+  it('detects air force saturation', () => {
+    const limits = MOBILIZATION_LIMITS.medium;
+    expect(isAirForceSaturated(12, 40, limits)).toBe(true);
+    expect(isAirForceSaturated(3, 40, limits)).toBe(false);
+  });
+
+  it('skips capital mobilization when air force is saturated on easy', () => {
+    const state = new GameState();
+    state.factionRegistry.register(makeFactionData('ai', { capital: 'capital', allies: [], startingIPCs: 50 }));
+    state.currentFactionId = 'ai';
+    state.unitRegistry.register(makeUnitData({ id: 'infantry' }));
+    state.unitRegistry.register(makeUnitData({ id: 'fighter', domain: 'air' as any, cost: 10 }));
+
+    const capital = makeTerritory('capital', 'ai', {
+      isCapital: true,
+      production: 4,
+      adjacentTo: [],
+    });
+    capital.addUnits('fighter', 8);
+    state.territories.set('capital', capital);
+
+    const sys = new MobilizationSystem(state);
+    const capitalOption = sys.getTerritoryMobilization(capital);
+    expect(capitalOption.type).toBe('capital');
+    expect(capitalOption.units.some(u => u.unitTypeId === 'fighter')).toBe(true);
+
+    expect(shouldSkipAirHeavyMobilization(
+      capitalOption,
+      8,
+      6,
+      MOBILIZATION_LIMITS.easy,
+      'easy',
+    )).toBe(true);
+
+    expect(shouldSkipAirHeavyMobilization(
+      capitalOption,
+      2,
+      20,
+      MOBILIZATION_LIMITS.hard,
+      'hard',
+    )).toBe(false);
   });
 
   it('skips coastal mobilization when navy is saturated on easy', () => {

@@ -479,7 +479,7 @@ class Game {
       'hold-capital': {
         title: 'Hold the Capital',
         subtitle: 'Protect Washington D.C. long enough to turn the front line.',
-        goals: ['Build defenders first.', 'Use the Threats overlay to spot danger.', 'End the phase when the co-pilot has no urgent warning.'],
+        goals: ['Build defenders first.', 'Use the Threats overlay to spot danger.', 'End the turn when the co-pilot has no urgent warning.'],
         doctrine: 'Defensive AI: reinforces strongholds and punishes exposed capitals.',
       },
       'factory-rush': {
@@ -499,7 +499,7 @@ class Game {
     const briefing = briefings[scenario] ?? {
       title: 'Scenario',
       subtitle: 'A guided operation is ready.',
-      goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End phases when your plan is complete.'],
+      goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End turns when your plan is complete.'],
       doctrine: `AI doctrine: ${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
     };
 
@@ -1870,9 +1870,10 @@ class Game {
         }
       }
 
-      // B - Open build menu (during purchase phase)
+      // B - Open build menu (during build phases)
       if (e.key === 'b' && this.isGameStarted) {
-        if (this.state.currentPhase === 'purchase') {
+        const phase = this.state.currentPhase as string;
+        if (['purchase', 'production', 'build', 'play'].includes(phase)) {
           e.preventDefault();
           document.getElementById('btn-build')?.click();
         }

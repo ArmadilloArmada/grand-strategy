@@ -16,6 +16,10 @@ export interface DifficultyMobilizationLimits {
   maxNavalUnits: number;
   /** Naval count vs land army — e.g. 0.2 ≈ 1 ship per 5 land units. */
   maxNavalToLandRatio: number;
+  /** Stop prioritizing air packages above this count (fighters + bombers). */
+  maxAirUnits: number;
+  /** Air count vs land army — e.g. 0.15 ≈ 1 air unit per ~7 land units. */
+  maxAirToLandRatio: number;
 }
 
 export const MOBILIZATION_LIMITS: Record<AIDifficultyLevel, DifficultyMobilizationLimits> = {
@@ -24,18 +28,24 @@ export const MOBILIZATION_LIMITS: Record<AIDifficultyLevel, DifficultyMobilizati
     ipcReserveRatio: 0.35,
     maxNavalUnits: 8,
     maxNavalToLandRatio: 0.15,
+    maxAirUnits: 6,
+    maxAirToLandRatio: 0.12,
   },
   medium: {
     maxMobilizationsPerTurn: 2,
     ipcReserveRatio: 0.2,
     maxNavalUnits: 16,
     maxNavalToLandRatio: 0.25,
+    maxAirUnits: 12,
+    maxAirToLandRatio: 0.2,
   },
   hard: {
     maxMobilizationsPerTurn: 3,
     ipcReserveRatio: 0.1,
     maxNavalUnits: 28,
     maxNavalToLandRatio: 0.4,
+    maxAirUnits: 20,
+    maxAirToLandRatio: 0.3,
   },
 };
 
@@ -119,6 +129,35 @@ export function isNavalFleetSaturated(
   return navalCount >= landBaseline * limits.maxNavalToLandRatio;
 }
 
+export function isAirForceSaturated(
+  airCount: number,
+  landCount: number,
+  limits: DifficultyMobilizationLimits,
+): boolean {
+  if (airCount >= limits.maxAirUnits) return true;
+  const landBaseline = Math.max(landCount, 4);
+  return airCount >= landBaseline * limits.maxAirToLandRatio;
+}
+
+export function shouldSkipAirHeavyMobilization(
+  option: MobilizationOption,
+  airCount: number,
+  landCount: number,
+  limits: DifficultyMobilizationLimits,
+  difficulty: AIDifficultyLevel,
+): boolean {
+  const airInPackage = countUnitsInMobilizationOption(option, 'air');
+  if (airInPackage === 0) return false;
+  if (!isAirForceSaturated(airCount, landCount, limits)) return false;
+
+  if (option.type === 'capital') return true;
+
+  const landInPackage = countUnitsInMobilizationOption(option, 'land');
+  if (difficulty === 'easy' && airInPackage >= landInPackage) return true;
+  if (difficulty === 'medium' && airInPackage > landInPackage + 1) return true;
+  return difficulty === 'easy' && airInPackage > 1;
+}
+
 export function shouldSkipNavalHeavyMobilization(
   option: MobilizationOption,
   navalCount: number,
@@ -156,6 +195,29 @@ export function mobilizationNavalPenalty(
     penalty += navalInPackage * (difficulty === 'easy' ? 50 : difficulty === 'medium' ? 30 : 12);
   }
   if (option.type === 'coastal') {
+    penalty += difficulty === 'easy' ? 25 : difficulty === 'medium' ? 10 : 0;
+  }
+  return penalty;
+}
+
+export function mobilizationAirPenalty(
+  option: MobilizationOption,
+  airCount: number,
+  landCount: number,
+  limits: DifficultyMobilizationLimits,
+  difficulty: AIDifficultyLevel,
+): number {
+  const airInPackage = countUnitsInMobilizationOption(option, 'air');
+  if (airInPackage === 0) return 0;
+
+  let penalty = 0;
+  if (airCount >= limits.maxAirUnits * 0.6) {
+    penalty += airInPackage * (difficulty === 'easy' ? 35 : difficulty === 'medium' ? 22 : 10);
+  }
+  if (isAirForceSaturated(airCount, landCount, limits)) {
+    penalty += airInPackage * (difficulty === 'easy' ? 50 : difficulty === 'medium' ? 30 : 12);
+  }
+  if (option.type === 'capital') {
     penalty += difficulty === 'easy' ? 25 : difficulty === 'medium' ? 10 : 0;
   }
   return penalty;

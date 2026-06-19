@@ -76,6 +76,12 @@ import { countStackGuidanceTargets, formatStackGuidanceLine } from './hud/stackG
 import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase, isNonCombatMovePhase, resolveMovePhaseContext } from './hud/PhaseHelpers';
 import { MapMoveDragController, type UnitDropKind } from './MapMoveDragController';
 import { MoveForMoveHUD, buildMoveForMoveView } from './hud/MoveForMoveHUD';
+import {
+  getAdvisorEndLabel,
+  getNextPhaseButtonLabel,
+  getSimplePhaseLabel,
+  isQuickPlayEndTurn,
+} from './hud/PhaseButtonLabels';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -1134,14 +1140,6 @@ export class HUD {
     this.stackCommand.refresh();
   }
 
-  private hideStackCommandPopover(): void {
-    this.stackCommand.hideStackCommandPopover();
-  }
-
-  private maybeShowStackCommandPopover(territoryId: string): void {
-    this.stackCommand.maybeShowStackCommandPopover(territoryId);
-  }
-
   private setupMobileStackBar(): void {
     if (document.getElementById('mobile-stack-command-bar')) return;
     const bar = document.createElement('div');
@@ -1694,7 +1692,7 @@ export class HUD {
     if (existing) { existing.remove(); return; }
 
     const shortcuts = [
-      ['↵ / Space', 'End phase / End turn'],
+      ['↵ / Space', 'End turn'],
       ['B', 'Open build / mobilize menu'],
       ['M', 'Move mode'],
       ['A', 'Attack from selected territory (auto-fires if one target)'],
@@ -1918,7 +1916,6 @@ export class HUD {
     const { territoryId, previousTerritoryId } = data;
 
     if (!territoryId) {
-      this.hideStackCommandPopover();
       this.updateSelectionInfo();
       this.renderer.startContinuousRender();
       this.updateValidMoves();
@@ -2722,14 +2719,11 @@ export class HUD {
     
     if (phaseEl && this.gameConfig.turnStyle !== 'move_for_move') {
       phaseEl.textContent = this.gameConfig.simpleMode
-        ? this.getSimplePhaseLabel(phase)
+        ? getSimplePhaseLabel(phase as string, this.gameConfig.turnStyle, this.turnManager.getPhaseDisplayName())
         : this.turnManager.getPhaseDisplayName();
     }
 
-    // Update phase progress indicator
-    if (this.gameConfig.turnStyle !== 'move_for_move') {
-      this.updatePhaseProgress(phase);
-    }
+    // Update phase display (end-turn button label is set in updateActionButtons)
     
     this.updateActionButtons();
     this.validMoveController.clear();
@@ -2745,102 +2739,9 @@ export class HUD {
     return;
   }
 
-  /**
-   * Update phase progress indicator in UI
-   */
-  private updatePhaseProgress(currentPhase: string): void {
-    const phaseOrder = ['purchase', 'combat_move', 'combat', 'noncombat_move', 'production', 'collect_income'];
-    const phaseSteps = document.querySelectorAll('.phase-step');
-    const connectors = document.querySelectorAll('.phase-connector');
-    
-    let currentIndex = phaseOrder.indexOf(currentPhase);
-    if (currentIndex === -1) {
-      // Map alternative phase names
-      const phaseMap: Record<string, string> = {
-        'build': 'purchase',
-        'move': 'combat_move',
-        'orders': 'combat_move',
-        'resolve': 'combat',
-        'action': 'combat_move',
-        'play': 'combat_move',
-        'end': 'collect_income',
-      };
-      currentIndex = phaseOrder.indexOf(phaseMap[currentPhase] || 'purchase');
-    }
-    
-    phaseSteps.forEach((step, index) => {
-      const wasActive = step.classList.contains('active');
-      step.classList.remove('active', 'completed', 'active-pop');
-      if (index < currentIndex) {
-        step.classList.add('completed');
-      } else if (index === currentIndex) {
-        step.classList.add('active');
-        if (!wasActive) {
-          void (step as HTMLElement).offsetWidth;
-          step.classList.add('active-pop');
-        }
-      }
-    });
-    
-    connectors.forEach((connector, index) => {
-      connector.classList.remove('completed');
-      if (index < currentIndex) {
-        connector.classList.add('completed');
-      }
-    });
-
-    this.syncSimplePhaseProgressLabels();
-  }
-
   private syncSimpleModeChrome(): void {
     const isSimple = this.gameConfig.simpleMode ?? true;
     document.body.classList.toggle('simple-mode', isSimple);
-  }
-
-  private syncSimplePhaseProgressLabels(): void {
-    const simpleLabels: Record<string, string> = {
-      purchase: 'Build',
-      combat_move: 'Act',
-      combat: 'Act',
-      noncombat_move: 'Move',
-      production: 'Build',
-      collect_income: 'Review',
-    };
-    const fullLabels: Record<string, string> = {
-      purchase: 'Buy',
-      combat_move: 'Move',
-      combat: 'Combat',
-      noncombat_move: 'Reposition',
-      production: 'Mobilize',
-      collect_income: 'Income',
-    };
-    const labels = (this.gameConfig.simpleMode ?? true) ? simpleLabels : fullLabels;
-    document.querySelectorAll<HTMLElement>('.phase-step').forEach(step => {
-      const phase = step.dataset.phase;
-      const label = phase ? labels[phase] : null;
-      const labelEl = step.querySelector<HTMLElement>('.phase-label');
-      if (label && labelEl) labelEl.textContent = label;
-    });
-  }
-
-  private getSimplePhaseLabel(phase: string): string {
-    const labels: Record<string, string> = {
-      purchase: 'Build',
-      build: 'Build',
-      production: 'Build',
-      combat_move: 'Act',
-      move: 'Act',
-      attack: 'Act',
-      combat: 'Act',
-      resolve: 'Act',
-      noncombat_move: 'Move',
-      collect_income: 'Review',
-      end: 'Review',
-      orders: 'Act',
-      action: 'Act',
-      play: 'Act',
-    };
-    return labels[phase] ?? this.turnManager.getPhaseDisplayName();
   }
 
   /**
@@ -3368,9 +3269,12 @@ export class HUD {
       const mfmView = this.gameConfig.turnStyle === 'move_for_move'
         ? buildMoveForMoveView(this.state, this.turnManager)
         : null;
+      const quickPlayEndTurn = isQuickPlayEndTurn(turnStyle, phaseStr, isHumanTurn);
       const endState = getEndPhaseButtonState({
-        isEndPhase,
-        nextLabel: mfmView?.endButtonLabel ?? this.getNextPhaseLabel(phaseStr),
+        isEndPhase: isEndPhase || quickPlayEndTurn,
+        nextLabel: quickPlayEndTurn
+          ? 'End Turn'
+          : (mfmView?.endButtonLabel ?? getNextPhaseButtonLabel(phaseStr, turnStyle, this.gameConfig.simpleMode)),
         isHumanTurn,
         noPendingMoves: this.state.pendingMoves.length === 0,
         noActiveCombat: !this.combatUI.getActiveCombat(),
@@ -3432,37 +3336,6 @@ export class HUD {
     if (contextTip) this.showFirstTimeTip(contextTip.tipId, contextTip.message);
   }
 
-  /**
-   * Get the next phase display label for the End Phase button
-   */
-  private getNextPhaseLabel(currentPhase: string): string {
-    const sequences: Record<string, string[]> = {
-      quick: ['play', 'end'],
-      move_for_move: ['play'],
-      classic: ['purchase', 'combat_move', 'combat', 'noncombat_move', 'production', 'collect_income'],
-      simple: ['move', 'attack', 'build', 'collect_income'],
-      civilization: ['orders', 'resolve'],
-      chess: ['action'],
-    };
-    const shortNames: Record<string, string> = {
-      purchase: 'Mobilize', combat_move: 'Combat Move', combat: 'Combat',
-      noncombat_move: 'Non-Combat Move', production: 'Mobilize', collect_income: 'Collect Income',
-      build: 'Mobilize', move: 'Move', attack: 'Attack', play: 'Command', end: 'End Turn',
-      orders: 'Orders', resolve: 'Resolve', action: 'Action',
-    };
-    const simpleNames: Record<string, string> = {
-      purchase: 'Build', combat_move: 'Act', combat: 'Act',
-      noncombat_move: 'Move', production: 'Build', collect_income: 'Review',
-      build: 'Build', move: 'Act', attack: 'Act', play: 'Act', end: 'Review',
-      orders: 'Act', resolve: 'Act', action: 'Act',
-    };
-    const style = this.gameConfig.turnStyle as string;
-    const seq = sequences[style] ?? sequences['quick'];
-    const idx = seq.indexOf(currentPhase);
-    const nextPhase = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
-    const names = this.gameConfig.simpleMode ? simpleNames : shortNames;
-    return nextPhase ? (names[nextPhase] ?? nextPhase) : 'Next';
-  }
   /**
    * Update valid move highlights
    */
@@ -3546,9 +3419,6 @@ export class HUD {
       this.stackCommand.autoSelectUnitType(territory);
     }
     this.updateValidMoves();
-    if (territory && countReadyUnitStacks(this.state, territory) >= 2 && !this.stackCommand.isSelectAllTypes()) {
-      this.maybeShowStackCommandPopover(fromTerritoryId);
-    }
   }
 
   private getUnitDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind {
@@ -3596,9 +3466,6 @@ export class HUD {
       this.executePlayerMove(fromTerritoryId, toTerritoryId, false);
     } else if (kind === 'attack') {
       this.combatUI.showBattlePreview(fromTerritoryId, toTerritoryId);
-      if (this.gameConfig.simpleMode && this.gameConfig.turnStyle !== 'move_for_move') {
-        this.combatUI.confirmAttackFromPreview(true);
-      }
     }
   }
 
@@ -3629,9 +3496,6 @@ export class HUD {
 
     if (attackTargets.length === 1) {
       this.combatUI.showBattlePreview(fromId, attackTargets[0].territoryId);
-      if (this.gameConfig.simpleMode && this.gameConfig.turnStyle !== 'move_for_move') {
-        this.combatUI.confirmAttackFromPreview(true);
-      }
     } else {
       this.showToast(`${attackTargets.length} targets available — click one to attack`, 'info');
     }
@@ -3678,46 +3542,40 @@ export class HUD {
    */
   private onEndPhaseClick(): void {
     const phase = this.state.currentPhase as string;
+    const turnStyle = this.gameConfig.turnStyle;
+    const faction = this.state.getCurrentFaction();
+    const isQuickHumanPlay = turnStyle === 'quick' && phase === 'play' && faction?.controlledBy === 'human';
 
     // Execute pending moves at end of movement phases (classic queue — not move-for-move)
-    if ((phase === 'noncombat_move' || phase === 'move') && this.gameConfig.turnStyle !== 'move_for_move') {
+    if ((phase === 'noncombat_move' || phase === 'move') && turnStyle !== 'move_for_move') {
       this.movementValidator.executeAllPendingMoves();
     }
-
-    // Handle production/build phase - new mobilization system
-    // Units are now mobilized directly at territories, no reserve/deploy flow needed
 
     // Clear pending moves when ending combat/attack/resolve phase
     if (phase === 'combat' || phase === 'attack' || phase === 'resolve') {
       this.state.pendingMoves = [];
     }
 
-    // For quick mode 'end' phase, collect income
-    if (phase === 'end') {
-      const faction = this.state.getCurrentFaction();
-      if (faction) {
-        const income = this.state.calculateIncome(faction.id);
-        faction.addIPCs(income);
-        this.showToast(`+${income} IPCs collected!`, 'success');
-        soundManager.play('income');
-      }
-    }
-
     // Production preview before leaving build phase
-    const isBuildPhase = ['purchase', 'build', 'production'].includes(phase);
-    if (isBuildPhase && this.gameConfig.turnStyle !== 'move_for_move' && phase !== 'play') {
+    const isLegacyBuildPhase = ['purchase', 'build', 'production'].includes(phase);
+    if (isLegacyBuildPhase && turnStyle !== 'move_for_move' && phase !== 'play') {
       this.showProductionPreview();
     }
 
     this.stopTurnTimer();
-    const faction = this.state.getCurrentFaction();
     const isIncomePhase = phase === 'end' || phase === 'collect_income';
-    const isMfmEndTurn = this.gameConfig.turnStyle === 'move_for_move' && phase === 'play';
-    const isQuickCommandEnd = this.gameConfig.turnStyle === 'quick' && phase === 'play';
-    if (faction?.controlledBy === 'human' && (isIncomePhase || isMfmEndTurn || isQuickCommandEnd)) {
+    const isMfmEndTurn = turnStyle === 'move_for_move' && phase === 'play';
+    if (faction?.controlledBy === 'human' && (isIncomePhase || isMfmEndTurn || isQuickHumanPlay)) {
       this.showTurnRecap();
     }
-    this.turnManager.advancePhase();
+
+    if (isQuickHumanPlay) {
+      // One click: play → end (income on phase_start) → next faction
+      this.turnManager.advancePhase();
+      this.turnManager.advancePhase();
+    } else {
+      this.turnManager.advancePhase();
+    }
     this.renderer.render();
     this.renderMinimap();
   }
@@ -5265,7 +5123,7 @@ export class HUD {
 
   private getBestMovementSource(factionId: string): { territoryId: string; label: string; detail: string; attacks: number; moves: number } | null {
     const phase = this.state.currentPhase;
-    const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+    const allowAttacks = isAttackMovePhase(phase);
     const candidates: Array<{ territoryId: string; label: string; detail: string; attacks: number; moves: number; score: number }> = [];
 
     for (const territory of this.state.territories.values()) {
@@ -5312,6 +5170,53 @@ export class HUD {
     return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
   }
 
+  private getMovementCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
+    headline: string;
+    detail: string;
+    primaryLabel: string;
+    primaryAction: string;
+    territoryId?: string;
+    secondaryLabel?: string;
+    secondaryAction?: string;
+  } {
+    const selected = this.state.getSelectedTerritory();
+    const selectedReady = selected?.owner === faction.id
+      ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
+      : 0;
+    const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
+
+    if (source && 'id' in source) {
+      return {
+        headline: `Use ${source.name}`,
+        detail: `${selectedReady} ready unit${selectedReady === 1 ? '' : 's'} selected. Green is movement, red is attack.`,
+        primaryLabel: 'Do It',
+        primaryAction: 'recommended-action',
+        territoryId: source.id,
+        secondaryLabel: 'Threats',
+        secondaryAction: 'threat-overlay',
+      };
+    }
+    if (source) {
+      return {
+        headline: source.label,
+        detail: source.detail,
+        primaryLabel: 'Do It',
+        primaryAction: 'recommended-action',
+        territoryId: source.territoryId,
+        secondaryLabel: 'Focus',
+        secondaryAction: 'focus-territory',
+      };
+    }
+    return {
+      headline: 'No ready movement',
+      detail: 'All available units have acted or no legal destinations are open.',
+      primaryLabel: getAdvisorEndLabel(this.gameConfig.turnStyle, this.state.currentPhase as string),
+      primaryAction: 'end-phase',
+      secondaryLabel: 'Threats',
+      secondaryAction: 'threat-overlay',
+    };
+  }
+
   private getTurnCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
     headline: string;
     detail: string;
@@ -5323,7 +5228,23 @@ export class HUD {
   } {
     const phase = this.state.currentPhase as string;
 
-    if (['purchase', 'production', 'build'].includes(phase)) {
+    if (phase === 'play') {
+      const target = this.getBestMobilizationTarget();
+      if (target) {
+        return {
+          headline: target.label,
+          detail: target.detail,
+          primaryLabel: 'Do It',
+          primaryAction: 'recommended-action',
+          territoryId: target.territoryId,
+          secondaryLabel: 'Focus',
+          secondaryAction: 'focus-territory',
+        };
+      }
+      return this.getMovementCoach(faction);
+    }
+
+    if (isBuildPhase(phase)) {
       const target = this.getBestMobilizationTarget();
       if (target) {
         return {
@@ -5339,58 +5260,23 @@ export class HUD {
       return {
         headline: 'No affordable mobilization',
         detail: `Keep ${faction.ipcs} IPCs or advance to movement.`,
-        primaryLabel: 'End Phase',
+        primaryLabel: getAdvisorEndLabel(this.gameConfig.turnStyle, phase),
         primaryAction: 'end-phase',
         secondaryLabel: 'Objectives',
         secondaryAction: 'show-objectives',
       };
     }
 
-    if (['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase)) {
-      const selected = this.state.getSelectedTerritory();
-      const selectedReady = selected?.owner === faction.id
-        ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
-        : 0;
-      const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
-
-      if (source && 'id' in source) {
-        return {
-          headline: `Use ${source.name}`,
-          detail: `${selectedReady} ready unit${selectedReady === 1 ? '' : 's'} selected. Green is movement, red is attack.`,
-          primaryLabel: 'Do It',
-          primaryAction: 'recommended-action',
-          territoryId: source.id,
-          secondaryLabel: 'Threats',
-          secondaryAction: 'threat-overlay',
-        };
-      }
-      if (source) {
-        return {
-          headline: source.label,
-          detail: source.detail,
-          primaryLabel: 'Do It',
-          primaryAction: 'recommended-action',
-          territoryId: source.territoryId,
-          secondaryLabel: 'Focus',
-          secondaryAction: 'focus-territory',
-        };
-      }
-      return {
-        headline: 'No ready movement',
-        detail: 'All available units have acted or no legal destinations are open.',
-        primaryLabel: 'End Phase',
-        primaryAction: 'end-phase',
-        secondaryLabel: 'Threats',
-        secondaryAction: 'threat-overlay',
-      };
+    if (isMovementPhase(phase)) {
+      return this.getMovementCoach(faction);
     }
 
-    if (['combat', 'attack', 'resolve'].includes(phase)) {
+    if (isCombatPhase(phase)) {
       const battles = this.state.pendingMoves.length;
       return {
         headline: battles > 0 ? 'Resolve queued battles' : 'No battles queued',
         detail: battles > 0 ? `${battles} battle${battles === 1 ? '' : 's'} waiting in combat resolution.` : 'Advance when ready.',
-        primaryLabel: battles > 0 ? 'Resolve' : 'End Phase',
+        primaryLabel: battles > 0 ? 'Resolve' : getAdvisorEndLabel(this.gameConfig.turnStyle, phase),
         primaryAction: battles > 0 ? 'recommended-action' : 'end-phase',
         secondaryLabel: 'Threats',
         secondaryAction: 'threat-overlay',
@@ -5417,17 +5303,24 @@ export class HUD {
     }
 
     if (action === 'recommended-action') {
-      const phase = this.state.currentPhase;
-      if (['purchase', 'production', 'build'].includes(phase)) {
+      const phase = this.state.currentPhase as string;
+      if (phase === 'play') {
+        const mobilizeTarget = this.getBestMobilizationTarget();
+        if (mobilizeTarget) {
+          this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
+        } else if (isAttackMovePhase(phase)) {
+          const attacks = this.validMoveController.getValidMoves().filter(m => m.isAttack);
+          if (attacks.length > 0) this.onAttackShortcut();
+          else this.overlayController.setMode('range');
+        }
+      } else if (isBuildPhase(phase)) {
         this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
-      } else if (['combat_move', 'move', 'orders', 'action'].includes(phase)) {
+      } else if (isAttackMovePhase(phase)) {
         const attacks = this.validMoveController.getValidMoves().filter(m => m.isAttack);
         if (attacks.length > 0) this.onAttackShortcut();
         else this.overlayController.setMode('range');
-      } else if (['combat', 'attack', 'resolve'].includes(phase)) {
+      } else if (isCombatPhase(phase)) {
         this.combatUI.onAttackClick();
-      } else {
-        document.getElementById('btn-end-phase')?.click();
       }
     } else if (action === 'end-phase') {
       document.getElementById('btn-end-phase')?.click();

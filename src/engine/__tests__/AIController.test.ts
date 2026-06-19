@@ -229,6 +229,48 @@ describe('AIController attack planning', () => {
     expect(state.currentFactionId).toBe('allies');
   });
 
+  it('does not run AI play-phase logic after handing off to human in quick mode', async () => {
+    const state = makeState();
+    state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2, cost: 3 }));
+
+    const axis = state.factionRegistry.get('axis')!;
+    const allies = state.factionRegistry.get('allies')!;
+    axis.controlledBy = 'ai';
+    allies.controlledBy = 'human';
+    axis.ipcs = 0;
+    allies.ipcs = 40;
+
+    const berlin = makeTerritory('berlin', 'axis', {
+      adjacentTo: ['london'],
+      isCapital: true,
+      hasFactory: true,
+      production: 2,
+    });
+    berlin.addUnits('infantry', 1);
+
+    const london = makeTerritory('london', 'allies', {
+      adjacentTo: ['berlin'],
+      isCapital: true,
+      hasFactory: true,
+      production: 4,
+    });
+    london.addUnits('infantry', 3);
+
+    state.territories.set('berlin', berlin);
+    state.territories.set('london', london);
+
+    const { ai, tm } = makeAI(state);
+    tm.setTurnStyle('quick');
+    state.currentPhase = tm.getFirstPhase();
+
+    await ai.executeTurn();
+
+    expect(state.currentFactionId).toBe('allies');
+    expect(state.currentPhase).toBe('play');
+    expect(allies.ipcs).toBe(40);
+    expect(london.getTotalUnitCount()).toBe(3);
+  });
+
   it('keeps an extra capital garrison when planning attacks from threatened territory', () => {
     const state = makeState();
     state.unitRegistry.register(makeUnitData({ id: 'infantry', attack: 1, defense: 2 }));

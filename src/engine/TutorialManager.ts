@@ -125,14 +125,14 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'movement_basics',
         title: 'Moving Units',
-        message: 'During the Movement phase, double-click a friendly territory to select it, then double-click an adjacent territory to move units there.',
+        message: 'During your Command or movement phase, select a friendly territory with ready units. Drag to a highlighted destination or press A to open an attack preview.',
         position: 'center',
         action: 'any',
       },
       {
         id: 'combat_basics',
         title: 'Attacking',
-        message: 'During Combat phase, select your territory with units, then click an adjacent enemy territory to attack.',
+        message: 'During Command or combat phases, select your territory with units, then click or drag onto an adjacent enemy territory. Confirm in the battle preview before dice resolve.',
         position: 'center',
         action: 'any',
       },
@@ -176,14 +176,14 @@ const TUTORIALS: Tutorial[] = [
       {
         id: 'factories',
         title: 'Factories',
-        message: 'Factories let you build units. Territories with factories (marked with a chimney symbol on the map) can produce new units during the Purchase and Production phases.',
+        message: 'Factories and capitals let you mobilize new units. Click 🏭 Mobilize (or press B) to spend IPCs on territory packages — each site can mobilize once per turn.',
         position: 'center',
         action: 'any',
       },
       {
         id: 'build_phase',
         title: 'Build Phase',
-        message: 'During the Build phase, click the "Build Units" button to open the production menu. Select units to purchase and they\'ll appear at your factories.',
+        message: 'Click 🏭 Mobilize to open the factory hub. Pick a mobilization package for a territory you own — units appear there immediately when you confirm.',
         target: '#btn-build',
         targetType: 'element',
         position: 'right',

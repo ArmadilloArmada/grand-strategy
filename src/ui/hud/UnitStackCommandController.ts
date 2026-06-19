@@ -10,7 +10,6 @@ import {
   type UnitStackSelectorOptions,
 } from './UnitStackSelector';
 import {
-  buildStackCommandPopoverHtml,
   setupUnitStackCommandDelegation,
 } from './UnitStackCommand';
 import { territoryHasAvailableUnits } from '../../engine/territoryControl';
@@ -33,10 +32,6 @@ export class UnitStackCommandController {
   selectAllTypes = false;
 
   private stackCommandTeardown: (() => void) | null = null;
-  private popoverDismissListener: ((event: Event) => void) | null = null;
-  /** Territories where the drag popover should not reappear this turn. */
-  private popoverSuppressedThisTurn = new Set<string>();
-  private popoverShownThisTurn = new Set<string>();
 
   constructor(private deps: UnitStackCommandDeps) {}
 
@@ -47,20 +42,15 @@ export class UnitStackCommandController {
       onAdjustMoveCount: (unitTypeId, delta) => this.adjustMoveCount(unitTypeId, delta),
       onSelectAllMoveCount: (unitTypeId) => this.selectAllMoveCount(unitTypeId),
       onSelectAllUnitTypes: () => this.selectAllUnitTypes(),
-      onSuppressPopover: (territoryId) => this.suppressPopoverForTerritory(territoryId),
     });
   }
 
   dispose(): void {
     this.stackCommandTeardown?.();
     this.stackCommandTeardown = null;
-    this.hideStackCommandPopover();
   }
 
   resetForNewTurn(): void {
-    this.popoverSuppressedThisTurn.clear();
-    this.popoverShownThisTurn.clear();
-    this.hideStackCommandPopover();
   }
 
   clearSelection(): void {
@@ -122,7 +112,6 @@ export class UnitStackCommandController {
       this.selectAllTypes = false;
       this.autoSelectUnitType(territory);
     }
-    this.hideStackCommandPopover();
     this.refresh();
   }
 
@@ -138,7 +127,6 @@ export class UnitStackCommandController {
     this.selectAllTypes = true;
     this.selectedUnitType = null;
     this.selectedMoveCount = null;
-    this.hideStackCommandPopover();
     this.refresh();
     this.deps.onValidMovesRefresh();
     if (showToast && readyCount > 1) {
@@ -167,7 +155,6 @@ export class UnitStackCommandController {
     this.selectedUnitType = unitTypeId;
     this.selectedMoveCount = null;
     this.selectAllTypes = false;
-    this.hideStackCommandPopover();
     this.refresh();
     this.deps.onValidMovesRefresh();
     const unitType = state.unitRegistry.get(unitTypeId);
@@ -216,61 +203,6 @@ export class UnitStackCommandController {
     return true;
   }
 
-  suppressPopoverForTerritory(territoryId: string): void {
-    this.popoverSuppressedThisTurn.add(territoryId);
-    this.hideStackCommandPopover();
-  }
-
-  maybeShowStackCommandPopover(territoryId: string): void {
-    const state = this.deps.getState();
-    const territory = state.territories.get(territoryId);
-    const popover = document.getElementById('stack-command-popover');
-    if (!territory || !popover) return;
-
-    const readyCount = countReadyUnitStacks(state, territory);
-    if (readyCount < 2) {
-      this.hideStackCommandPopover();
-      return;
-    }
-    if (this.popoverSuppressedThisTurn.has(territoryId)) {
-      return;
-    }
-    if (this.popoverShownThisTurn.has(territoryId)) {
-      return;
-    }
-
-    const rect = this.deps.getCanvasRect();
-    if (!rect) return;
-
-    const screen = this.deps.renderer.worldToScreen(territory.center[0], territory.center[1]);
-    popover.innerHTML = buildStackCommandPopoverHtml(state, territory, this.selectorOptions());
-    popover.style.left = `${Math.min(rect.left + screen.x + 12, window.innerWidth - 280)}px`;
-    popover.style.top = `${Math.max(rect.top + screen.y - 20, 72)}px`;
-    popover.classList.remove('hidden');
-    this.popoverShownThisTurn.add(territoryId);
-
-    if (this.popoverDismissListener) {
-      document.removeEventListener('pointerdown', this.popoverDismissListener);
-    }
-    this.popoverDismissListener = (event: Event) => {
-      if ((event.target as Node) && popover.contains(event.target as Node)) return;
-      this.hideStackCommandPopover();
-    };
-    setTimeout(() => {
-      if (this.popoverDismissListener) {
-        document.addEventListener('pointerdown', this.popoverDismissListener);
-      }
-    }, 0);
-  }
-
-  hideStackCommandPopover(): void {
-    document.getElementById('stack-command-popover')?.classList.add('hidden');
-    if (this.popoverDismissListener) {
-      document.removeEventListener('pointerdown', this.popoverDismissListener);
-      this.popoverDismissListener = null;
-    }
-  }
-
   refresh(): void {
     const state = this.deps.getState();
     const territory = state.getSelectedTerritory();
@@ -297,7 +229,6 @@ export class UnitStackCommandController {
     state.selectTerritory(commandFrom);
     const commandTerritory = state.territories.get(commandFrom);
     this.selectedMoveCount = null;
-    this.hideStackCommandPopover();
 
     if (commandTerritory && territoryHasAvailableUnits(commandTerritory)) {
       const readyCount = countReadyUnitStacks(state, commandTerritory);

@@ -289,6 +289,19 @@ export function calculateUnitPriority(
   }
   if (['fighter', 'bomber'].includes(unitType)) {
     priority *= personality.air;
+
+    let airTotal = 0;
+    let landTotal = 0;
+    for (const [id, count] of currentComposition) {
+      if (id === 'fighter' || id === 'bomber') {
+        airTotal += count;
+      } else if (!['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(id)) {
+        landTotal += count;
+      }
+    }
+    if (airTotal >= 6) priority *= 0.45;
+    if (airTotal >= 12) priority *= 0.35;
+    if (landTotal > 0 && airTotal / landTotal > 0.2) priority *= 0.4;
   }
   if (['infantry', 'artillery', 'anti_air'].includes(unitType)) {
     priority *= personality.defense;

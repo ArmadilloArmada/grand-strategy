@@ -1,6 +1,5 @@
 import type { GameState } from '../../engine/GameState';
 import type { Territory } from '../../data/Territory';
-import { buildUnitStackSelectorHtml, type UnitStackSelectorOptions } from './UnitStackSelector';
 import { isRangedStrikeUnit } from './MovementSelection';
 
 const STACK_CHIP_SELECTOR = '[data-unit-type-id]';
@@ -11,10 +10,9 @@ export interface UnitStackCommandCallbacks {
   onAdjustMoveCount: (unitTypeId: string, delta: number) => void;
   onSelectAllMoveCount?: (unitTypeId: string) => void;
   onSelectAllUnitTypes?: () => void;
-  onSuppressPopover?: (territoryId: string) => void;
 }
 
-/** One delegated listener for HQ, War Room, popover, and mobile stack bar. */
+/** One delegated listener for HQ, War Room, and mobile stack bar. */
 export function setupUnitStackCommandDelegation(callbacks: UnitStackCommandCallbacks): () => void {
   const onClick = (event: Event) => {
     const target = event.target as HTMLElement;
@@ -36,14 +34,6 @@ export function setupUnitStackCommandDelegation(callbacks: UnitStackCommandCallb
       return;
     }
 
-    const suppressBtn = target.closest<HTMLElement>('[data-stack-popover-suppress]');
-    if (suppressBtn) {
-      event.preventDefault();
-      const territoryId = suppressBtn.getAttribute('data-territory-id');
-      if (territoryId) callbacks.onSuppressPopover?.(territoryId);
-      return;
-    }
-
     const allTypesBtn = target.closest<HTMLElement>('[data-stack-select-all-types]');
     if (allTypesBtn) {
       event.preventDefault();
@@ -59,34 +49,6 @@ export function setupUnitStackCommandDelegation(callbacks: UnitStackCommandCallb
 
   document.addEventListener('click', onClick);
   return () => document.removeEventListener('click', onClick);
-}
-
-export function buildStackCommandPopoverHtml(
-  state: GameState,
-  territory: Territory,
-  options: UnitStackSelectorOptions,
-): string {
-  return `
-    <div class="stack-command-popover-title">Choose stack</div>
-    ${buildUnitStackSelectorHtml(state, territory, options)}
-    <div class="stack-command-popover-foot">
-      <span>Or use HQ / War Room</span>
-      <button type="button" class="stack-popover-suppress" data-stack-popover-suppress data-territory-id="${territory.id}">
-        Don't ask again this turn
-      </button>
-    </div>
-  `;
-}
-
-export function shouldShowStackPopoverOnSelect(
-  state: GameState,
-  territory: Territory,
-  readyStackCount: number,
-  selectedUnitType: string | null,
-): boolean {
-  if (readyStackCount < 2) return false;
-  if (selectedUnitType) return false;
-  return true;
 }
 
 export function formatActiveStackLabel(

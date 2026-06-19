@@ -113,7 +113,6 @@ export class MoveForMoveHUD {
   setEnabled(enabled: boolean): void {
     document.body.classList.toggle('move-for-move-mode', enabled);
     document.getElementById('mfm-progress')?.classList.toggle('hidden', !enabled);
-    document.getElementById('phase-progress')?.classList.toggle('hidden', enabled);
     if (!enabled) {
       document.body.classList.remove('mfm-move-segment');
     }

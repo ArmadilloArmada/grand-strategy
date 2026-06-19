@@ -31,8 +31,10 @@ import {
   countFactionUnitsByDomain,
   getIpcReserveFloor,
   getMaxMobilizationsForTurn,
+  mobilizationAirPenalty,
   mobilizationNavalPenalty,
   MOBILIZATION_LIMITS,
+  shouldSkipAirHeavyMobilization,
   shouldSkipNavalHeavyMobilization,
   type AIDifficultyLevel,
 } from './AIDifficulty';
@@ -292,6 +294,11 @@ export class AIController {
     this.considerNuclear(faction);
 
     while (true) {
+      const active = this.state.getCurrentFaction();
+      // Guard before processPhase: advancePhase on the last AI phase can hand off to the
+      // next faction (e.g. quick "end" → human "play") before we re-check ownership.
+      if (!active || active.id !== faction.id || active.controlledBy !== 'ai') break;
+
       const phaseStart = performance.now();
       await this.processPhase(evaluations);
       this.emitPerf('aiPhaseMs', performance.now() - phaseStart, { phase: this.state.currentPhase, factionId: faction.id });
@@ -813,6 +820,7 @@ export class AIController {
     const limits = MOBILIZATION_LIMITS[this.difficultyLevel];
     let navalCount = countFactionUnitsByDomain(this.state, faction.id, 'sea');
     let landCount = countFactionUnitsByDomain(this.state, faction.id, 'land');
+    let airCount = countFactionUnitsByDomain(this.state, faction.id, 'air');
     const ipcReserveFloor = getIpcReserveFloor(this.difficultyLevel, faction.ipcs);
     const maxMobilizations = getMaxMobilizationsForTurn(this.difficultyLevel, this.personality.patience);
     let count = 0;
@@ -824,6 +832,9 @@ export class AIController {
       if (shouldSkipNavalHeavyMobilization(option, navalCount, landCount, limits, this.difficultyLevel)) {
         continue;
       }
+      if (shouldSkipAirHeavyMobilization(option, airCount, landCount, limits, this.difficultyLevel)) {
+        continue;
+      }
 
       const result = this.mobilizationSystem.mobilize(option.territory.id);
       if (result.success) {
@@ -831,6 +842,7 @@ export class AIController {
         for (const spawned of result.unitsSpawned ?? []) {
           const unitType = this.state.unitRegistry.get(spawned.unitTypeId);
           if (unitType?.domain === 'sea') navalCount += spawned.count;
+          else if (unitType?.domain === 'air') airCount += spawned.count;
           else if (unitType?.domain === 'land') landCount += spawned.count;
         }
         this.state.emit("ai_thinking", {
@@ -883,11 +895,20 @@ export class AIController {
       score -= 20;
     }
 
+    const landArmy = countFactionUnitsByDomain(this.state, faction.id, 'land');
+    const limits = MOBILIZATION_LIMITS[this.difficultyLevel];
     score -= mobilizationNavalPenalty(
       option,
       countFactionUnitsByDomain(this.state, faction.id, 'sea'),
-      countFactionUnitsByDomain(this.state, faction.id, 'land'),
-      MOBILIZATION_LIMITS[this.difficultyLevel],
+      landArmy,
+      limits,
+      this.difficultyLevel,
+    );
+    score -= mobilizationAirPenalty(
+      option,
+      countFactionUnitsByDomain(this.state, faction.id, 'air'),
+      landArmy,
+      limits,
       this.difficultyLevel,
     );
 
