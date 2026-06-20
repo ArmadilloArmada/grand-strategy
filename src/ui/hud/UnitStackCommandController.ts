@@ -206,7 +206,7 @@ export class UnitStackCommandController {
   refresh(): void {
     const state = this.deps.getState();
     const territory = state.getSelectedTerritory();
-    renderUnitStackSelector(state, territory, this.selectorOptions());
+    renderUnitStackSelector(state, territory ?? null, this.selectorOptions());
     if (this.selectAllTypes && territory) {
       this.deps.renderer.setActiveCommandStack('__all__', '✦', null);
     } else if (territory && this.selectedUnitType) {

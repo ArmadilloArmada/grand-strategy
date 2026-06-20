@@ -1,5 +1,4 @@
 import type { ValidMove } from '../../engine/MovementValidator';
-import type { MovementValidator } from '../../engine/MovementValidator';
 import type { Territory } from '../../data/Territory';
 import type { UnitType } from '../../data/Unit';
 import { isFullAntiNavalStriker } from '../../engine/NavalSystem';

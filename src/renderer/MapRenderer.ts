@@ -375,7 +375,7 @@ export class MapRenderer {
       this.drawOverlayLayer(this.validMoveTargets, 'rgba(34, 197, 94, 0.25)');
       this.drawOverlayLayer(this.coastalStrikeTargets, 'rgba(251, 146, 60, 0.35)');
       this.drawOverlayLayer(
-        [...this.attackTargets].filter(id => !this.coastalStrikeTargets.has(id)),
+        new Set([...this.attackTargets].filter(id => !this.coastalStrikeTargets.has(id))),
         'rgba(239, 68, 68, 0.3)',
       );
     } else if (this.overlayMode === 'threat' && this.threatTerritoryIds.size > 0) {

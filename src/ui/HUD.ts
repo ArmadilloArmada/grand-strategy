@@ -66,7 +66,7 @@ import {
   getNuclearButtonState,
   getStrategicBombButtonState,
 } from './hud/ActionButtonState';
-import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, isRangedStrikeUnit, getRangedUnitActionHint, resolveValidMoveAtTarget, resolveAllValidMovesAtTarget } from './hud/MovementSelection';
+import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, isRangedStrikeUnit, resolveValidMoveAtTarget, resolveAllValidMovesAtTarget } from './hud/MovementSelection';
 import { countReadyUnitStacks } from './hud/UnitStackSelector';
 import { formatActiveStackLabel } from './hud/UnitStackCommand';
 import { UnitStackCommandController } from './hud/UnitStackCommandController';
@@ -3343,7 +3343,6 @@ export class HUD {
     this.validMoveController.updateValidMoves();
   }
 
-  private applyOverlay(): void { this.overlayController.apply(); }
   cycleOverlay(): void {
     this.overlayController.cycle();
     this.validMoveController.updateMapReadabilityLegend();
@@ -3367,7 +3366,7 @@ export class HUD {
   }
 
   private setupUnitDrag(): void {
-    new MapMoveDragController(this.renderer, () => this.state, {
+    new MapMoveDragController(this.renderer, {
       canDragFrom: (territoryId) => this.canStartUnitDragFrom(territoryId),
       onDragStart: (fromTerritoryId) => {
         if (this.state.selectedTerritoryId !== fromTerritoryId) {

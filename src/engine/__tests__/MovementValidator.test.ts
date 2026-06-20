@@ -229,6 +229,7 @@ describe('MovementValidator', () => {
         count: 1,
         fromTerritoryId: 'a',
         toTerritoryId: 'sea1',
+        path: ['a', 'sea1'],
         viaTransport: 'sea1',
       });
       expect(embarked).toBe(true);

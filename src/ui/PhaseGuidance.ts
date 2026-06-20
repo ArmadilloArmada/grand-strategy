@@ -293,7 +293,7 @@ export class PhaseGuidance {
     return sea > 0 && sea / (sea + land) >= 0.12;
   }
 
-  private getNavalMobilizeHint(factionId: string | undefined): string {
+  private getNavalMobilizeHint(_factionId: string | undefined): string {
     if (!this.mapHasSignificantSea()) return '';
     const coastal = this.mobilizationSystem.getMobilizationOptions()
       .find(o => o.canMobilize && o.type === 'coastal');

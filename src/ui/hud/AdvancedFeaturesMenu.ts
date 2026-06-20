@@ -11,14 +11,12 @@ export class AdvancedFeaturesMenu {
   private open = false;
   private outsideClickListener: ((event: MouseEvent) => void) | null = null;
   private repositionListener: (() => void) | null = null;
-  private toggle: HTMLButtonElement | null = null;
   private dropdown: HTMLElement | null = null;
 
   init(handlers: AdvancedFeaturesHandlers): void {
     const toggle = document.getElementById('btn-advanced-menu') as HTMLButtonElement | null;
     const dropdown = document.getElementById('advanced-menu-dropdown');
     if (!toggle || !dropdown) return;
-    this.toggle = toggle;
     this.dropdown = dropdown;
 
     // Escape the top hub's overflow clipping.
@@ -108,7 +106,6 @@ export class AdvancedFeaturesMenu {
     }
     this.open = false;
     this.dropdown?.classList.add('hidden');
-    this.toggle = null;
     this.dropdown = null;
   }
 

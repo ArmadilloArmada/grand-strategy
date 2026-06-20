@@ -20,7 +20,6 @@ export interface UnitDragHandlers {
 export class MapMoveDragController {
   constructor(
     private renderer: MapRenderer,
-    private getState: () => GameState,
     private handlers: UnitDragHandlers,
   ) {
     this.renderer.setUnitDragController({

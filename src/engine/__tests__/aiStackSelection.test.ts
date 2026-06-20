@@ -13,6 +13,7 @@ function makeTerritory(id: string, type: 'land' | 'sea' = 'land'): Territory {
     isCapital: false,
     hasFactory: false,
     owner: 'faction_a',
+    originalOwner: 'faction_a',
     polygon: [[0, 0], [1, 0], [1, 1], [0, 1]],
     center: [0, 0],
     adjacentTo: [],

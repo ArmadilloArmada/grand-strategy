@@ -518,43 +518,6 @@ export class MovementValidator {
     return moves;
   }
 
-  /**
-   * Get total transport capacity for amphibious moves through a sea zone:
-   * transports in the sea, plus transports on friendly coastal tiles touching that sea.
-   */
-  private getTransportCapacity(seaZoneId: string): number {
-    const seaZone = this.state.territories.get(seaZoneId);
-    if (!seaZone) return 0;
-    let sum = seaZone.units.reduce((acc, pu) => {
-      const ut = this.state.unitRegistry.get(pu.unitTypeId);
-      return acc + (ut ? ut.transportCapacity * pu.count : 0);
-    }, 0);
-
-    const currentFaction = this.state.getCurrentFaction();
-    if (!currentFaction) return sum;
-
-    for (const adjId of getNavalReachNeighborIds(this.state, seaZone)) {
-      const t = this.state.territories.get(adjId);
-      if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
-      sum += t.units.reduce((acc, pu) => {
-        const ut = this.state.unitRegistry.get(pu.unitTypeId);
-        return acc + (ut ? ut.transportCapacity * pu.count : 0);
-      }, 0);
-    }
-    return sum;
-  }
-
-  /**
-   * Available transport capacity after accounting for already-queued loads
-   */
-  private getAvailableTransportCapacity(seaZoneId: string): number {
-    const total = this.getTransportCapacity(seaZoneId);
-    const alreadyLoaded = this.state.pendingMoves
-      .filter(m => m.viaTransport === seaZoneId)
-      .reduce((sum, m) => sum + m.count, 0);
-    return Math.max(0, total - alreadyLoaded);
-  }
-
   /** Each map step costs 1 MP, including sea legs for amphibious units. */
   private getMovementStepCost(_from: Territory, _to: Territory, _unitType: UnitType): number {
     return 1;
@@ -611,65 +574,6 @@ export class MovementValidator {
     }
 
     return true;
-  }
-
-  /**
-   * Find all coastal territories reachable via sea transports from a land territory.
-   * @deprecated Superseded by implicit amphibious movement in the main BFS.
-   */
-  private getTransportMoves(fromTerritoryId: string, unitType: UnitType): ValidMove[] {
-    const moves: ValidMove[] = [];
-    const currentFaction = this.state.getCurrentFaction();
-    if (!currentFaction) return moves;
-
-    const fromTerritory = this.state.territories.get(fromTerritoryId);
-    if (!fromTerritory || !fromTerritory.isLand()) return moves;
-
-    // Look in every adjacent sea zone for friendly transports with spare capacity
-    for (const seaId of this.getTerritoryNeighbors(fromTerritory, unitType)) {
-      const seaZone = this.state.territories.get(seaId);
-      if (!seaZone || seaZone.type !== 'sea') continue;
-      const hasFriendlyFleetInSea = seaZone.units.some(pu => {
-        const ut = this.state.unitRegistry.get(pu.unitTypeId);
-        return !!ut && ut.domain === 'sea' && pu.count > 0;
-      });
-      let hasFriendlyFleetNear = hasFriendlyFleetInSea;
-      if (!hasFriendlyFleetNear) {
-        for (const adjId of this.getTerritoryNeighbors(seaZone, unitType)) {
-          const t = this.state.territories.get(adjId);
-          if (!t || t.type !== 'coastal' || t.owner !== currentFaction.id) continue;
-          if (t.units.some(pu => {
-            const ut = this.state.unitRegistry.get(pu.unitTypeId);
-            return !!ut && ut.domain === 'sea' && pu.count > 0;
-          })) {
-            hasFriendlyFleetNear = true;
-            break;
-          }
-        }
-      }
-      const isFriendlySea = seaZone.owner === null || seaZone.owner === currentFaction.id;
-      if (!isFriendlySea || !hasFriendlyFleetNear) continue;
-
-      const capacity = this.getAvailableTransportCapacity(seaId);
-      if (capacity <= 0) continue;
-
-      // Every coastal territory adjacent to this sea zone is a valid unload point
-      for (const destId of this.getTerritoryNeighbors(seaZone, unitType)) {
-        if (destId === fromTerritoryId) continue;
-        const dest = this.state.territories.get(destId);
-        if (!dest || !dest.isLand()) continue;
-
-        const isEnemy = dest.owner !== null && currentFaction.isEnemyOf(dest.owner);
-        moves.push({
-          territoryId: destId,
-          path: [fromTerritoryId, seaId, destId],
-          movementCost: 2,
-          isAttack: isEnemy,
-          viaTransport: seaId,
-        });
-      }
-    }
-    return moves;
   }
 
   /**

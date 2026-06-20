@@ -4,7 +4,7 @@ import type { UnitType } from '../data/Unit';
 
 /** Score ready stacks so AI prefers subs vs cruisers etc. intelligently. */
 export function scoreReadyStackForAI(
-  state: GameState,
+  _state: GameState,
   territory: Territory,
   unitType: UnitType,
   availableCount: number,

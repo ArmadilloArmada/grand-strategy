@@ -79,6 +79,10 @@ export interface CombatState {
   coastalStrike?: boolean;
   /** Ranged-only combat — no territory capture even if defenders are eliminated */
   stayInPlace?: boolean;
+  /** Set when combat was resolved on the tactical grid instead of auto-battle */
+  resolvedTactically?: boolean;
+  /** Tactical win with no attacker casualties — boosts morale on strategic map */
+  tacticalCleanWin?: boolean;
 }
 
 export interface BombardmentResult {

@@ -17,7 +17,7 @@ export interface TacticalTerrain {
   moveCost: number;
   color: string;
   note: string;
-  kind?: 'land' | 'water' | 'shore';
+  kind?: 'land' | 'water' | 'shore' | 'beach';
   isObjective?: boolean;
 }
 
@@ -1401,11 +1401,6 @@ export class TacticalBattleUI {
     if (!this.activeCombat) return null;
     const pool = unit.side === 'attacker' ? this.activeCombat.attackers : this.activeCombat.defenders;
     return pool[unit.sourceIndex]?.unitType ?? null;
-  }
-
-  private isAdjacentToWater(x: number, y: number): boolean {
-    if (!this.state) return false;
-    return isTacticalAdjacentToWater(this.state.width, this.state.height, this.state.terrain, x, y);
   }
 
   private isCoastalFiringPosition(x: number, y: number): boolean {

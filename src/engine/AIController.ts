@@ -1640,7 +1640,6 @@ export class AIController {
         }
       } else if (sourceTerritory && combat.winner !== 'attacker') {
         for (const move of attackingMoves) {
-          const ut = this.state.unitRegistry.get(move.unitTypeId);
           const pu = combat.attackers.find(a => a.unitType.id === move.unitTypeId);
           const surviving = pu ? pu.count - pu.casualties : move.count;
           if (surviving > 0) {
