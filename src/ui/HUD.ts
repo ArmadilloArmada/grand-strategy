@@ -64,6 +64,7 @@ import {
 } from './hud/ActionButtonState';
 import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
 import { isAttackMovePhase, isMovementPhase } from './hud/PhaseHelpers';
+import { AdvancedFeaturesMenu } from './hud/AdvancedFeaturesMenu';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -94,6 +95,7 @@ export class HUD {
   private tutorialController!: TutorialController;
   private undoController!: UndoController;
   private overlayController!: OverlayController;
+  private advancedMenu = new AdvancedFeaturesMenu();
 
   // Faction panel collapsed state
   private factionPanelCollapsed: boolean = false;
@@ -381,6 +383,14 @@ export class HUD {
     document.getElementById('btn-espionage')?.addEventListener('click', () => this.showEspionageModal());
     document.getElementById('btn-close-espionage')?.addEventListener('click', () => {
       document.getElementById('espionage-modal')?.classList.add('hidden');
+    });
+
+    this.advancedMenu.init({
+      onTech: () => this.techUI.show(),
+      onDiplomacy: () => this.diplomacyUI.showModal(),
+      onEspionage: () => this.showEspionageModal(),
+      onStats: () => this.statsUI.show(),
+      onNuclear: () => this.showNuclearModal(),
     });
 
     // Nuclear
@@ -2384,8 +2394,7 @@ export class HUD {
       phaseEl.textContent = this.turnManager.getPhaseDisplayName();
     }
 
-    // Update phase progress indicator
-    this.updatePhaseProgress(phase);
+    // Update phase display (end-turn button label is set in updateActionButtons)
     
     this.updateActionButtons();
     this.renderer.clearValidMoveTargets();
@@ -2401,50 +2410,6 @@ export class HUD {
     }
 
     return;
-  }
-
-  /**
-   * Update phase progress indicator in UI
-   */
-  private updatePhaseProgress(currentPhase: string): void {
-    const phaseOrder = ['purchase', 'combat_move', 'combat', 'noncombat_move', 'production', 'collect_income'];
-    const phaseSteps = document.querySelectorAll('.phase-step');
-    const connectors = document.querySelectorAll('.phase-connector');
-    
-    let currentIndex = phaseOrder.indexOf(currentPhase);
-    if (currentIndex === -1) {
-      // Map alternative phase names
-      const phaseMap: Record<string, string> = {
-        'build': 'purchase',
-        'move': 'combat_move',
-        'orders': 'combat_move',
-        'resolve': 'combat',
-        'action': 'combat_move',
-        'end': 'collect_income',
-      };
-      currentIndex = phaseOrder.indexOf(phaseMap[currentPhase] || 'purchase');
-    }
-    
-    phaseSteps.forEach((step, index) => {
-      const wasActive = step.classList.contains('active');
-      step.classList.remove('active', 'completed', 'active-pop');
-      if (index < currentIndex) {
-        step.classList.add('completed');
-      } else if (index === currentIndex) {
-        step.classList.add('active');
-        if (!wasActive) {
-          void (step as HTMLElement).offsetWidth;
-          step.classList.add('active-pop');
-        }
-      }
-    });
-    
-    connectors.forEach((connector, index) => {
-      connector.classList.remove('completed');
-      if (index < currentIndex) {
-        connector.classList.add('completed');
-      }
-    });
   }
 
   /**
@@ -2942,6 +2907,7 @@ export class HUD {
       nuclearBtn.disabled = nuclearState.disabled;
       nuclearBtn.title = nuclearState.title;
       nuclearBtn.innerHTML = nuclearState.labelHtml;
+      this.advancedMenu.syncNuclearVisibility(nuclearState.show);
     }
 
     // End Phase button — show next phase name and keyboard hint

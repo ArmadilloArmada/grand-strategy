@@ -127,40 +127,10 @@
           <span id="save-indicator" class="save-indicator hidden" title="Game saved">💾</span>
         </div>
 
-        <!-- Center zone: phase pipeline -->
+        <!-- Center zone: end turn -->
         <div class="ribbon-zone ribbon-center">
           <span id="current-phase" class="hidden">-</span>
-          <div id="phase-progress">
-            <div class="phase-step" data-phase="purchase" title="Purchase Units">
-              <span class="phase-icon">🛒</span>
-              <span class="phase-label">Buy</span>
-            </div>
-            <div class="phase-connector"></div>
-            <div class="phase-step" data-phase="combat_move" title="Combat Movement">
-              <span class="phase-icon">⚔️</span>
-              <span class="phase-label">Move</span>
-            </div>
-            <div class="phase-connector"></div>
-            <div class="phase-step" data-phase="combat" title="Resolve Combat">
-              <span class="phase-icon">🎲</span>
-              <span class="phase-label">Combat</span>
-            </div>
-            <div class="phase-connector"></div>
-            <div class="phase-step" data-phase="noncombat_move" title="Non-Combat Movement">
-              <span class="phase-icon">🚶</span>
-              <span class="phase-label">Reposition</span>
-            </div>
-            <div class="phase-connector"></div>
-            <div class="phase-step" data-phase="production" title="Place Units">
-              <span class="phase-icon">🏭</span>
-              <span class="phase-label">Build</span>
-            </div>
-            <div class="phase-connector"></div>
-            <div class="phase-step" data-phase="collect_income" title="Collect Income">
-              <span class="phase-icon">💰</span>
-              <span class="phase-label">Income</span>
-            </div>
-          </div>
+          <button id="btn-end-phase" class="ribbon-end-btn" aria-label="End turn">➡️ End Turn</button>
         </div>
 
         <!-- Right zone: round, turn order, badges -->
@@ -191,15 +161,23 @@
             <span id="context-helper-text">Welcome! Select a territory to begin.</span>
           </div>
         </div>
-        <!-- Right: End Phase + global commands -->
+        <!-- Right: global commands -->
         <div class="rba-group rba-right">
-          <button id="btn-end-phase" class="rba-end-btn" aria-label="End current phase">➡️ End Phase</button>
-          <div class="btn-separator"></div>
-          <button id="btn-research" title="Research technologies" aria-label="Research">🔬<span class="btn-label"> Tech</span></button>
-          <button id="btn-diplomacy" title="Diplomatic relations" aria-label="Diplomacy">🤝<span class="btn-label"> Diplo</span></button>
-          <button id="btn-espionage" title="Espionage operations" aria-label="Espionage">🕵️<span class="btn-label"> Spy</span></button>
-          <button id="btn-nuclear" class="hidden" title="Launch nuclear strike" aria-label="Nuclear">☢️<span class="btn-label"> Nuke</span></button>
-          <button id="btn-stats" title="View statistics" aria-label="Stats">📊<span class="btn-label"> Stats</span></button>
+          <div class="advanced-menu-wrap">
+            <button id="btn-advanced-menu" type="button" title="Tech, diplomacy, espionage, and stats" aria-label="More commands menu" aria-expanded="false" aria-haspopup="true">More ▾</button>
+            <div id="advanced-menu-dropdown" class="advanced-menu-dropdown hidden" role="menu">
+              <button type="button" role="menuitem" data-advanced-action="tech">🔬 Tech</button>
+              <button type="button" role="menuitem" data-advanced-action="diplomacy">🤝 Diplomacy</button>
+              <button type="button" role="menuitem" data-advanced-action="espionage">🕵️ Espionage</button>
+              <button type="button" role="menuitem" data-advanced-action="stats">📊 Stats</button>
+              <button type="button" role="menuitem" data-advanced-action="nuclear" class="hidden">☢️ Nuclear</button>
+            </div>
+          </div>
+          <button id="btn-research" class="rba-advanced-source hidden" title="Research technologies" aria-label="Research" tabindex="-1">🔬<span class="btn-label"> Tech</span></button>
+          <button id="btn-diplomacy" class="rba-advanced-source hidden" title="Diplomatic relations" aria-label="Diplomacy" tabindex="-1">🤝<span class="btn-label"> Diplo</span></button>
+          <button id="btn-espionage" class="rba-advanced-source hidden" title="Espionage operations" aria-label="Espionage" tabindex="-1">🕵️<span class="btn-label"> Spy</span></button>
+          <button id="btn-nuclear" class="hidden rba-advanced-source" title="Launch nuclear strike" aria-label="Nuclear" tabindex="-1">☢️<span class="btn-label"> Nuke</span></button>
+          <button id="btn-stats" class="rba-advanced-source hidden" title="View statistics" aria-label="Stats" tabindex="-1">📊<span class="btn-label"> Stats</span></button>
           <button id="btn-fog-toggle" title="Toggle fog of war" aria-label="Fog">☁<span class="btn-label"> Fog</span></button>
           <button id="btn-theme-toggle" title="Toggle theme" aria-label="Theme">◑</button>
           <div class="btn-separator"></div>
@@ -798,7 +776,9 @@
             <strong>C</strong> — Centre view on your capital<br><br>
             <strong>Fog of War</strong> — Toggle with 🌫️ in the toolbar. Enemy units in
             unexplored territory are hidden. Move into a region to reveal it.<br><br>
-            Hover any territory for a tooltip showing its IPC value, owner, and all units present.
+            <strong>Select a territory</strong> to see details in the <strong>HQ</strong> panel (left)
+            and <strong>War Room</strong> (right). Use the War Room <strong>Command Stack</strong>
+            to pick which unit type to move when several are on the same tile.
           </div>
         </div>
 
@@ -806,15 +786,15 @@
         <div class="tutorial-step" data-step="4">
           <div class="tutorial-image">🔄</div>
           <div class="tutorial-text">
-            <strong>Turn Structure — 6 Phases</strong><br><br>
-            <strong>1. Purchase</strong> — Spend IPCs to queue units at your factories<br>
-            <strong>2. Combat Move</strong> — Move units into enemy-held territories<br>
-            <strong>3. Combat</strong> — Battles are resolved with animated dice rolls<br>
-            <strong>4. Non-Combat Move</strong> — Reposition remaining units freely<br>
-            <strong>5. Production</strong> — Deploy purchased units at factories<br>
-            <strong>6. Collect Income</strong> — Gain IPCs for every territory you hold<br><br>
-            Press <strong>Enter</strong> or the <strong>→ End Phase</strong> button to advance.
-            The phase progress bar at the top shows where you are in the turn.
+            <strong>Turn Structure</strong><br><br>
+            <strong>Simple turn style</strong> (default for new players) — one phase per turn:<br>
+            &nbsp;• <strong>Command</strong> — Mobilize (🏭), move units, and attack in any order<br>
+            &nbsp;• Click <strong>End Turn</strong> in the top ribbon (or press <strong>Enter</strong> / <strong>Space</strong>) to collect income and pass play<br><br>
+            <strong>Classic turn style</strong> — six phases in order:<br>
+            &nbsp;1. Purchase &nbsp; 2. Combat Move &nbsp; 3. Combat &nbsp; 4. Non-Combat Move &nbsp; 5. Production &nbsp; 6. Collect Income<br><br>
+            <strong>Simple Mode</strong> (in New Game settings) turns on the <strong>Command Co-Pilot</strong>
+            in the War Room, a streamlined territory panel, and friendlier labels.
+            It does not change the turn rules — pick <strong>Turn Style</strong> separately.
           </div>
         </div>
 
@@ -855,14 +835,18 @@
         <div class="tutorial-step" data-step="7">
           <div class="tutorial-image">🏭</div>
           <div class="tutorial-text">
-            <strong>Economy &amp; Production</strong><br><br>
+            <strong>Economy &amp; Mobilization</strong><br><br>
             <strong>IPCs</strong> (Industrial Production Certificates) are your currency.
-            Each owned territory produces IPCs equal to its printed value every turn.<br><br>
-            <strong>Factories</strong> (🏭) are where units are built. You can only place
-            units in territories with a factory — and only up to the territory's IPC value
-            per turn.<br><br>
-            Capture enemy factories to boost your own production. Bombers can
-            <strong>strategic bomb</strong> enemy factories to reduce their output.<br><br>
+            Each owned land territory adds IPCs equal to its printed value when you
+            <strong>End Turn</strong>.<br><br>
+            <strong>Mobilize</strong> (🏭 button or <strong>B</strong>) — Spend IPCs to raise
+            troops at your territories. Packages depend on the site:<br>
+            &nbsp;• <em>Factory</em> — Tanks, artillery, and infantry<br>
+            &nbsp;• <em>Capital</em> — Mixed force including air<br>
+            &nbsp;• <em>Coastal / land</em> — Infantry and marines or local garrisons<br>
+            Each territory can mobilize once per turn.<br><br>
+            Capture enemy factories to expand production. Bombers can
+            <strong>strategic bomb</strong> factories to shut them down temporarily.<br><br>
             More territory → more income → bigger army. Snowball carefully!
           </div>
         </div>
@@ -928,16 +912,22 @@
           <div class="tutorial-image">⌨️</div>
           <div class="tutorial-text">
             <strong>Keyboard Shortcuts &amp; Tips</strong><br><br>
-            <strong>Enter / Space</strong> — End current phase<br>
-            <strong>Escape</strong> — Clear selection / open menu<br>
+            <strong>Enter / Space</strong> — End Turn (top ribbon)<br>
+            <strong>B</strong> — Open mobilize menu<br>
+            <strong>A</strong> — Attack from selected territory (opens battle preview)<br>
+            <strong>Escape</strong> — Clear selection / close modal<br>
             <strong>Tab / Shift+Tab</strong> — Cycle through your territories<br>
             <strong>H</strong> — Open this help &nbsp;|&nbsp; <strong>F</strong> — Fit map to screen<br>
-            <strong>C</strong> — Centre on capital &nbsp;|&nbsp; <strong>B</strong> — Build menu<br>
-            <strong>A</strong> — Attack selected territory (combat phase)<br>
+            <strong>C</strong> — Centre on capital &nbsp;|&nbsp; <strong>O</strong> — Cycle map overlay<br>
             <strong>Ctrl+S</strong> — Quick save &nbsp;|&nbsp; <strong>Ctrl+L</strong> — Quick load<br><br>
-            <strong>Tips:</strong> Always buy infantry first — cheapest per IPC.
-            Secure a factory early. Use naval transports to open second fronts.
-            Watch for diplomacy proposals from the AI!
+            <strong>Movement</strong> — Select your territory, pick a stack in the War Room if needed,
+            then <strong>drag</strong> units to a highlighted tile or click an enemy to attack.<br><br>
+            <strong>Tactical battle</strong> (when the grid is open):<br>
+            <strong>Space</strong> fire · <strong>E</strong> end turn · <strong>U</strong> undo move ·
+            <strong>1</strong>–<strong>9</strong> pick stack · <strong>Esc</strong> switch to auto-battle<br><br>
+            <strong>Tips:</strong> Follow the Command Co-Pilot when Simple Mode is on.
+            Mobilize at factories and capitals early. Use naval transports to open second fronts.
+            Confirm attacks in the preview before dice resolve.
           </div>
         </div>
 

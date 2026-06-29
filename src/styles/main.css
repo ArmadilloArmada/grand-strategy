@@ -726,6 +726,62 @@ body {
   gap: 0.2rem;
 }
 
+/* Advanced menu — collapses secondary commands */
+.advanced-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+#btn-advanced-menu {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.advanced-menu-dropdown {
+  position: fixed;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 11.5rem;
+  padding: 0.4rem;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.advanced-menu-dropdown::before {
+  content: 'Optional commands';
+  display: block;
+  padding: 0.2rem 0.55rem 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.advanced-menu-dropdown button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.advanced-menu-dropdown button:hover {
+  background: rgba(184, 134, 11, 0.18);
+}
+
+#action-buttons .rba-advanced-source {
+  display: none !important;
+}
+
 /* Phase-active: brighten buttons that are usable in the current phase */
 #action-buttons button.phase-active {
   background: rgba(184, 134, 11, 0.08);
@@ -1048,14 +1104,39 @@ body {
   font-size: 0.8rem;
 }
 
-/* Phase pipeline inside ribbon — remove its own background/border */
-.ribbon-center #phase-progress {
-  background: none !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  padding: 0.2rem 0.5rem !important;
-  animation: none !important;
+/* End Turn — centered in the top ribbon */
+.ribbon-center #btn-end-phase {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(0.72rem, 1.35vw, 0.88rem);
+  font-weight: 700;
+  padding: 0.35rem 1.15rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  cursor: pointer;
+  color: #e2e8f0;
+  background: linear-gradient(135deg, rgba(37, 99, 168, 0.18), rgba(37, 99, 168, 0.28));
+  border: 1px solid rgba(37, 99, 168, 0.45);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  transition: all var(--transition-normal);
+}
+
+.ribbon-center #btn-end-phase:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(37, 99, 168, 0.28), rgba(37, 99, 168, 0.38));
+  border-color: #60a5fa;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15), 0 0 15px rgba(37, 99, 168, 0.25);
+}
+
+.ribbon-center #btn-end-phase:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ribbon-center #btn-end-phase.btn-end-phase-pulse {
+  animation: endPhasePulse 2s ease-in-out infinite;
+}
+
+.ribbon-center #btn-end-phase.btn-end-phase-pulse:hover:not(:disabled) {
+  animation-play-state: paused;
 }
 
 .ribbon-round {
@@ -1105,17 +1186,7 @@ body {
   text-overflow: ellipsis;
 }
 
-#btn-end-phase {
-  background: linear-gradient(135deg, rgba(37, 99, 168, 0.12), rgba(37, 99, 168, 0.18));
-  border-color: rgba(37, 99, 168, 0.4);
-}
-
-#btn-end-phase:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgba(37, 99, 168, 0.2), rgba(37, 99, 168, 0.3));
-  border-color: #60a5fa;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 15px rgba(37, 99, 168, 0.2);
-}
-
+/* End Phase pulse (shared keyframes; ribbon placement above) */
 #btn-end-phase.btn-end-phase-pulse {
   animation: endPhasePulse 2s ease-in-out infinite;
 }
@@ -7825,9 +7896,14 @@ body.theme-dark .panel-grip {
   border-radius: 5px !important;
 }
 
-/* End Phase: prominent right-side primary button */
-#action-buttons #btn-end-phase {
-  font-size: clamp(0.62rem, 1.2vw, 0.76rem) !important;
-  padding: clamp(0.14rem, 0.45vw, 0.3rem) clamp(0.5rem, 1.2vw, 0.9rem) !important;
+/* Simple Mode: prominent ribbon end-turn control */
+body.simple-mode .ribbon-center #btn-end-phase {
+  min-width: clamp(96px, 10vw, 140px) !important;
+  font-size: clamp(0.78rem, 1.45vw, 0.92rem) !important;
+}
+
+body.simple-mode #strategic-advisor-panel {
+  border-color: rgba(56, 189, 248, 0.28) !important;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08), 0 10px 28px rgba(8, 47, 73, 0.22) !important;
 }
 
