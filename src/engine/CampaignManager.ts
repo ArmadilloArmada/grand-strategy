@@ -23,7 +23,7 @@ export interface CampaignMission {
 export interface MissionObjective {
   id: string;
   description: string;
-  type: 'capture' | 'defend' | 'destroy' | 'survive' | 'produce' | 'earn';
+  type: 'capture' | 'defend' | 'destroy' | 'survive' | 'produce' | 'earn' | 'tactical_win';
   target: string | number;
   current?: number;
   completed?: boolean;
@@ -71,6 +71,7 @@ export const CAMPAIGNS: Campaign[] = [
         objectives: [
           { id: 'obj1', description: 'Capture the Contested Territory', type: 'capture', target: 'contested_territory' },
           { id: 'obj2', description: 'Win a battle', type: 'destroy', target: 1 },
+          { id: 'obj3', description: 'Win 1 tactical battle', type: 'tactical_win', target: 1 },
         ],
         rewards: [
           { type: 'ipcs', value: 10, description: '+10 IPCs for next mission' },
@@ -428,6 +429,79 @@ export const CAMPAIGNS: Campaign[] = [
       },
     ],
   },
+  {
+    id: 'theater_campaign',
+    name: 'Theater Operations',
+    description: 'Three regional campaigns across the Mediterranean, Eastern Front, and Island Chains',
+    icon: '🗺️',
+    missions: [
+      {
+        id: 'theater_1',
+        name: 'Control the Narrows',
+        description: 'Seize coastal strongpoints in the Mediterranean theater',
+        mapId: 'grid-mediterranean',
+        faction: 'med_nord',
+        difficulty: 'normal',
+        objectives: [
+          { id: 'obj1', description: 'Hold 2 territories', type: 'capture', target: 2 },
+          { id: 'obj2', description: 'Produce 6 units', type: 'produce', target: 6 },
+        ],
+        rewards: [
+          { type: 'ipcs', value: 25, description: '+25 IPCs for the next theater' },
+          { type: 'tech', value: 'naval_aviation', description: 'Unlock Naval Aviation' },
+        ],
+        briefing: 'The narrows decide who controls Mediterranean trade. Secure two coastal territories and keep factories producing.',
+        debriefingWin: 'The narrows are yours. Enemy fleets must now sail around your blockade.',
+        debriefingLoss: 'The enemy still controls the sea lanes. Regroup and try again.',
+      },
+      {
+        id: 'theater_2',
+        name: 'Eastern Breakthrough',
+        description: 'Drive deep on the Eastern Front before winter sets in',
+        mapId: 'grid-eastern-front',
+        faction: 'axis',
+        difficulty: 'hard',
+        objectives: [
+          { id: 'obj1', description: 'Capture 3 territories', type: 'capture', target: 3 },
+          { id: 'obj2', description: 'Destroy 4 enemy units', type: 'destroy', target: 4 },
+        ],
+        bonusObjectives: [
+          { id: 'bonus1', description: 'Complete within 8 turns', type: 'survive', target: 8 },
+          { id: 'bonus2', description: 'Win 1 tactical assault', type: 'tactical_win', target: 1 },
+        ],
+        rewards: [
+          { type: 'ipcs', value: 35, description: '+35 IPCs — captured supply depots' },
+        ],
+        unlockCondition: 'theater_1',
+        briefing: 'Speed is everything. Punch through the Soviet line and destroy their mobile reserves before they dig in.',
+        debriefingWin: 'The front collapses. Moscow trembles at your advance.',
+        debriefingLoss: 'The offensive stalls in the mud. The enemy counterattacks.',
+      },
+      {
+        id: 'theater_3',
+        name: 'Island Chain',
+        description: 'Hop from island to island and dominate the archipelago',
+        mapId: 'grid-archipelago',
+        faction: 'isle_n',
+        difficulty: 'normal',
+        objectives: [
+          { id: 'obj1', description: 'Capture 4 territories', type: 'capture', target: 4 },
+          { id: 'obj2', description: 'Destroy 5 enemy units', type: 'destroy', target: 5 },
+        ],
+        bonusObjectives: [
+          { id: 'bonus1', description: 'Hold your capital throughout', type: 'defend', target: 'in_cap' },
+        ],
+        rewards: [
+          { type: 'ipcs', value: 30, description: '+30 IPCs — island bases secured' },
+          { type: 'bonus', value: 'victory_theater', description: 'Theater Campaign Victory!' },
+        ],
+        unlockCondition: 'theater_2',
+        briefing: 'Amphibious warfare demands patience and power projection. Take islands one at a time and never leave your capital exposed.',
+        debriefingWin: 'The archipelago bows to your fleet. Theater operations complete.',
+        debriefingLoss: 'The island defenders held every beach. The campaign continues.',
+      },
+    ],
+  },
 ];
 
 /** Minimal game state interface for objective checking */
@@ -467,6 +541,12 @@ export class CampaignManager {
   trackUnitsProduced(count: number): void {
     const cur = this.runtimeCounters.get('produced') ?? 0;
     this.runtimeCounters.set('produced', cur + count);
+  }
+
+  /** Call when the human player wins a tactical battle during a campaign mission */
+  trackTacticalVictory(count: number = 1): void {
+    const cur = this.runtimeCounters.get('tactical_wins') ?? 0;
+    this.runtimeCounters.set('tactical_wins', cur + count);
   }
 
   /** Reset runtime counters at mission start */
@@ -524,6 +604,11 @@ export class CampaignManager {
       } else if (obj.type === 'earn') {
         met = false;
         progress = 'Pending';
+      } else if (obj.type === 'tactical_win') {
+        const target = typeof obj.target === 'number' ? obj.target : 1;
+        const cur = this.runtimeCounters.get('tactical_wins') ?? 0;
+        met = cur >= target;
+        progress = `${Math.min(cur, target)}/${target}`;
       }
 
       return { objective: obj, met, progress };

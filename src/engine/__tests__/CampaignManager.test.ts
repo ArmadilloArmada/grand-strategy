@@ -168,6 +168,17 @@ describe('CampaignManager — checkObjectives', () => {
     expect(destroyResult!.met).toBe(true);
   });
 
+  it('tactical_win objective: met when tactical victories tracked', () => {
+    const cm = makeManager();
+    cm.trackTacticalVictory(1);
+    const mission = CAMPAIGNS[0].missions[0];
+    const state = makeGameState();
+    const results = cm.checkObjectives(mission, state, 'player');
+    const tacticalResult = results.find(r => r.objective.id === 'obj3');
+    expect(tacticalResult!.met).toBe(true);
+    expect(tacticalResult!.progress).toBe('1/1');
+  });
+
   it('produce objective: met when produced count >= target', () => {
     const cm = makeManager();
     cm.trackUnitsProduced(3);
@@ -290,5 +301,22 @@ describe('CampaignManager — resetCampaign / resetAll', () => {
     cm.resetAll();
     expect(cm.getProgress('tutorial_campaign')).toBeUndefined();
     expect(cm.getProgress('europe_campaign')).toBeUndefined();
+  });
+});
+
+describe('CampaignManager — theater campaign', () => {
+  it('includes the Theater Operations campaign with three linked missions', () => {
+    const theater = CAMPAIGNS.find(c => c.id === 'theater_campaign');
+    expect(theater).toBeDefined();
+    expect(theater!.missions).toHaveLength(3);
+    expect(theater!.missions[0]!.mapId).toBe('grid-mediterranean');
+    expect(theater!.missions[1]!.unlockCondition).toBe('theater_1');
+    expect(theater!.missions[2]!.unlockCondition).toBe('theater_2');
+  });
+
+  it('starts at Control the Narrows', () => {
+    const cm = makeManager();
+    const mission = cm.startCampaign('theater_campaign');
+    expect(mission?.id).toBe('theater_1');
   });
 });

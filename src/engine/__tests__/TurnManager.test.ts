@@ -189,4 +189,13 @@ describe('TurnManager — turn style phases', () => {
     tm.setTurnStyle('quick');
     expect(tm.getPhases().length).toBeLessThan(classicLen);
   });
+
+  it('move_for_move starts in play phase with active segment', () => {
+    const { state, tm } = buildTwoFactionState();
+    tm.setTurnStyle('move_for_move');
+    tm.startGame();
+    expect(state.currentPhase as string).toBe('play');
+    expect(tm.isMoveForMoveSegmentActive()).toBe(true);
+    expect(tm.moveForMoveTurnOwnerId).toBe('alpha');
+  });
 });

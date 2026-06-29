@@ -77,14 +77,17 @@ export class VictoryScreen {
 
     if (isPlayerVictory) {
       soundManager.play('victory');
+      soundManager.playMusic('victory_theme');
     } else {
       soundManager.play('defeat');
+      soundManager.playMusic('defeat_theme');
     }
 
     // Brief cinematic flash before the full modal
     this.showVictoryFlash(faction?.color ?? '#ffd700', isPlayerVictory);
 
     const stats = this.calculateGameStats();
+    const commanderRating = this.getCommanderRating(isPlayerVictory, stats);
 
     // Scoreboard shows every participant (including defeated ones) but excludes
     // map factions that were not selected for this game.
@@ -99,15 +102,15 @@ export class VictoryScreen {
       .sort((a, b) => b.territories - a.territories)
       .map((entry, i) => {
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-        const highlight = entry.isWinner ? `background: rgba(0,0,0,0.06); border-radius: 6px;` : '';
-        return `<tr style="${highlight}">
-          <td style="padding: 0.4rem 0.5rem;">${medal}</td>
-          <td style="padding: 0.4rem 0.5rem; font-weight: 600; color: ${entry.f.color};">${entry.f.name}</td>
-          <td style="padding: 0.4rem 0.5rem; text-align: center;">${entry.territories}</td>
-          <td style="padding: 0.4rem 0.5rem; text-align: center;">${entry.fStats?.unitsKilled ?? 0}</td>
-          <td style="padding: 0.4rem 0.5rem; text-align: center;">${entry.fStats?.unitsLost ?? 0}</td>
-          <td style="padding: 0.4rem 0.5rem; text-align: center;">${entry.fStats?.techResearched ?? 0}</td>
-          <td style="padding: 0.4rem 0.5rem; text-align: center;">${entry.fStats?.nukesLaunched ?? 0}</td>
+        const rowClass = entry.isWinner ? ' class="victory-winner-row"' : '';
+        return `<tr${rowClass}>
+          <td>${medal}</td>
+          <td style="font-weight: 600; color: ${entry.f.color};">${entry.f.name}</td>
+          <td style="text-align: center;">${entry.territories}</td>
+          <td style="text-align: center;">${entry.fStats?.unitsKilled ?? 0}</td>
+          <td style="text-align: center;">${entry.fStats?.unitsLost ?? 0}</td>
+          <td style="text-align: center;">${entry.fStats?.techResearched ?? 0}</td>
+          <td style="text-align: center;">${entry.fStats?.nukesLaunched ?? 0}</td>
         </tr>`;
       }).join('');
 
@@ -130,29 +133,29 @@ export class VictoryScreen {
 
     const barChart = (value: number, max: number, color: string) => {
       const pct = Math.round((value / max) * 100);
-      return `<div style="display:flex;align-items:center;gap:0.4rem;margin-top:2px;">
-        <div style="flex:1;background:rgba(0,0,0,0.12);border-radius:3px;height:10px;overflow:hidden;">
-          <div class="victory-bar" data-pct="${pct}" style="width:0%;background:${color};height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(0.22,1,0.36,1);"></div>
+      return `<div class="victory-bar-row">
+        <div class="victory-bar-track">
+          <div class="victory-bar" data-pct="${pct}" style="background:${color};"></div>
         </div>
-        <span style="min-width:2.5rem;text-align:right;font-size:0.8rem;">${value}</span>
+        <span class="victory-bar-value">${value}</span>
       </div>`;
     };
 
     const factionChartRows = allFactionStats
       .sort((a, b) => b.territories - a.territories)
       .map(({ f, territories, fStats }) => `
-        <div style="margin-bottom:0.75rem;">
-          <div style="font-weight:600;font-size:0.85rem;color:${f.color};margin-bottom:2px;">${f.id === data.winner ? '🏆 ' : ''}${f.name}</div>
-          <div style="font-size:0.75rem;color:#888;">Territories</div>
+        <div class="victory-chart-row">
+          <div class="victory-chart-name" style="color:${f.color};">${f.id === data.winner ? '🏆 ' : ''}${f.name}</div>
+          <div class="victory-chart-label">Territories</div>
           ${barChart(territories, maxTerritories, f.color)}
-          <div style="font-size:0.75rem;color:#888;margin-top:4px;">Kills</div>
+          <div class="victory-chart-label">Kills</div>
           ${barChart(fStats?.unitsKilled ?? 0, maxKills, f.color)}
-          <div style="font-size:0.75rem;color:#888;margin-top:4px;">Total Income</div>
+          <div class="victory-chart-label">Total Income</div>
           ${barChart(fStats?.totalIncomeEarned ?? 0, maxIncome, f.color)}
-          <div style="font-size:0.75rem;color:#888;margin-top:4px;">🔬 Tech Researched</div>
+          <div class="victory-chart-label">🔬 Tech Researched</div>
           ${barChart(fStats?.techResearched ?? 0, maxTech, f.color)}
           ${(fStats?.nukesLaunched ?? 0) > 0 ? `
-          <div style="font-size:0.75rem;color:#888;margin-top:4px;">☢️ Nuclear Strikes</div>
+          <div class="victory-chart-label">☢️ Nuclear Strikes</div>
           ${barChart(fStats?.nukesLaunched ?? 0, maxNukes, '#ef4444')}` : ''}
         </div>
       `).join('');
@@ -161,7 +164,7 @@ export class VictoryScreen {
     modal.className = 'modal';
     modal.id = 'victory-modal';
     modal.innerHTML = `
-      <div class="modal-content" style="text-align: center; max-width: 620px;">
+      <div class="modal-content victory-modal-content">
         <h2>${isPlayerVictory ? '🏆 VICTORY!' : '💀 DEFEAT'}</h2>
         <div style="font-size: 3.5rem; margin: 0.5rem 0;">${isPlayerVictory ? '👑' : '⚰️'}</div>
         <p style="font-size: 1.4rem; font-family: 'Cinzel', serif; color: ${faction?.color ?? '#333'}; margin: 0.25rem 0;">
@@ -175,40 +178,47 @@ export class VictoryScreen {
           "${this.getVictoryFlavorText(data.winner, isPlayerVictory)}"
         </p>
 
-        <div style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; text-align: left;">
-          <h3 style="text-align: center; margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Final Standings</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+        <div class="victory-rating-card">
+          <div class="victory-rating-kicker">Commander Rating</div>
+          <div class="victory-rating-grade" style="color: ${faction?.color ?? '#b8860b'};">${commanderRating.grade}</div>
+          <div class="victory-rating-label">${commanderRating.label}</div>
+        </div>
+
+        <div class="victory-stat-panel">
+          <h3 class="victory-section-title">Final Standings</h3>
+          <table class="victory-standings-table">
             <thead>
-              <tr style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; border-bottom: 1px solid rgba(0,0,0,0.1);">
-                <th style="padding: 0.25rem 0.5rem; text-align: left;"></th>
-                <th style="padding: 0.25rem 0.5rem; text-align: left;">Faction</th>
-                <th style="padding: 0.25rem 0.5rem;">Territories</th>
-                <th style="padding: 0.25rem 0.5rem;">Kills</th>
-                <th style="padding: 0.25rem 0.5rem;">Losses</th>
-                <th style="padding: 0.25rem 0.5rem;">🔬 Tech</th>
-                <th style="padding: 0.25rem 0.5rem;">☢️ Nukes</th>
+              <tr>
+                <th style="text-align: left;"></th>
+                <th style="text-align: left;">Faction</th>
+                <th>Territories</th>
+                <th>Kills</th>
+                <th>Losses</th>
+                <th>🔬 Tech</th>
+                <th>☢️ Nukes</th>
               </tr>
             </thead>
             <tbody>${factionRows}</tbody>
           </table>
         </div>
 
-        <div style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; text-align: left;">
-          <h3 style="text-align: center; margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Faction Comparison</h3>
+        <div class="victory-stat-panel">
+          <h3 class="victory-section-title">Faction Comparison</h3>
           ${factionChartRows}
         </div>
 
-        <div style="background: rgba(0,0,0,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; text-align: left;">
-          <h3 style="text-align: center; margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Your Performance</h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; font-size: 0.9rem;">
+        <div class="victory-stat-panel">
+          <h3 class="victory-section-title">Your Performance</h3>
+          <div class="victory-performance-grid">
             <div>⚔️ Battles Fought</div><div style="text-align: right;"><strong>${stats.battlesFought}</strong></div>
+            ${stats.tacticalBattlesWon > 0 ? `<div>🎯 Tactical Victories</div><div style="text-align: right;"><strong>${stats.tacticalBattlesWon}</strong></div>` : ''}
             <div>💰 Total IPCs Earned</div><div style="text-align: right;"><strong>${stats.totalIncome}</strong></div>
             <div>🏭 Units Produced</div><div style="text-align: right;"><strong>${stats.unitsProduced}</strong></div>
             <div>💀 Enemies Destroyed</div><div style="text-align: right;"><strong>${stats.enemiesDestroyed}</strong></div>
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+        <div class="victory-actions">
           <button class="primary" id="btn-victory-play-again">🔄 Play Again</button>
           <button id="btn-victory-review">📊 Review Map</button>
           <button id="btn-victory-main-menu">🏠 Main Menu</button>
@@ -249,18 +259,11 @@ export class VictoryScreen {
   /** Full-screen color flash with text that fades out before the modal appears. */
   private showVictoryFlash(factionColor: string, isVictory: boolean): void {
     const flash = document.createElement('div');
-    flash.style.cssText = `
-      position:fixed;inset:0;z-index:19999;display:flex;flex-direction:column;
-      align-items:center;justify-content:center;pointer-events:none;
-      background:${factionColor};opacity:0;
-      transition:opacity 0.25s ease;
-    `;
+    flash.className = 'victory-flash-overlay';
+    flash.style.background = `linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)), ${factionColor}`;
     const label = document.createElement('div');
+    label.className = 'victory-flash-label';
     label.textContent = isVictory ? 'VICTORY' : 'DEFEAT';
-    label.style.cssText = `
-      font-family:'Cinzel',serif;font-size:clamp(2.5rem,8vw,6rem);font-weight:700;
-      color:rgba(255,255,255,0.95);letter-spacing:0.15em;text-shadow:0 4px 24px rgba(0,0,0,0.5);
-    `;
     flash.appendChild(label);
     document.body.appendChild(flash);
 
@@ -372,6 +375,7 @@ export class VictoryScreen {
     turns: number;
     territoriesControlled: number;
     battlesFought: number;
+    tacticalBattlesWon: number;
     totalIncome: number;
     unitsProduced: number;
     enemiesDestroyed: number;
@@ -384,9 +388,36 @@ export class VictoryScreen {
       turns: this.state.turnNumber,
       territoriesControlled: territories.length,
       battlesFought: (fStats?.battlesWon ?? 0) + (fStats?.battlesLost ?? 0),
+      tacticalBattlesWon: fStats?.tacticalBattlesWon ?? 0,
       totalIncome: fStats?.totalIncomeEarned ?? 0,
       unitsProduced: fStats?.unitsProduced ?? 0,
       enemiesDestroyed: fStats?.unitsKilled ?? 0,
     };
+  }
+
+  private getCommanderRating(
+    isPlayerVictory: boolean,
+    stats: ReturnType<VictoryScreen['calculateGameStats']>
+  ): { grade: string; label: string } {
+    if (!isPlayerVictory) {
+      if (stats.enemiesDestroyed >= 20 || stats.territoriesControlled >= 8) {
+        return { grade: 'C+', label: 'Defiant stand. The campaign was costly, not quiet.' };
+      }
+      return { grade: 'D', label: 'Command lost. Rebuild the opening plan and try again.' };
+    }
+
+    if (stats.tacticalBattlesWon >= 2) {
+      return { grade: 'A+', label: 'Tactical master — you command the battlefield and the map.' };
+    }
+    if (stats.turns <= 8 && stats.enemiesDestroyed >= 20) {
+      return { grade: 'S', label: 'Decisive victory. Fast pressure, clean finish.' };
+    }
+    if (stats.turns <= 14) {
+      return { grade: 'A', label: 'Strong command. You converted tempo into control.' };
+    }
+    if (stats.totalIncome >= 150 || stats.unitsProduced >= 20) {
+      return { grade: 'B+', label: 'Industrial win. The war machine did its work.' };
+    }
+    return { grade: 'B', label: 'Victory secured. Room to sharpen the next campaign.' };
   }
 }

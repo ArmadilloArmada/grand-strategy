@@ -19,6 +19,7 @@ export class AdvancedFeaturesMenu {
     if (!toggle || !dropdown) return;
     this.dropdown = dropdown;
 
+    // Escape the top hub's overflow clipping.
     if (dropdown.parentElement !== document.body) {
       document.body.appendChild(dropdown);
     }
@@ -108,6 +109,7 @@ export class AdvancedFeaturesMenu {
     this.dropdown = null;
   }
 
+  /** Keep nuclear strike visible in the dropdown when unlocked. */
   syncNuclearVisibility(visible: boolean): void {
     const item = document.querySelector<HTMLElement>('[data-advanced-action="nuclear"]');
     item?.classList.toggle('hidden', !visible);

@@ -25,11 +25,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test -- --run
-
-      - name: Validate maps
-        run: npm run validate:maps
-
-      - name: Build
-        run: npm run build
+      - name: Release check (tests, maps, build)
+        run: npm run release:check

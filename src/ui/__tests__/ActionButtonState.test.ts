@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getNextPhaseButtonLabel } from '../hud/PhaseButtonLabels';
 import {
   getAttackButtonState,
   getBuildButtonState,
@@ -42,14 +43,23 @@ describe('ActionButtonState', () => {
   });
 
   it('computes build/strategic bombing states', () => {
-    const build = getBuildButtonState({
+    const buildQuick = getBuildButtonState({
       buildPhase: true,
       isHumanTurn: true,
       canMobilize: false,
       turnStyle: 'quick',
     });
-    expect(build.canBuild).toBe(true);
-    expect(build.title).toContain('Not enough IPCs');
+    expect(buildQuick.canBuild).toBe(true);
+    expect(buildQuick.title).toContain('Open the build menu anytime');
+
+    const buildClassic = getBuildButtonState({
+      buildPhase: true,
+      isHumanTurn: true,
+      canMobilize: false,
+      turnStyle: 'classic',
+    });
+    expect(buildClassic.canBuild).toBe(true);
+    expect(buildClassic.title).toContain('Not enough IPCs');
 
     const bomb = getStrategicBombButtonState({
       movementPhase: false,
@@ -85,6 +95,28 @@ describe('ActionButtonState', () => {
     expect(nuclear.show).toBe(true);
     expect(nuclear.disabled).toBe(true);
     expect(nuclear.labelHtml).toContain('60%');
+
+    const endTurn = getEndPhaseButtonState({
+      isEndPhase: true,
+      nextLabel: 'End Turn',
+      isHumanTurn: true,
+      noPendingMoves: true,
+      noActiveCombat: true,
+      noSelection: true,
+    });
+    expect(endTurn.labelHtml).toContain('End Turn');
+
+    const quickPlayLabel = getNextPhaseButtonLabel('play', 'quick', true);
+    const quickEnd = getEndPhaseButtonState({
+      isEndPhase: true,
+      nextLabel: quickPlayLabel,
+      isHumanTurn: true,
+      noPendingMoves: true,
+      noActiveCombat: true,
+      noSelection: true,
+    });
+    expect(quickPlayLabel).toBe('End Turn');
+    expect(quickEnd.labelHtml).toContain('End Turn');
 
     const end = getEndPhaseButtonState({
       isEndPhase: false,

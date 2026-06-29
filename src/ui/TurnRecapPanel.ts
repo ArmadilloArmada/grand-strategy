@@ -6,6 +6,8 @@ export interface TurnRecapStats {
   captures: number;
   mobilizations: number;
   unitsMobilized: number;
+  unitsMoved: number;
+  ipcsSpent: number;
   income: number;
   unitsLost: number;
   enemyUnitsDestroyed: number;
@@ -64,6 +66,8 @@ export class TurnRecapPanel {
       this.renderRow('Territories captured', recap.captures.toString()),
       this.renderRow('Mobilized territories', recap.mobilizations.toString()),
       this.renderRow('Units mobilized', recap.unitsMobilized.toString()),
+      this.renderRow('Units moved', recap.unitsMoved.toString()),
+      this.renderRow('IPCs spent', recap.ipcsSpent > 0 ? `-${recap.ipcsSpent} IPC` : '0 IPC'),
       this.renderRow('Income collected', `+${recap.income} IPC`),
       this.renderRow('Combat exchange', `${netExchange >= 0 ? '+' : ''}${netExchange}`),
       data.nextDangerName ? this.renderRow('Next step: danger', data.nextDangerName, true) : '',

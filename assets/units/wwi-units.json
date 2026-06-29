@@ -26,10 +26,11 @@
     "hitPoints": 1,
     "canBlitz": false,
     "canBombard": true,
+    "attackRange": 2,
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": true,
-    "notes": "Howitzers dominated WWI. Boosts infantry attack."
+    "notes": "Howitzers dominated WWI. Heavy and slow to reposition."
   },
   {
     "id": "cavalry",
@@ -45,14 +46,14 @@
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": true,
-    "notes": "Mobile reconnaissance. Can blitz through open terrain."
+    "notes": "Mobile reconnaissance. The fastest ground force of the era."
   },
   {
     "id": "fighter",
     "name": "Biplane Fighter",
     "attack": 2,
     "defense": 2,
-    "movement": 3,
+    "movement": 2,
     "cost": 10,
     "domain": "air",
     "hitPoints": 1,
@@ -61,14 +62,14 @@
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": false,
-    "notes": "Early air combat. Limited effectiveness."
+    "notes": "Early air combat. Short range and limited loiter time."
   },
   {
     "id": "battleship",
-    "name": "Battleship",
+    "name": "Dreadnought",
     "attack": 4,
     "defense": 4,
-    "movement": 2,
+    "movement": 1,
     "cost": 22,
     "domain": "sea",
     "hitPoints": 2,
@@ -77,11 +78,11 @@
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": false,
-    "notes": "Dreadnoughts ruled the seas. Shore bombardment capable."
+    "notes": "Dreadnoughts ruled the seas but steamed slowly between stations."
   },
   {
     "id": "destroyer",
-    "name": "Destroyer",
+    "name": "Torpedo Boat Destroyer",
     "attack": 2,
     "defense": 2,
     "movement": 2,
@@ -93,14 +94,14 @@
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": false,
-    "notes": "Sub hunter. Anti-submarine warfare."
+    "notes": "Sub hunter. Faster than capital ships but still coal-limited."
   },
   {
     "id": "submarine",
-    "name": "Submarine",
+    "name": "U-Boat",
     "attack": 2,
     "defense": 1,
-    "movement": 2,
+    "movement": 1,
     "cost": 7,
     "domain": "sea",
     "hitPoints": 1,
@@ -109,14 +110,30 @@
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": false,
-    "notes": "U-boat warfare devastated Allied shipping."
+    "notes": "U-boat warfare devastated Allied shipping. Short underwater endurance."
+  },
+  {
+    "id": "marines",
+    "name": "Marines",
+    "attack": 2,
+    "defense": 2,
+    "movement": 1,
+    "cost": 5,
+    "domain": "land",
+    "hitPoints": 1,
+    "canBlitz": false,
+    "canBombard": false,
+    "canStrategicBomb": false,
+    "transportCapacity": 0,
+    "requiredTransport": true,
+    "notes": "Expeditionary troops for coastal landings and island assaults."
   },
   {
     "id": "transport",
     "name": "Transport",
     "attack": 0,
     "defense": 0,
-    "movement": 2,
+    "movement": 1,
     "cost": 7,
     "domain": "sea",
     "hitPoints": 1,
@@ -125,6 +142,6 @@
     "canStrategicBomb": false,
     "transportCapacity": 2,
     "requiredTransport": false,
-    "notes": "Troop transport. Vulnerable without escorts."
+    "notes": "Troop transport. Convoy speed limited by the slowest hull."
   }
 ]

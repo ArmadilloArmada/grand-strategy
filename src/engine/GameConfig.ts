@@ -10,16 +10,17 @@ export type GameMode = 'vs-ai' | 'hotseat';
  */
 export type TurnStyle = 
   | 'classic'      // 6-phase TripleA style
-  | 'quick'        // Simplified: Build → Move → Attack → End
+  | 'quick'        // Simplified: Command (build/move/attack) → End
   | 'spectator'    // Pause between each AI turn
   | 'action'       // Pause after every move/attack
   | 'civilization' // Each unit moves OR attacks once per turn
-  | 'chess';       // One action per turn, alternating
+  | 'chess'        // One action per turn, alternating
+  | 'move_for_move'; // All factions build, then alternate one move at a time
 
 export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: string; icon: string }> = {
   quick: {
     name: 'Simple',
-    description: '3 phases: Build → Move/Attack → End. Best for beginners!',
+    description: 'One command phase: mobilize, move, and attack freely — then End Turn.',
     icon: '⚡'
   },
   classic: {
@@ -46,6 +47,11 @@ export const TURN_STYLE_INFO: Record<TurnStyle, { name: string; description: str
     name: 'Chess',
     description: 'One action per turn, then opponent goes. Pure tactics!',
     icon: '♟️'
+  },
+  move_for_move: {
+    name: 'Move for Move',
+    description: 'Build anytime with the 🏭 button. Each move passes to the next player. End Turn to collect.',
+    icon: '↔️'
   }
 };
 
@@ -54,22 +60,22 @@ export type UnitEra = 'wwi' | 'wwii' | 'coldwar' | 'modern';
 export const UNIT_ERA_INFO: Record<UnitEra, { name: string; description: string; icon: string }> = {
   wwi: {
     name: 'World War I (1914)',
-    description: 'Slow trench warfare. Infantry dominant, early tanks.',
+    description: 'Slow trench warfare. Most units move 1 tile; cavalry and destroyers reach 2.',
     icon: '🎖️'
   },
   wwii: {
     name: 'World War II (1942)',
-    description: 'Classic combined arms. Balanced mobility.',
+    description: 'Classic combined arms. Standard mobility — land 1–2, air 3–4, naval 2.',
     icon: '⚔️'
   },
   coldwar: {
     name: 'Cold War (1970)',
-    description: 'Jet age. Faster units, stronger air power.',
+    description: 'Jet age. Armor and fleets move 3 tiles; jets reach 4–5.',
     icon: '☢️'
   },
   modern: {
     name: 'Modern (2020)',
-    description: 'High-tech warfare. Fast, powerful, expensive.',
+    description: 'High-tech warfare. Motorized land 2–3, air 5–6, naval task forces up to 4.',
     icon: '🛰️'
   }
 };
@@ -90,6 +96,9 @@ export interface GameConfig {
   aiOpponents?: string[];
   /** Maximum number of AI opponents to activate. 0 / undefined = no cap. */
   aiOpponentCount?: number;
+  /** Match-scoped AI tuning chosen from New Game setup. */
+  aiDifficulty?: 'easy' | 'medium' | 'hard';
+  aiPersonality?: string;
   /**
    * Resolved set of faction IDs participating in the current game session
    * (humans + their allies + chosen opponents, capped by aiOpponentCount).
@@ -110,6 +119,9 @@ export interface GameConfig {
   // Options
   fogOfWar: boolean;
   autoSave: boolean;
+  simpleMode: boolean;
+  /** Streamlined first-game coaching (Simple Campaign quick start). */
+  guidedOnboarding?: boolean;
   phaseTimerSeconds: number; // 0 = disabled; max seconds per phase (human only)
   
   // Tracking
@@ -119,6 +131,67 @@ export interface GameConfig {
   territoriesCaptured: Map<string, number>;
 }
 
+/** Serializable subset of GameConfig stored in save slots (no Map fields). */
+export type PersistedGameConfig = Pick<GameConfig,
+  | 'mapId'
+  | 'unitEra'
+  | 'mode'
+  | 'humanFactions'
+  | 'aiOpponents'
+  | 'aiOpponentCount'
+  | 'aiDifficulty'
+  | 'aiPersonality'
+  | 'activeFactionIds'
+  | 'turnStyle'
+  | 'victoryType'
+  | 'capitalsToWin'
+  | 'territoriesPercent'
+  | 'economicTarget'
+  | 'turnLimit'
+  | 'fogOfWar'
+  | 'autoSave'
+  | 'simpleMode'
+  | 'phaseTimerSeconds'
+>;
+
+export function serializeGameConfig(config: GameConfig): PersistedGameConfig {
+  return {
+    mapId: config.mapId,
+    unitEra: config.unitEra,
+    mode: config.mode,
+    humanFactions: [...config.humanFactions],
+    aiOpponents: config.aiOpponents ? [...config.aiOpponents] : undefined,
+    aiOpponentCount: config.aiOpponentCount,
+    aiDifficulty: config.aiDifficulty,
+    aiPersonality: config.aiPersonality,
+    activeFactionIds: config.activeFactionIds ? [...config.activeFactionIds] : undefined,
+    turnStyle: config.turnStyle,
+    victoryType: config.victoryType,
+    capitalsToWin: config.capitalsToWin,
+    territoriesPercent: config.territoriesPercent,
+    economicTarget: config.economicTarget,
+    turnLimit: config.turnLimit,
+    fogOfWar: config.fogOfWar,
+    autoSave: config.autoSave,
+    simpleMode: config.simpleMode,
+    phaseTimerSeconds: config.phaseTimerSeconds,
+  };
+}
+
+export function mergePersistedGameConfig(base: GameConfig, saved: PersistedGameConfig): GameConfig {
+  return {
+    ...base,
+    ...saved,
+    humanFactions: [...saved.humanFactions],
+    aiOpponents: saved.aiOpponents ? [...saved.aiOpponents] : base.aiOpponents,
+    activeFactionIds: saved.activeFactionIds ? [...saved.activeFactionIds] : base.activeFactionIds,
+    totalIPCsEarned: base.totalIPCsEarned,
+    battlesWon: base.battlesWon,
+    territoriesCaptured: base.territoriesCaptured,
+    startTime: base.startTime,
+  };
+}
+
 export const defaultConfig: GameConfig = {
   mapId: 'grid',
   unitEra: 'wwii',
@@ -126,6 +199,8 @@ export const defaultConfig: GameConfig = {
   humanFactions: ['atlantic_alliance'],
   aiOpponents: undefined,
   aiOpponentCount: 0,
+  aiDifficulty: 'medium',
+  aiPersonality: 'default',
   activeFactionIds: undefined,
 
   turnStyle: 'classic',
@@ -138,6 +213,7 @@ export const defaultConfig: GameConfig = {
   
   fogOfWar: true,
   autoSave: true,
+  simpleMode: true,
   phaseTimerSeconds: 0,
   
   startTime: Date.now(),
@@ -239,4 +315,3 @@ export function checkVictory(
   
   return { winner: null, reason: '' };
 }
-

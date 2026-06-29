@@ -54,6 +54,15 @@ export class MoraleSystem {
     faction.morale = 100 - faction.warWeariness;
   }
 
+  /** Extra morale recovery when a faction wins via tactical command. */
+  recordTacticalVictory(factionId: string, cleanWin: boolean = false): void {
+    const faction = this.state.factionRegistry.get(factionId);
+    if (!faction) return;
+    const recovery = cleanWin ? 7 : 4;
+    faction.warWeariness = Math.max(0, faction.warWeariness - recovery);
+    faction.morale = 100 - faction.warWeariness;
+  }
+
   /**
    * Returns combat modifier for a faction based on current morale.
    * Applied as a flat bonus to both attack and defense rolls.

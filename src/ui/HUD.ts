@@ -5,7 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { TurnManager } from '../engine/TurnManager';
-import { MovementValidator, ValidMove } from '../engine/MovementValidator';
+import { MovementValidator, usesImplicitAmphibious } from '../engine/MovementValidator';
 import { ProductionManager } from '../engine/ProductionManager';
 import { MobilizationSystem } from '../engine/MobilizationSystem';
 import { CombatResolver } from '../engine/CombatResolver';
@@ -24,7 +24,7 @@ import { getMapEntry, getMapList } from '../data/mapRegistry';
 import type { FactionData } from '../data/Faction';
 import type { MapData } from '../loaders/MapLoader';
 import { ESPIONAGE_OPS } from '../engine/EspionageSystem';
-import { UNIT_ICONS } from './hudConstants';
+import { getUnitIcon } from './hudConstants';
 import { CombatUI } from './CombatUI';
 import { ProductionUI } from './ProductionUI';
 import { MinimapController } from './MinimapController';
@@ -42,7 +42,12 @@ import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
 import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
-import { getMaxCapturableCapitals, normalizeCapitalsToWin } from '../engine/SetupValidation';
+import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
+import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
+import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
+import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
+import { areTerritoriesNeighbors } from '../engine/gridAdjacency';
+import type { SpawnedUnit } from '../engine/MobilizationSystem';
 import { dragManager } from './DragManager';
 import { toastManager } from './ToastManager';
 import { aiActivityFeed } from './AIActivityFeed';
@@ -51,20 +56,32 @@ import { StrategicAdvisor } from './StrategicAdvisor';
 import { PhaseGuidance } from './PhaseGuidance';
 import { TurnRecapPanel, TurnRecapStats } from './TurnRecapPanel';
 import { AbilityPanel } from './AbilityPanel';
+import { AI_PERSONALITIES } from '../engine/AIPersonalities';
 import { showFirstRunTutorialOffer } from './hud/OnboardingPrompt';
 import {
-  getAttackButtonState,
   getBuildButtonState,
   getEndPhaseButtonState,
   getFortifyButtonState,
   getHudPhaseFlags,
-  getMoveButtonState,
   getNuclearButtonState,
   getStrategicBombButtonState,
 } from './hud/ActionButtonState';
-import { resolveTerritorySelectionMove, splitMoveAndAttackTargets } from './hud/MovementSelection';
-import { isAttackMovePhase, isMovementPhase } from './hud/PhaseHelpers';
+import { resolveTerritorySelectionMove, resolveHighlightedMoveUnitType, isRangedStrikeUnit, resolveValidMoveAtTarget, resolveAllValidMovesAtTarget } from './hud/MovementSelection';
+import { countReadyUnitStacks } from './hud/UnitStackSelector';
+import { formatActiveStackLabel } from './hud/UnitStackCommand';
+import { UnitStackCommandController } from './hud/UnitStackCommandController';
+import { ValidMoveController } from './hud/ValidMoveController';
 import { AdvancedFeaturesMenu } from './hud/AdvancedFeaturesMenu';
+import { countStackGuidanceTargets, formatStackGuidanceLine } from './hud/stackGuidance';
+import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase, isNonCombatMovePhase, resolveMovePhaseContext } from './hud/PhaseHelpers';
+import { MapMoveDragController, type UnitDropKind } from './MapMoveDragController';
+import { MoveForMoveHUD, buildMoveForMoveView } from './hud/MoveForMoveHUD';
+import {
+  getAdvisorEndLabel,
+  getNextPhaseButtonLabel,
+  getSimplePhaseLabel,
+  isQuickPlayEndTurn,
+} from './hud/PhaseButtonLabels';
 
 export class HUD {
   private movementValidator: MovementValidator;
@@ -86,10 +103,13 @@ export class HUD {
   private phaseGuidance!: PhaseGuidance;
   private turnRecapPanel!: TurnRecapPanel;
   private abilityPanel!: AbilityPanel;
+  private moveForMoveHUD = new MoveForMoveHUD();
+  private moveForMovePassBound = false;
 
-  // Current UI state
-  private selectedUnitType: string | null = null;
-  private validMoves: ValidMove[] = [];
+  // Unit stack command (HQ chips, popover, keyboard)
+  private stackCommand!: UnitStackCommandController;
+  private validMoveController!: ValidMoveController;
+  private advancedMenu = new AdvancedFeaturesMenu();
 
   // Extracted sub-controllers
   private tutorialController!: TutorialController;
@@ -160,18 +180,67 @@ export class HUD {
     };
   })();
 
+  private unitIcon(unitTypeId: string): string {
+    return getUnitIcon(unitTypeId, this.gameConfig.unitEra);
+  }
+
+  /** Push lobby config (era, etc.) into map rendering. */
+  syncRendererFromConfig(): void {
+    this.renderer.setUnitEra(this.gameConfig.unitEra ?? 'wwii');
+  }
+
+  getSelectedMoveCount(): number | null {
+    return this.stackCommand.getSelectedMoveCount();
+  }
+
+  getSelectedUnitType(): string | null {
+    return this.stackCommand.getSelectedUnitType();
+  }
+
+  selectUnitType(unitTypeId: string): void {
+    this.stackCommand.selectUnitType(unitTypeId);
+  }
+
+  private getResolvedMoveCount(territory: import('../data/Territory').Territory, unitTypeId: string): number {
+    return this.stackCommand.getResolvedMoveCount(territory, unitTypeId);
+  }
+
+  /** Keep commanding mixed stacks after a move or attack. */
+  private handoffStackAfterAction(fromId: string, toId?: string): void {
+    this.stackCommand.handoffAfterAction(fromId, toId);
+    this.updateUndoButton();
+    this.updateStrategicAdvisor();
+  }
+
   constructor(
     private state: GameState,
     private turnManager: TurnManager,
     private renderer: MapRenderer
   ) {
     this.movementValidator = new MovementValidator(state);
+    this.turnManager.setMovementValidator(this.movementValidator);
     this.productionManager = new ProductionManager(state);
     state.systems.reserveSystem = this.productionManager.getReserveSystem();
-    this.mobilizationSystem = new MobilizationSystem(state);
+    if (!state.systems.mobilizationSystem) {
+      state.systems.mobilizationSystem = new MobilizationSystem(state);
+    }
+    this.mobilizationSystem = state.systems.mobilizationSystem;
     this.combatResolver = new CombatResolver(state);
     this.technologyManager = new TechnologyManager(state);
     this.phaseGuidance = new PhaseGuidance(state, this.movementValidator, this.mobilizationSystem);
+    this.stackCommand = new UnitStackCommandController({
+      getState: () => this.state,
+      renderer: this.renderer,
+      unitIcon: (id) => this.unitIcon(id),
+      escapeHtml: (value) => this.escapeHtml(value),
+      showToast: (msg, type) => this.showToast(msg, type),
+      onStackChanged: () => this.updateSelectionInfo(),
+      onValidMovesRefresh: () => this.updateValidMoves(),
+      getCanvasRect: () => {
+        const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
+        return canvas?.getBoundingClientRect() ?? null;
+      },
+    });
     this.turnRecapPanel = new TurnRecapPanel();
     this.abilityPanel = new AbilityPanel();
 
@@ -181,6 +250,20 @@ export class HUD {
       updateFactionPanel: () => this.updateFactionPanel(),
       updateSelectionInfo: () => this.updateSelectionInfo(),
       updateActionButtons: () => this.updateActionButtons(),
+      afterUnitAction: (fromId?: string, toId?: string) => {
+        if (fromId) this.handoffStackAfterAction(fromId, toId);
+        this.handleMoveForMovePass();
+      },
+      getSelectedUnitType: () => {
+        if (this.stackCommand.isSelectAllTypes()) return null;
+        return resolveHighlightedMoveUnitType({
+          validMovesUnitTypeId: this.validMoveController.getValidMovesUnitTypeId(),
+          selectedUnitType: this.stackCommand.getSelectedUnitType(),
+        });
+      },
+      getSelectedMoveCount: () => (
+        this.stackCommand.isSelectAllTypes() ? null : this.stackCommand.getSelectedMoveCount()
+      ),
     };
     this.combatUI = new CombatUI(state, renderer, this.combatResolver, combatCallbacks);
 
@@ -188,9 +271,14 @@ export class HUD {
       showToast: (msg: string, type: 'success' | 'info' | 'error') => this.showToast(msg, type),
       updateMobilizationHighlights: () => this.updateMobilizationHighlights(),
       updateSelectionInfo: () => this.updateSelectionInfo(),
-      onMobilized: (territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]) => {
+      onMobilized: (territoryId: string, cost: number, units: SpawnedUnit[]) => {
         this.undoController.recordMove({ type: 'mobilize', data: { territoryId, cost, units } });
         this.undoController.updateButtons();
+        const faction = this.state.getCurrentFaction();
+        if (faction) {
+          const recap = this.ensureTurnRecap(faction.id);
+          recap.ipcsSpent += cost;
+        }
       },
     };
     this.productionUI = new ProductionUI(state, renderer, this.productionManager, this.mobilizationSystem, productionCallbacks);
@@ -231,9 +319,8 @@ export class HUD {
       undoMobilize: (territoryId, cost, units) => {
         const faction = this.state.getCurrentFaction();
         if (faction) faction.ipcs += cost;
-        const territory = this.state.territories.get(territoryId);
-        if (territory) {
-          for (const u of units) territory.removeUnits(u.unitTypeId, u.count);
+        for (const u of units) {
+          this.state.territories.get(u.territoryId)?.removeUnits(u.unitTypeId, u.count);
         }
         this.mobilizationSystem.undoMobilize(territoryId);
         this.updateMobilizationHighlights();
@@ -244,6 +331,16 @@ export class HUD {
     });
     this.overlayController = new OverlayController(state, renderer, {
       showToast: (msg, type) => this.showToast(msg, type),
+    });
+    this.validMoveController = new ValidMoveController({
+      getState: () => this.state,
+      movementValidator: this.movementValidator,
+      renderer: this.renderer,
+      overlayController: this.overlayController,
+      mobilizationSystem: this.mobilizationSystem,
+      stackCommand: this.stackCommand,
+      escapeHtml: (value) => this.escapeHtml(value),
+      onAfterUpdate: () => this.updateActionButtons(),
     });
     this.firstWarRoom = new FirstWarRoom({
       focusTerritory: (territoryId) => this.runAdvisorAction('focus-territory', territoryId),
@@ -276,6 +373,7 @@ export class HUD {
     this.supplySystem = new SupplySystem(state);
 
     this.setupEventListeners();
+    this.setupUnitDrag();
     this.subscribeToGameEvents();
   }
   
@@ -294,13 +392,44 @@ export class HUD {
     document.body.appendChild(popup);
     
     // Play sound
-    soundManager.play('victory');
+    soundManager.play('achievement');
     
     // Visual celebration
     visualEffects.confetti(window.innerWidth / 2, window.innerHeight * 0.3, 40);
     
     // Remove after animation
     setTimeout(() => popup.remove(), 4000);
+  }
+
+  private ensureMoveForMovePassListener(): void {
+    if (this.moveForMovePassBound) return;
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('#btn-mfm-pass')) {
+        this.onMoveForMovePassClick();
+      }
+    });
+    this.moveForMovePassBound = true;
+  }
+
+  private onMoveForMovePassClick(): void {
+    if (this.gameConfig.turnStyle !== 'move_for_move') return;
+    if (!this.turnManager.isMoveForMoveSegmentActive()) return;
+    const faction = this.state.getCurrentFaction();
+    if (faction?.controlledBy !== 'human') return;
+
+    this.showToast('Passing move to the next player…', 'info');
+    this.handleMoveForMovePass();
+  }
+
+  private syncMoveForMoveChrome(): void {
+    const isMfm = this.gameConfig.turnStyle === 'move_for_move';
+    this.moveForMoveHUD.setEnabled(isMfm);
+    if (!isMfm) return;
+
+    this.moveForMoveHUD.mount();
+    const view = buildMoveForMoveView(this.state, this.turnManager);
+    this.moveForMoveHUD.render(view);
   }
 
   /**
@@ -310,6 +439,7 @@ export class HUD {
     // Action buttons
     this.enhanceCommandBar();
     this.setupWarRoomLayout();
+    this.setupMobileStackBar();
     this.setupHQLayout();
     this.syncToastContainerDock();
     // HQ is skipped when innerWidth ≤700; if the window later widens, create the panel then.
@@ -320,10 +450,9 @@ export class HUD {
       });
     });
     window.addEventListener('resize', () => this.scheduleHQLayoutEnsure());
-    document.getElementById('btn-move')?.addEventListener('click', () => this.onMoveClick());
-    document.getElementById('btn-attack')?.addEventListener('click', () => this.onAttackClick());
     document.getElementById('btn-build')?.addEventListener('click', () => this.onBuildClick());
     document.getElementById('btn-end-phase')?.addEventListener('click', () => this.onEndPhaseClick());
+    this.ensureMoveForMovePassListener();
 
     // Help button
     document.getElementById('help-button')?.addEventListener('click', () => this.showTutorial());
@@ -340,7 +469,7 @@ export class HUD {
     document.getElementById('btn-close-combat')?.addEventListener('click', () => this.combatUI.onCloseCombat());
 
     // Strategic bombing button
-    document.getElementById('btn-strategic-bomb')?.addEventListener('click', () => this.combatUI.showStrategicBombingModal());
+    document.getElementById('btn-strategic-bomb')?.addEventListener('click', () => this.combatUI.executeStrategicBombing());
 
     // Fortify button
     document.getElementById('btn-fortify')?.addEventListener('click', () => this.onFortifyClick());
@@ -356,6 +485,7 @@ export class HUD {
       this.productionUI.renderFactoryHub();
     });
     document.getElementById('fh-btn-confirm')?.addEventListener('click', () => this.productionUI.confirmFactoryHubOrders());
+    document.getElementById('fh-btn-buy-deploy')?.addEventListener('click', () => this.productionUI.confirmFactoryHubOrders(true));
 
     // Deployment modal buttons
     document.getElementById('btn-confirm-deploy')?.addEventListener('click', () => this.productionUI.onConfirmDeploy());
@@ -377,7 +507,6 @@ export class HUD {
     (window as any).__hudInstance = this;
 
     // Fog of war toggle
-    document.getElementById('btn-fog-toggle')?.addEventListener('click', () => this.toggleFogOfWar());
 
     // Espionage
     document.getElementById('btn-espionage')?.addEventListener('click', () => this.showEspionageModal());
@@ -476,7 +605,8 @@ export class HUD {
     });
 
     // Battle preview buttons
-    document.getElementById('btn-confirm-attack')?.addEventListener('click', () => this.combatUI.confirmAttackFromPreview());
+    document.getElementById('btn-confirm-attack')?.addEventListener('click', () => this.combatUI.confirmAttackFromPreview(true));
+    document.getElementById('btn-play-tactical')?.addEventListener('click', () => this.combatUI.confirmTacticalAttackFromPreview());
     document.getElementById('btn-cancel-attack')?.addEventListener('click', () => this.combatUI.closeBattlePreview());
 
     // Mini-map setup
@@ -484,14 +614,17 @@ export class HUD {
 
     // Territory hover tooltip
     this.setupTerritoryTooltip();
+    this.setupUnitStackSelectorListeners();
 
     // New game modal handlers
     document.getElementById('game-mode')?.addEventListener('change', (e) => {
       const mode = (e.target as HTMLSelectElement).value;
       const hotseatOptions = document.getElementById('hotseat-options');
       const vsAiOptions = document.getElementById('vs-ai-options');
+      const vsAiOpponentOptions = document.getElementById('vs-ai-opponent-options');
       if (hotseatOptions) hotseatOptions.classList.toggle('hidden', mode !== 'hotseat');
       if (vsAiOptions) vsAiOptions.classList.toggle('hidden', mode !== 'vs-ai');
+      if (vsAiOpponentOptions) vsAiOpponentOptions.classList.toggle('hidden', mode !== 'vs-ai');
       this.updateSetupSummary();
     });
 
@@ -532,6 +665,10 @@ export class HUD {
       this.syncSetupHelpers();
     });
 
+    document.getElementById('btn-apply-recommended-setup')?.addEventListener('click', () => {
+      this.applyRecommendedSetup();
+    });
+
     const factionSelect = document.getElementById('player-faction') as HTMLSelectElement | null;
     if (factionSelect) {
       const updateFactionCard = () => {
@@ -550,12 +687,15 @@ export class HUD {
       'human-factions',
       'ai-opponent-count',
       'ai-opponents',
+      'setup-ai-difficulty',
+      'setup-ai-personality',
       'victory-capitals',
       'victory-domination',
       'victory-economic',
       'turn-limit',
       'fog-of-war',
       'auto-save',
+      'simple-mode',
     ]) {
       document.getElementById(id)?.addEventListener('change', () => this.updateSetupSummary());
       document.getElementById(id)?.addEventListener('input', () => this.updateSetupSummary());
@@ -582,11 +722,21 @@ export class HUD {
       // Skip modals that are non-dismissable (e.g. combat modal while active)
       const isCombat = modal.id === 'combat-modal';
 
+      const dismissModal = (): void => {
+        const closeBtn = modal.querySelector<HTMLElement>(
+          '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+        );
+        if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+          closeBtn.click();
+          return;
+        }
+        modal.classList.add('hidden');
+      };
+
       // Backdrop click: clicking the overlay (not the content) closes the modal
       modal.addEventListener('click', (e) => {
         if (e.target !== modal) return;
-        const closeBtn = modal.querySelector<HTMLElement>('[id^="btn-close"]');
-        closeBtn?.click();
+        dismissModal();
       });
 
       // Inject a sticky × close button only when the existing close button is a
@@ -600,8 +750,9 @@ export class HUD {
           xBtn.className = 'modal-x-close';
           xBtn.textContent = '×';
           xBtn.setAttribute('aria-label', 'Close');
-          xBtn.addEventListener('click', () => {
-            existingClose?.click();
+          xBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismissModal();
           });
           content.insertBefore(xBtn, content.firstChild);
         }
@@ -631,6 +782,19 @@ export class HUD {
     document.body.appendChild(panel);
 
     const content = panel.querySelector('#war-room-content');
+    const unitSlot = document.createElement('div');
+    unitSlot.id = 'war-room-unit-slot';
+    unitSlot.className = 'war-room-section unit-stack-selector hidden';
+    unitSlot.setAttribute('aria-label', 'Unit stack selector');
+    const unitTitle = document.createElement('div');
+    unitTitle.className = 'war-room-section-title';
+    unitTitle.textContent = 'Command Stack';
+    const unitBody = document.createElement('div');
+    unitBody.className = 'unit-stack-selector-body';
+    unitSlot.appendChild(unitTitle);
+    unitSlot.appendChild(unitBody);
+    content?.appendChild(unitSlot);
+
     const advisor = document.getElementById('strategic-advisor-panel') ?? document.createElement('section');
     advisor.id = 'strategic-advisor-panel';
     advisor.classList.add('war-room-section', 'hidden');
@@ -675,6 +839,11 @@ export class HUD {
     panel.querySelector('#btn-toggle-war-room')?.addEventListener('click', () => {
       panel.classList.toggle('collapsed');
     });
+
+    const unitSlotEl = document.getElementById('war-room-unit-slot');
+    if (unitSlotEl && content?.firstChild !== unitSlotEl) {
+      content?.prepend(unitSlotEl);
+    }
   }
 
   private scheduleHQLayoutEnsure(): void {
@@ -742,7 +911,10 @@ export class HUD {
   private setupHQLayout(): void {
     // Skip only on very narrow viewports; keep HQ Hub enabled on most laptop widths.
     if (window.innerWidth <= 700) return;
-    if (document.getElementById('hq-panel')) return;
+    if (document.getElementById('hq-panel')) {
+      this.migrateHQLayoutIfNeeded();
+      return;
+    }
 
     const panel = document.createElement('aside');
     panel.id = 'hq-panel';
@@ -757,18 +929,27 @@ export class HUD {
 
     const content = panel.querySelector('#hq-content') as HTMLElement;
 
+    const pinned = document.createElement('div');
+    pinned.id = 'hq-pinned';
+    pinned.className = 'hq-pinned';
+    const scroll = document.createElement('div');
+    scroll.id = 'hq-scroll';
+    scroll.className = 'hq-scroll';
+    content.appendChild(pinned);
+    content.appendChild(scroll);
+
     // MINIMAP — top of HQ panel, giving a tactical overview at all times
     const minimap = document.getElementById('minimap-container');
     if (minimap) {
-      content.appendChild(minimap);
+      pinned.appendChild(minimap);
     }
 
     // RECAP SLOT — turn/phase recap cards render here instead of floating over screen
     const recapSlot = document.createElement('div');
     recapSlot.id = 'hq-recap-slot';
-    content.appendChild(recapSlot);
+    pinned.appendChild(recapSlot);
 
-    // TERRITORY section — move #selection-info into HQ
+    // TERRITORY section — move #selection-info into HQ (always visible above scroll region)
     const selection = document.getElementById('selection-info');
     if (selection) {
       selection.removeAttribute('style');
@@ -779,7 +960,7 @@ export class HUD {
         t.textContent = 'Territory';
         selection.prepend(t);
       }
-      content.appendChild(selection);
+      pinned.appendChild(selection);
     }
 
     // ABILITY section — wrap supply indicator + faction ability
@@ -794,13 +975,13 @@ export class HUD {
     if (supply) { supply.removeAttribute('style'); abilityWrap.appendChild(supply); }
     const ability = document.getElementById('faction-ability-container');
     if (ability) { ability.removeAttribute('style'); abilityWrap.appendChild(ability); }
-    content.appendChild(abilityWrap);
+    scroll.appendChild(abilityWrap);
 
     // BATTLE LOG section — move #battle-log-panel into HQ, expanded by default
     const blog = document.getElementById('battle-log-panel');
     if (blog) {
       blog.removeAttribute('style');
-      content.appendChild(blog);
+      scroll.appendChild(blog);
     }
     battleLog.setCollapsed(false);
 
@@ -810,6 +991,31 @@ export class HUD {
     });
 
     this.syncToastContainerDock();
+  }
+
+  /** Move ability + battle log into the scroll region on older HQ layouts. */
+  private migrateHQLayoutIfNeeded(): void {
+    const content = document.getElementById('hq-content');
+    if (!content || document.getElementById('hq-scroll')) return;
+
+    const pinned = document.createElement('div');
+    pinned.id = 'hq-pinned';
+    pinned.className = 'hq-pinned';
+    const scroll = document.createElement('div');
+    scroll.id = 'hq-scroll';
+    scroll.className = 'hq-scroll';
+    content.appendChild(pinned);
+    content.appendChild(scroll);
+
+    for (const child of Array.from(content.children)) {
+      if (child === pinned || child === scroll) continue;
+      const el = child as HTMLElement;
+      if (el.id === 'hq-ability-section' || el.id === 'battle-log-panel') {
+        scroll.appendChild(el);
+      } else {
+        pinned.appendChild(el);
+      }
+    }
   }
 
   fitMapToCommandLayout(): void {
@@ -870,9 +1076,17 @@ export class HUD {
     if (modalOpen) {
       // Escape closes the frontmost modal
       if (key === 'Escape') {
-        const openModal = document.querySelector('.modal:not(.hidden)');
-        const closeBtn = openModal?.querySelector<HTMLElement>('[id^="btn-close"]');
-        closeBtn?.click();
+        const openModal = document.querySelector<HTMLElement>('.modal:not(.hidden)');
+        if (openModal && openModal.id !== 'main-menu-modal') {
+          const closeBtn = openModal.querySelector<HTMLElement>(
+            '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+          );
+          if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+            closeBtn.click();
+          } else {
+            openModal.classList.add('hidden');
+          }
+        }
       }
       return;
     }
@@ -882,153 +1096,62 @@ export class HUD {
 
     switch (key) {
       case 'F': if (e.shiftKey) { e.preventDefault(); this.resetUIToCommandLayout(); } break;
-      case 'm': case 'M': if (isHumanTurn) this.onMoveClick(); break;
-      case 'a': case 'A': if (isHumanTurn) this.onAttackShortcut(); break;
+      case 'a': case 'A':
+        if (isHumanTurn) {
+          if (isCombatPhase(this.state.currentPhase)) this.resolveCombat();
+          else this.onAttackShortcut();
+        }
+        break;
       case 'r': case 'R': if (isHumanTurn) this.techUI.show(); break;
       case 'd': case 'D': if (isHumanTurn) this.diplomacyUI.showModal(); break;
       case 's': case 'S': if (isHumanTurn) this.showAISpeedMenu(); break;
       case '+': case '=': this.renderer.zoom(1.2); break;
       case '-': this.renderer.zoom(0.8); break;
+      case 'Tab':
+        if (isHumanTurn && isMovementPhase(this.state.currentPhase)) {
+          e.preventDefault();
+          this.stackCommand.cycleUnitStack(e.shiftKey ? -1 : 1);
+        }
+        break;
+      case '1': case '2': case '3':
+        if (isHumanTurn && isMovementPhase(this.state.currentPhase) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) break;
+          e.preventDefault();
+          this.stackCommand.pickStackByIndex(Number(e.key));
+        }
+        break;
     }
   }
 
   /**
-   * Setup territory hover tooltip
+   * Territory hover tooltips are disabled — selection panel shows territory info instead.
    */
   private setupTerritoryTooltip(): void {
-    // Hide all tooltips whenever any modal opens (class mutation: hidden removed)
-    const modalObserver = new MutationObserver(() => {
-      if (document.querySelector('.modal:not(.hidden)')) {
-        document.getElementById('territory-tooltip')?.classList.add('hidden');
-        document.getElementById('unit-tooltip')?.classList.add('hidden');
-      }
+    this.renderer.setTerritoryHoverCallback(() => {
+      document.getElementById('territory-tooltip')?.classList.add('hidden');
     });
-    document.querySelectorAll('.modal').forEach(m => {
-      modalObserver.observe(m, { attributes: true, attributeFilter: ['class'] });
-    });
+  }
 
-    this.renderer.setTerritoryHoverCallback((territoryId, clientX, clientY) => {
-      const el = document.getElementById('territory-tooltip');
-      const content = document.getElementById('territory-tooltip-content');
-      if (!el || !content) return;
-      // Suppress while any modal is open or the AI is taking its turn
-      if (document.querySelector('.modal:not(.hidden)') || this.state.getCurrentFaction()?.controlledBy === 'ai') {
-        el.classList.add('hidden');
-        return;
-      }
-      if (!territoryId) {
-        el.classList.add('hidden');
-        return;
-      }
-      const territory = this.state.territories.get(territoryId);
-      if (!territory) {
-        el.classList.add('hidden');
-        return;
-      }
-      
-      const owner = territory.owner ? this.state.factionRegistry.get(territory.owner)?.name : 'Neutral';
-      const unitCount = territory.getTotalUnitCount();
-      const badges: string[] = [];
-      if (territory.isCapital) badges.push('⭐ Capital');
-      if (territory.hasFactory) badges.push('🏭 Factory');
-      
-      // Check if we're in build phase and this is our territory
-      const phase = this.state.currentPhase;
-      const faction = this.state.getCurrentFaction();
-      const isBuildPhase = ['purchase', 'production', 'build'].includes(phase);
-      const isOwnTerritory = faction && territory.owner === faction.id && territory.type !== 'sea';
-      
-      let mobilizationInfo = '';
-      if (isBuildPhase && isOwnTerritory && faction?.controlledBy === 'human') {
-        const option = this.mobilizationSystem.getTerritoryMobilization(territory);
-        const wasMobilized = this.mobilizationSystem.wasMobilized(territoryId);
-        
-        if (wasMobilized) {
-          mobilizationInfo = `<div style="margin-top: 0.5rem; padding: 0.4rem; background: rgba(26,122,92,0.1); border-radius: 4px; color: #1a7a5c;">
-            ✓ Mobilized this turn
-          </div>`;
-        } else {
-          const unitsStr = option.units.map(u => {
-            const icon = UNIT_ICONS[u.unitTypeId] || '⬜';
-            return `${icon}×${u.count}`;
-          }).join(' ');
-          
-          const canAfford = option.canMobilize;
-          const bgColor = canAfford ? 'rgba(184,134,11,0.12)' : 'rgba(0,0,0,0.06)';
-          const textColor = canAfford ? '#6b4f10' : '#888';
-          
-          mobilizationInfo = `<div style="margin-top: 0.5rem; padding: 0.4rem; background: ${bgColor}; border-radius: 4px;">
-            <div style="color: ${textColor}; font-weight: bold;">
-              ${canAfford ? '🖱️ Click to Mobilize' : '❌ ' + option.reason}
-            </div>
-            <div style="font-size: 0.85rem; margin-top: 0.25rem;">
-              Cost: <strong style="color: #8b6914;">${option.cost} IPCs</strong><br>
-              Spawns: ${unitsStr}
-            </div>
-          </div>`;
-        }
-      }
-      
-      // Respect fog of war — hide enemy unit details in hidden territories
-      let threatInfo = '';
-      if (isOwnTerritory && faction) {
-        const threat = calculateTerritoryThreat(this.state, territory, faction);
-        if (threat.threatLevel > 0) {
-          const status = threat.defenseGap > 0 ? 'Under-defended front' : 'Covered front';
-          const bgColor = threat.defenseGap > 0 ? 'rgba(239,68,68,0.14)' : 'rgba(245,158,11,0.12)';
-          const textColor = threat.defenseGap > 0 ? '#b91c1c' : '#92400e';
-          threatInfo = `<div style="margin-top: 0.5rem; padding: 0.4rem; background: ${bgColor}; border-radius: 4px; color: ${textColor};">
-            <strong>${status}</strong><br>
-            Enemy pressure: ${Math.round(threat.threatLevel)} | Defense: ${Math.round(threat.defenseStrength)}
-          </div>`;
-        }
-      }
+  private setupUnitStackSelectorListeners(): void {
+    this.stackCommand.init();
+  }
 
-      const isVisible = this.isTerritoryVisible(territoryId);
-      const showUnits = isVisible || territory.owner === faction?.id;
+  private refreshUnitStackSelector(): void {
+    this.stackCommand.refresh();
+  }
 
-      const unitBreakdown = showUnits
-        ? (territory.units.length > 0
-            ? territory.units.map(u => {
-                const icon = UNIT_ICONS[u.unitTypeId] || '⬜';
-                const name = this.state.unitRegistry.get(u.unitTypeId)?.name ?? u.unitTypeId;
-                return `<span style="white-space:nowrap">${icon} ${u.count}× ${name}</span>`;
-              }).join('&nbsp;&nbsp;')
-            : 'None')
-        : '<span style="color:#888">🌫️ Hidden by fog of war</span>';
-
-      const tooltipCommander = showUnits
-        ? territory.units.find((u: any) => u.commander)?.commander
-        : null;
-      const commanderLine = tooltipCommander
-        ? `<br>⭐ Led by <strong>${tooltipCommander.name}</strong> (+${tooltipCommander.attackBonus} ATK / +${tooltipCommander.defenseBonus} DEF)`
-        : '';
-
-      const ownerHistory = this.state.ownershipHistory.get(territory.id) ?? [];
-      const historyLine = ownerHistory.length > 0
-        ? `<div style="margin-top:0.35rem;font-size:0.75rem;color:#9ca3af;">
-            📜 Previously: ${[...ownerHistory].reverse().slice(0, 3).map(h => {
-              const f = this.state.factionRegistry.get(h.factionId);
-              return `<span style="color:${f?.color ?? '#aaa'}">${f?.name ?? h.factionId}</span> (T${h.turnNumber})`;
-            }).join(' ← ')}
-           </div>`
-        : '';
-
-      content.innerHTML = `
-        <strong>${territory.name}</strong><br>
-        Owner: ${owner}<br>
-        IPC value: ${territory.production}<br>
-        Units (${showUnits ? unitCount : '?'}): ${unitBreakdown}
-        ${badges.length ? '<br>' + badges.join(' • ') : ''}
-        ${commanderLine}
-        ${historyLine}
-        ${threatInfo}
-        ${mobilizationInfo}
-      `;
-      el.style.left = `${clientX + 15}px`;
-      el.style.top = `${clientY + 15}px`;
-      el.classList.remove('hidden');
-    });
+  private setupMobileStackBar(): void {
+    if (document.getElementById('mobile-stack-command-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'mobile-stack-command-bar';
+    bar.className = 'mobile-stack-command-bar hidden';
+    bar.setAttribute('aria-label', 'Command stack');
+    bar.innerHTML = `
+      <div class="mobile-stack-command-title">Command Stack</div>
+      <div class="unit-stack-selector-body"></div>
+    `;
+    document.body.appendChild(bar);
   }
 
   /**
@@ -1038,6 +1161,7 @@ export class HUD {
     this.state.on('turn_start', (e) => {
       this.updateTurnInfo();
       this.mobilizationSystem.resetForNewTurn();
+      this.stackCommand.resetForNewTurn();
       // Tick dynamic features for human factions
       const evData = e.data as { factionId?: string } | undefined;
       const fid = evData?.factionId ?? this.state.currentFactionId;
@@ -1054,12 +1178,44 @@ export class HUD {
     this.state.on('victory', (e) => this.handleVictory(e.data as { winner?: string; factionId?: string }));
     this.state.on('ai_thinking', (e) => {
       const data = e.data as { message?: string; action?: string; territory?: string; territoryId?: string };
-      if (data.message) {
-        this.updateAIActivityBanner(data.message);
-        if (data.action) this.addAIActivity(data.message, data.action);
+      let displayMessage = data.message ?? '';
+      if (data.territory) {
+        displayMessage = displayMessage ? `${displayMessage} — ${data.territory}` : data.territory;
+      }
+      if (displayMessage) {
+        this.updateAIActivityBanner(displayMessage);
+        if (data.action) this.addAIActivity(displayMessage, data.action);
       }
       if (data.territoryId) {
         this.renderer.setAIPulseTerritory(data.territoryId);
+      }
+    });
+    this.state.on('tactical_assault_start', (e) => {
+      const data = e.data as { territoryId?: string; territoryName?: string };
+      soundManager.play('tactical_start');
+      soundManager.playMusic('tactical_combat');
+      if (data.territoryId) {
+        this.renderer.setAIPulseTerritory(data.territoryId);
+        const territory = this.state.territories.get(data.territoryId);
+        if (territory) {
+          const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+          visualEffects.shake(0.25);
+          visualEffects.muzzleFlash(screen.x, screen.y);
+        }
+      }
+    });
+    this.state.on('combat_start', (e) => {
+      const combat = (e.data as { combat?: { territoryId: string; attackingFactionId: string; defendingFactionId: string } })?.combat;
+      if (!combat) return;
+      const humanIds = new Set(this.state.factionRegistry.getAll().filter(f => f.controlledBy === 'human').map(f => f.id));
+      if (!humanIds.has(combat.attackingFactionId) && !humanIds.has(combat.defendingFactionId)) return;
+      soundManager.play('combat_start');
+      soundManager.playMusic('combat');
+      const territory = this.state.territories.get(combat.territoryId);
+      if (territory) {
+        const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+        visualEffects.shake(0.35);
+        visualEffects.muzzleFlash(screen.x, screen.y);
       }
     });
     this.state.on('combat_end', (e) => this.onCombatEnd(e));
@@ -1108,7 +1264,14 @@ export class HUD {
       if (!faction) return;
       const recap = this.ensureTurnRecap(faction.id);
       recap.mobilizations++;
-      recap.unitsMobilized += data.units.reduce((sum, unit) => sum + unit.count, 0);
+      const unitsCount = data.units.reduce((sum, unit) => sum + unit.count, 0);
+      recap.unitsMobilized += unitsCount;
+
+      const territory = this.state.territories.get(data.territoryId);
+      if (territory && unitsCount > 0) {
+        const screen = this.renderer.worldToScreen(territory.center[0], territory.center[1]);
+        visualEffects.floatText(screen.x, screen.y - 18, `+${unitsCount} ready next turn`, faction.color, 16);
+      }
     });
 
     this.state.on('income_collected', (e) => {
@@ -1159,6 +1322,13 @@ export class HUD {
     const combat = data.combat;
     if (!combat) return;
 
+    if (data.retreated) {
+      soundManager.play('retreat');
+      soundManager.playMusic('gameplay');
+    } else {
+      soundManager.playMusic('gameplay');
+    }
+
     const territory = this.state.territories.get(combat.territoryId);
     const faction = this.state.getCurrentFaction();
     const humanFactions = this.state.factionRegistry.getAll().filter(f => f.controlledBy === 'human');
@@ -1182,12 +1352,21 @@ export class HUD {
     }
     
     // Get screen position for effects (center of screen as fallback)
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
+    const effectPoint = territory
+      ? this.renderer.worldToScreen(territory.center[0], territory.center[1])
+      : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const centerX = effectPoint.x;
+    const centerY = effectPoint.y;
     
     // Calculate casualties for achievements
     const attackerLosses = combat.attackers.reduce((sum, u) => sum + u.casualties, 0);
     const defenderLosses = combat.defenders.reduce((sum, u) => sum + u.casualties, 0);
+    if (attackerLosses + defenderLosses > 0) {
+      const attackerColor = this.state.factionRegistry.get(combat.attackingFactionId)?.color ?? '#fbbf24';
+      const defenderColor = this.state.factionRegistry.get(combat.defendingFactionId)?.color ?? '#60a5fa';
+      visualEffects.muzzleFlash(centerX - 14, centerY - 6, attackerColor);
+      visualEffects.muzzleFlash(centerX + 14, centerY + 6, defenderColor);
+    }
 
     if (faction?.controlledBy === 'ai') {
       const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
@@ -1297,6 +1476,22 @@ export class HUD {
         setTimeout(() => this.showToast(`💬 ${taunt}`, 'info'), 1200);
       }
     }
+
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      setTimeout(() => this.handleMoveForMovePass(), 400);
+    }
+  }
+
+  /** Pass the turn to the next faction after a single move in move-for-move mode. */
+  private handleMoveForMovePass(): void {
+    if (this.gameConfig.turnStyle !== 'move_for_move') return;
+    if (!this.turnManager.isMoveForMoveSegmentActive()) return;
+    this.turnManager.passMoveForMoveTurn();
+    this.updateTurnInfo();
+    this.updatePhaseInfo();
+    this.updateActionButtons();
+    this.renderer.render();
+    this.renderMinimap();
   }
 
   /**
@@ -1380,10 +1575,17 @@ export class HUD {
       const size = result.attackerCriticals > 0 ? 28 : 20;
       const label = result.attackerCriticals > 0 ? `💥 -${result.attackerHits}` : `-${result.attackerHits}`;
       visualEffects.floatText(screen.x + jitter(), screen.y - 20 + jitter(), label, color, size);
+      soundManager.play(result.attackerCriticals > 0 ? 'explosion' : 'hit');
+      visualEffects.muzzleFlash(screen.x - 12, screen.y - 8, color);
+      if (result.attackerCriticals > 0) visualEffects.shake(0.5);
+    } else {
+      soundManager.play('miss');
     }
     if (result.defenderHits > 0) {
       const color = this.state.factionRegistry.get(combat.defendingFactionId)?.color ?? '#4488ff';
       visualEffects.floatText(screen.x + jitter(), screen.y + 20 + jitter(), `-${result.defenderHits}`, color, 20);
+      soundManager.play('hit');
+      visualEffects.muzzleFlash(screen.x + 12, screen.y + 8, color);
     }
   }
 
@@ -1491,7 +1693,7 @@ export class HUD {
     if (existing) { existing.remove(); return; }
 
     const shortcuts = [
-      ['↵ / Space', 'End phase / End turn'],
+      ['↵ / Space', 'End turn'],
       ['B', 'Open build / mobilize menu'],
       ['M', 'Move mode'],
       ['A', 'Attack from selected territory (auto-fires if one target)'],
@@ -1564,6 +1766,8 @@ export class HUD {
       captures: 0,
       mobilizations: 0,
       unitsMobilized: 0,
+      unitsMoved: 0,
+      ipcsSpent: 0,
       income: 0,
       unitsLost: 0,
       enemyUnitsDestroyed: 0,
@@ -1613,7 +1817,12 @@ export class HUD {
     // Update mobilization highlights for build phase
     const phase = this.state.currentPhase;
     const isBuildPhase = ['purchase', 'production', 'build'].includes(phase);
-    if (isBuildPhase && faction?.controlledBy === 'human') {
+    const skipAutoBuildPrompt = phase === 'play';
+    if (isBuildPhase && faction?.controlledBy === 'human' && !skipAutoBuildPrompt) {
+      if (this.gameConfig.simpleMode) {
+        this.overlayController.setMode('threat');
+        this.updateMapReadabilityLegend();
+      }
       this.updateMobilizationHighlights();
       // Auto-open the deployment / mobilization modal so the player is
       // immediately prompted to make strategic placement choices.
@@ -1624,7 +1833,7 @@ export class HUD {
         this.showDeploymentModal();
       } else {
         // Open factory hub so player can plan their purchases
-        this.productionUI.showFactoryHub();
+        this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
       }
     } else {
       this.renderer.clearMobilizationTargets();
@@ -1633,10 +1842,14 @@ export class HUD {
     // Check if phase should be auto-skipped (nothing to do)
     if (faction?.controlledBy === 'human') {
       this.checkAutoSkipPhase(phase, faction);
-      // One-time hint about the Enter shortcut to end phases
-      this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
-      const firstTurnTip = this.phaseGuidance.getFirstTurnTip(this.state.turnNumber, phase);
-      if (firstTurnTip) this.showFirstTimeTip(firstTurnTip.tipId, firstTurnTip.message);
+      const guided = this.gameConfig.guidedOnboarding && this.state.turnNumber === 1;
+      if (!guided) {
+        this.showFirstTimeTip('enter-shortcut', 'Press <b>Enter</b> or <b>Space</b> to end the current phase without clicking the button.');
+      }
+      if (!this.gameConfig.guidedOnboarding || this.state.turnNumber > 1) {
+        const firstTurnTip = this.phaseGuidance.getFirstTurnTip(this.state.turnNumber, phase);
+        if (firstTurnTip) this.showFirstTimeTip(firstTurnTip.tipId, firstTurnTip.message);
+      }
     }
   }
   
@@ -1659,8 +1872,8 @@ export class HUD {
     } else if (phase === 'noncombat_move') {
       // Auto-skip if no units can move
       const hasMovableUnits = Array.from(this.state.territories.values()).some(t => {
-        if (t.owner !== faction.id) return false;
-        return t.units.some(pu => t.getAvailableUnitCount(pu.unitTypeId) > 0);
+        if (!canIssueOrdersFromTerritory(t, faction.id)) return false;
+        return territoryHasAvailableUnits(t);
       });
       if (!hasMovableUnits) {
         shouldSkip = true;
@@ -1702,11 +1915,14 @@ export class HUD {
    */
   private onTerritorySelected(data: { territoryId: string | null; previousTerritoryId?: string | null }): void {
     const { territoryId, previousTerritoryId } = data;
-    this.updateSelectionInfo();
-    // Start the animation loop so the selection glow animates
-    this.renderer.startContinuousRender();
 
-    if (!territoryId) return;
+    if (!territoryId) {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
+      this.updateValidMoves();
+      this.updateStrategicAdvisor();
+      return;
+    }
 
     const phase = this.state.currentPhase;
     const faction = this.state.getCurrentFaction();
@@ -1717,6 +1933,8 @@ export class HUD {
 
     // Handle commander move mode
     if (this.commanderMoveSource !== null) {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       if (territoryId === this.commanderMoveSource) {
         this.commanderMoveSource = null;
         this.showToast('Commander move cancelled.', 'info');
@@ -1728,34 +1946,55 @@ export class HUD {
 
     // Handle placement mode (placing purchased units)
     if (this.isPlacementMode) {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.handlePlacementClick(territoryId);
       return;
     }
 
-    // Check if clicking on a valid move target
-    // Handle all movement-capable phases across different turn styles
+    const canMobilizeOnClick = (
+      isBuildPhase(phase) || this.gameConfig.turnStyle === 'move_for_move'
+    ) && faction.controlledBy === 'human'
+      && territory.owner === faction.id
+      && territory.type !== 'sea';
+
+    if (canMobilizeOnClick && !this.mobilizationSystem.wasMobilized(territoryId)) {
+      const mobilizeOption = this.mobilizationSystem.getTerritoryMobilization(territory);
+      if (mobilizeOption.canMobilize) {
+        this.updateSelectionInfo();
+        this.renderer.startContinuousRender();
+        this.productionUI.handleMapMobilization(territoryId);
+        return;
+      }
+    }
+
+    // Resolve move/attack against highlighted targets BEFORE changing the active unit stack.
     const movementPhase = isMovementPhase(phase);
-    
     const moveResolution = resolveTerritorySelectionMove({
       phaseIsMovement: movementPhase,
       territoryId,
       previousTerritoryId,
-      validMoves: this.validMoves,
+      validMoves: this.validMoveController.getValidMoves(),
     });
+
     if (moveResolution.kind === 'refresh') {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.updateValidMoves();
+      this.updateStrategicAdvisor();
       return;
     }
     if (moveResolution.kind === 'previewAttack') {
+      this.updateSelectionInfo();
+      this.renderer.startContinuousRender();
       this.combatUI.showBattlePreview(moveResolution.fromId, moveResolution.toId);
       return;
     }
-    if (moveResolution.kind === 'executeMove') {
-      this.executePlayerMove(moveResolution.fromId, moveResolution.toId, false);
-      return;
-    }
 
-    // Update valid moves for newly selected territory
+    // Selecting a new territory — auto-select largest stack with all units ready.
+    this.renderer.startContinuousRender();
+    this.stackCommand.onTerritorySelected(territory, territoryId !== previousTerritoryId);
+    this.updateSelectionInfo();
     this.updateValidMoves();
     this.updateStrategicAdvisor();
   }
@@ -1791,7 +2030,7 @@ export class HUD {
       this.showToast('Commanders can only move to friendly territory.', 'error');
       return;
     }
-    if (!from.adjacentTo.includes(toId) && from.id !== toId) {
+    if (!areTerritoriesNeighbors(this.state, from, to)) {
       this.showToast('Commander must move to an adjacent territory.', 'error');
       return;
     }
@@ -1858,28 +2097,88 @@ export class HUD {
     if (!fromTerritory || !toTerritory || !faction) {
       return;
     }
-    if (fromTerritory.owner !== faction.id) {
+    if (!canIssueOrdersFromTerritory(fromTerritory, faction.id)) {
       return;
     }
 
-    // Collect only units that CAN move (haven't acted yet this turn)
+    const moveContext = resolveMovePhaseContext(this.state.currentPhase);
+    const combatMove = moveContext !== 'noncombat';
     const unitsToMove: { unitTypeId: string; count: number }[] = [];
-    
-    for (const pu of fromTerritory.units) {
-      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (!unitType) continue;
-      if (!unitType.canEnter(toTerritory.type)) continue;
-      
-      // Only count units that haven't moved this turn
-      const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
-      if (availableCount <= 0) continue;
-      
-      unitsToMove.push({ unitTypeId: pu.unitTypeId, count: availableCount });
-    }
 
-    if (unitsToMove.length === 0) {
-      this.showToast('No available units can move there! (Units can only act once per turn)', 'info');
-      return;
+    if (this.stackCommand.isSelectAllTypes()) {
+      const stackMoves = resolveAllValidMovesAtTarget(
+        this.validMoveController.getValidMoves(),
+        toId,
+        'move',
+      );
+      if (stackMoves.length === 0) {
+        this.showToast('That destination is not reachable by any ready unit.', 'info');
+        return;
+      }
+
+      for (const stackMove of stackMoves) {
+        const stackTypeId = stackMove.unitTypeId;
+        if (!stackTypeId) continue;
+        const stackCount = fromTerritory.getAvailableUnitCount(stackTypeId);
+        if (stackCount <= 0) continue;
+
+        const validation = this.movementValidator.validateMove(
+          stackTypeId,
+          stackCount,
+          fromId,
+          toId,
+          combatMove,
+        );
+        if (!validation.valid) continue;
+
+        unitsToMove.push({ unitTypeId: stackTypeId, count: stackCount });
+      }
+
+      if (unitsToMove.length === 0) {
+        this.showToast('No available units can move there! (Units can only act once per turn)', 'info');
+        return;
+      }
+    } else {
+      const validMove = resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toId, 'move');
+      const unitTypeId = validMove?.unitTypeId ?? resolveHighlightedMoveUnitType({
+        validMovesUnitTypeId: this.validMoveController.getValidMovesUnitTypeId(),
+        selectedUnitType: this.stackCommand.selectedUnitType,
+      }) ?? (() => {
+        this.stackCommand.autoSelectUnitType(fromTerritory);
+        return this.stackCommand.selectedUnitType;
+      })();
+      if (!unitTypeId) {
+        this.showToast('No units available to move.', 'info');
+        return;
+      }
+
+      const unitType = this.state.unitRegistry.get(unitTypeId);
+      if (!unitType) return;
+
+      const moveCount = this.getResolvedMoveCount(fromTerritory, unitTypeId);
+      if (moveCount <= 0) {
+        this.showToast('No available units can move there! (Units can only act once per turn)', 'info');
+        return;
+      }
+
+      if (!validMove || validMove.isAttack) {
+        this.showToast('That destination is not reachable by the selected unit.', 'info');
+        return;
+      }
+
+      const validation = this.movementValidator.validateMove(
+        unitTypeId,
+        moveCount,
+        fromId,
+        toId,
+        combatMove,
+      );
+      if (!validation.valid) {
+        this.showToast(validation.reason ?? 'Invalid move.', 'info');
+        return;
+      }
+
+      unitsToMove.push({ unitTypeId, count: moveCount });
     }
 
     // Capture neutral/unowned territory when moving in
@@ -1890,12 +2189,28 @@ export class HUD {
 
     // SIMPLE: Move units from source to destination
     let totalMoved = 0;
+    let primaryDomain: 'land' | 'sea' | 'air' = 'land';
     for (const unit of unitsToMove) {
+      const unitTypeForEmbark = this.state.unitRegistry.get(unit.unitTypeId);
+      if (!unitTypeForEmbark) continue;
+      primaryDomain = unitTypeForEmbark.domain;
+
       fromTerritory.removeUnits(unit.unitTypeId, unit.count);
       toTerritory.addUnits(unit.unitTypeId, unit.count);
 
+      if (toTerritory.type === 'sea' && usesImplicitAmphibious(unitTypeForEmbark)) {
+        claimSeaZoneForFaction(this.state, toTerritory, faction.id);
+      }
+
       // Mark units as having acted (in the destination territory)
       toTerritory.markUnitsActed(unit.unitTypeId, unit.count);
+
+      this.state.emit('units_moved', {
+        unitTypeId: unit.unitTypeId,
+        count: unit.count,
+        from: fromId,
+        to: toId,
+      });
 
       totalMoved += unit.count;
     }
@@ -1904,11 +2219,21 @@ export class HUD {
     if (wasNeutral) {
       this.showToast(`Captured ${toTerritory.name} with ${totalMoved} units!`, 'success');
       soundManager.play('capture');
+      const screen = this.renderer.worldToScreen(toTerritory.center[0], toTerritory.center[1]);
+      visualEffects.captureEffect(screen.x, screen.y, faction.color);
     } else {
-      this.showToast(`Moved ${totalMoved} units to ${toTerritory.name}`, 'success');
-      const movedDomain = this.state.unitRegistry.get(unitsToMove[0]?.unitTypeId)?.domain ?? 'land';
-      soundManager.play(movedDomain === 'sea' ? 'naval_horn' : movedDomain === 'air' ? 'aircraft' : 'move');
+      const stackSummary = unitsToMove.length > 1
+        ? `${unitsToMove.length} unit types`
+        : (this.state.unitRegistry.get(unitsToMove[0]?.unitTypeId)?.name ?? unitsToMove[0]?.unitTypeId ?? 'units');
+      this.showToast(`Moved ${totalMoved} ${stackSummary} to ${toTerritory.name}. They are done until next turn.`, 'success');
+      soundManager.play(primaryDomain === 'sea' ? 'naval_horn' : primaryDomain === 'air' ? 'aircraft' : 'move');
     }
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      this.showToast('Move complete — next player\'s turn', 'info');
+    }
+    const recap = this.ensureTurnRecap(faction.id);
+    recap.unitsMoved += totalMoved;
+    battleLog.logMove(this.state.turnNumber, faction.name, faction.color, `${totalMoved} units moved to ${toTerritory.name}; ready next turn.`);
 
     // Track for undo
     this.undoController.recordMove({
@@ -1916,15 +2241,16 @@ export class HUD {
       data: { from: fromId, to: toId, units: unitsToMove },
     });
 
-    // Update display
+    // Update display — keep commanding from this territory when more stacks remain
     this.renderer.render();
     this.renderMinimap();
-    this.renderer.clearValidMoveTargets();
-    this.validMoves = [];
-    this.state.selectedTerritoryId = null;
-    this.updateSelectionInfo();
-    this.updateActionButtons();
-    this.updateUndoButton();
+    this.handoffStackAfterAction(fromId, toId);
+
+    if (this.gameConfig.turnStyle === 'move_for_move' && this.turnManager.isMoveForMoveSegmentActive()) {
+      this.handleMoveForMovePass();
+    }
+
+    sanitizeNavalUnitPlacement(this.state);
   }
 
   /**
@@ -2089,6 +2415,7 @@ export class HUD {
    * Update turn info display
    */
   updateTurnInfo(): void {
+    this.syncSimpleModeChrome();
     const faction = this.state.getCurrentFaction();
     const turnEl = document.getElementById('turn-number');
     const factionEl = document.getElementById('current-faction');
@@ -2199,8 +2526,7 @@ export class HUD {
 
         this.stopTurnTimer();
 
-        // First-time tips
-        if (this.state.turnNumber === 1) {
+        if (this.state.turnNumber === 1 && !this.gameConfig.guidedOnboarding) {
           this.showFirstTimeTip('turn_start', 'Click territories to select them, then use the action bar at the bottom');
           this.showFirstWarRoom(faction.id);
         }
@@ -2387,20 +2713,22 @@ export class HUD {
    * Update phase info display
    */
   updatePhaseInfo(): void {
+    this.syncSimpleModeChrome();
+    this.syncMoveForMoveChrome();
     const phaseEl = document.getElementById('current-phase');
     const phase = this.state.currentPhase;
     
-    if (phaseEl) {
-      phaseEl.textContent = this.turnManager.getPhaseDisplayName();
+    if (phaseEl && this.gameConfig.turnStyle !== 'move_for_move') {
+      phaseEl.textContent = this.gameConfig.simpleMode
+        ? getSimplePhaseLabel(phase as string, this.gameConfig.turnStyle, this.turnManager.getPhaseDisplayName())
+        : this.turnManager.getPhaseDisplayName();
     }
 
     // Update phase display (end-turn button label is set in updateActionButtons)
     
     this.updateActionButtons();
-    this.renderer.clearValidMoveTargets();
-    this.validMoves = [];
-    this.selectedUnitType = null;
-    void this.selectedUnitType; // used when building unit selection
+    this.validMoveController.clear();
+    this.stackCommand.selectedUnitType = null;
 
     // Update IPC display
     const faction = this.state.getCurrentFaction();
@@ -2410,6 +2738,11 @@ export class HUD {
     }
 
     return;
+  }
+
+  private syncSimpleModeChrome(): void {
+    const isSimple = this.gameConfig.simpleMode ?? true;
+    document.body.classList.toggle('simple-mode', isSimple);
   }
 
   /**
@@ -2506,10 +2839,8 @@ export class HUD {
     const faction = this.state.getCurrentFaction();
     if (!faction) return '';
 
-    if (territory.type === 'coastal' && territory.owner === faction.id) {
-      const adjacentSeas = territory.adjacentTo
-        .map(id => this.state.territories.get(id))
-        .filter((t): t is import('../data/Territory').Territory => !!t && t.type === 'sea');
+    if (territory.isLand() && territory.owner === faction.id && hasSeaAccess(this.state, territory)) {
+      const adjacentSeas = getAdjacentSeaZones(this.state, territory);
       if (adjacentSeas.length === 0) return '';
 
       const blockaded = this.supplySystem.isNavalBlockaded(territory.id, faction.id);
@@ -2520,17 +2851,33 @@ export class HUD {
         !sea.owner ||
         !faction.isEnemyOf(sea.owner)
       ).length;
+
+      const fleetSummaries = adjacentSeas
+        .map(sea => {
+          const lines = summarizeFleet(this.state, sea);
+          if (lines.length === 0) return null;
+          const isFriendly = !sea.owner || sea.owner === faction.id;
+          if (!isFriendly) return null;
+          return `${this.escapeHtml(sea.name)}: ${lines.map(l => `${l.count} ${l.label}`).join(', ')}`;
+        })
+        .filter(Boolean);
+
+      const fleetHtml = fleetSummaries.length > 0
+        ? `<span class="naval-roles">Fleet: ${fleetSummaries.join(' · ')}</span>`
+        : `<span style="font-size:0.72rem;opacity:0.85;">Naval builds deploy to adjacent sea zones — select one to inspect your fleet.</span>`;
+
       return `<div class="naval-status ${blockaded ? 'danger' : 'open'}">
         <strong>${blockaded ? 'Naval blockade' : 'Sea access open'}</strong>
         <span>${openSeas}/${adjacentSeas.length} adjacent sea zone${adjacentSeas.length === 1 ? '' : 's'} open</span>
+        ${fleetHtml}
       </div>`;
     }
 
     if (territory.type === 'sea') {
-      const transports = territory.units.reduce((sum, unit) => {
-        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
-        return sum + (unitType?.transportCapacity ?? 0) * unit.count;
-      }, 0);
+      const transports = faction
+        ? getTransportCapacityInSeaZone(this.state, territory.id, faction.id)
+        : 0;
+      const fleetLines = summarizeFleet(this.state, territory);
       const adjacentCoasts = territory.adjacentTo
         .map(id => this.state.territories.get(id))
         .filter(t => t?.isLand())
@@ -2538,9 +2885,13 @@ export class HUD {
         .map(t => t?.name ?? '')
         .filter(Boolean);
       const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+      const fleetHtml = fleetLines.length > 0
+        ? fleetLines.map(line => `${line.count} ${line.label}`).join(' · ')
+        : 'No fleet present';
       return `<div class="naval-status sea">
         <strong>${owner ? `${this.escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
-        <span>${transports > 0 ? `${transports} transport capacity` : 'No transport capacity'}${adjacentCoasts.length ? ` · Coasts: ${this.escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
+        <span>${fleetHtml}${transports > 0 ? ` · ${transports} lift` : ''}${adjacentCoasts.length ? ` · Coasts: ${this.escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
+        ${fleetLines.length > 0 ? `<span class="naval-roles">${fleetLines.map(l => this.escapeHtml(`${l.label}: ${l.duty}`)).join(' · ')}</span>` : ''}
       </div>`;
     }
 
@@ -2557,11 +2908,33 @@ export class HUD {
       if (detailsEl) {
         detailsEl.innerHTML = this.buildFactionSummaryHtml();
       }
+      this.validMoveController.clear();
+      this.stackCommand.clearSelection();
+      this.updateMapReadabilityLegend();
       this.updateActionButtons();
       return;
     }
 
     if (nameEl) nameEl.textContent = territory.name;
+
+    if (territory.type !== 'sea' && territory.units.some(pu => {
+      const ut = this.state.unitRegistry.get(pu.unitTypeId);
+      return ut?.domain === 'sea';
+    })) {
+      sanitizeNavalUnitPlacement(this.state);
+    }
+
+    if (this.gameConfig.simpleMode) {
+      if (detailsEl) {
+        detailsEl.classList.remove('content-refresh');
+        void detailsEl.offsetWidth;
+        detailsEl.innerHTML = this.buildSimpleTerritoryDetails(territory);
+        detailsEl.classList.add('content-refresh');
+      }
+      this.refreshUnitStackSelector();
+      this.updateActionButtons();
+      return;
+    }
 
     // Build details HTML with board game styling
     let html = '';
@@ -2621,13 +2994,17 @@ export class HUD {
     // Units with icons - show available/total for owned territories
     const isOwnedTerritory = territory.owner === this.state.currentFactionId;
     const phase = this.state.currentPhase;
-    const isMovementPhase = ['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase);
+    const movementPhaseActive = isMovementPhase(phase);
     
-    if (territory.units.length > 0) {
-      // Show unit summary for owned territories
-      if (isOwnedTerritory && isMovementPhase) {
-        const totalUnits = territory.getTotalUnitCount();
-        const availableUnits = territory.units.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
+    const displayUnits = territory.units.filter(pu => {
+      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+      return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
+    });
+
+    if (displayUnits.length > 0) {
+      if (isOwnedTerritory && movementPhaseActive) {
+        const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
+        const availableUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
         const actedUnits = totalUnits - availableUnits;
         
         if (actedUnits > 0) {
@@ -2637,47 +3014,11 @@ export class HUD {
           </div>`;
         }
       }
-      
-      html += `<div class="unit-list">`;
-      for (const pu of territory.units) {
-        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-        if (unitType) {
-          const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
-          const moveIcon = unitType.movement === 1 ? '🚶' : unitType.movement >= 3 ? '✈️' : '🚗';
-          const availableCount = territory.getAvailableUnitCount(pu.unitTypeId);
-          const movedCount = (pu.movedCount || 0);
-          
-          // Show available/total for owned territories during movement phases
-          let countDisplay = `×${pu.count}`;
-          let statusBadge = '';
-          let rowStyle = '';
-          
-          if (isOwnedTerritory && isMovementPhase) {
-            if (movedCount > 0 && availableCount > 0) {
-              countDisplay = `${availableCount}/${pu.count}`;
-              statusBadge = `<span style="font-size:0.65rem; color:#22c55e; margin-left:0.25rem;">✓${availableCount}</span>`;
-            } else if (availableCount === 0) {
-              countDisplay = `×${pu.count}`;
-              statusBadge = `<span style="font-size:0.65rem; color:#666; margin-left:0.25rem;">⏸</span>`;
-              rowStyle = 'opacity: 0.5;';
-            }
-          }
 
-          const isBattered = (pu as any).batteredUntilTurn && (pu as any).batteredUntilTurn > this.state.turnNumber;
-          const batteredBadge = isBattered
-            ? `<span style="font-size:0.6rem;color:#f97316;margin-left:0.3rem;font-weight:600;" title="Battered: -1 attack this turn">⚠ battered</span>`
-            : '';
-
-          html += `<div class="unit-item" style="${rowStyle}">
-            <span>${icon} ${unitType.name}${statusBadge}${batteredBadge}</span>
-            <span class="unit-count" title="${availableCount} available, ${movedCount} already acted">${countDisplay}</span>
-            <span class="unit-stats" style="font-size:0.7rem;color:#666" title="Attack/Defense/Movement">${unitType.attack}/${unitType.defense}/${moveIcon}${unitType.movement}</span>
-          </div>`;
-        }
+      if (isOwnedTerritory && territory.units.some(pu => territory.getAvailableUnitCount(pu.unitTypeId) < pu.count)) {
+        html += `<div class="acted-explainer">Moved or newly built units have acted and refresh on your next turn.</div>`;
       }
-      html += `</div>`;
 
-      // Commander card — show if any unit in this territory has a named general
       const commanderUnit = territory.units.find((u: any) => u.commander);
       if (commanderUnit?.commander) {
         const cmd = commanderUnit.commander;
@@ -2713,7 +3054,7 @@ export class HUD {
 
       // Combat strength summary
       let totalAtk = 0, totalDef = 0;
-      for (const pu of territory.units) {
+      for (const pu of displayUnits) {
         const ut = this.state.unitRegistry.get(pu.unitTypeId);
         if (ut) { totalAtk += ut.attack * pu.count; totalDef += ut.defense * pu.count; }
       }
@@ -2725,9 +3066,9 @@ export class HUD {
       </div>`;
 
       // Attack range preview (enemies reachable from this territory)
-      if (isOwnedTerritory && isMovementPhase && this.validMoves.length > 0) {
-        const enemyIds = Array.from(new Set(this.validMoves.filter(m => m.isAttack).map(m => m.territoryId)));
-        const moveIds = Array.from(new Set(this.validMoves.filter(m => !m.isAttack).map(m => m.territoryId)));
+      if (isOwnedTerritory && movementPhaseActive && this.validMoveController.getValidMoves().length > 0) {
+        const enemyIds = Array.from(new Set(this.validMoveController.getValidMoves().filter(m => m.isAttack).map(m => m.territoryId)));
+        const moveIds = Array.from(new Set(this.validMoveController.getValidMoves().filter(m => !m.isAttack).map(m => m.territoryId)));
         if (enemyIds.length > 0) {
           html += `<div class="attack-range-preview">
             🎯 <strong>${enemyIds.length}</strong> enem${enemyIds.length === 1 ? 'y' : 'ies'} in attack range
@@ -2741,10 +3082,14 @@ export class HUD {
           html += `<div class="target-preview-list">
             ${previewTargets.map(target => {
               const t = this.state.territories.get(target.id);
-              const viaTransport = this.validMoves.some(move => move.territoryId === target.id && move.viaTransport);
-              const label = target.type === 'attack' ? 'Attack' : viaTransport ? 'Transport' : 'Move';
-              const className = viaTransport ? 'transport' : target.type;
-              return `<button class="${className}" onclick="window.__hudInstance?.focusTerritory('${target.id}')">${label}: ${this.escapeHtml(t?.name ?? target.id)}</button>`;
+              const move = this.validMoveController.getValidMoves().find(m => m.territoryId === target.id);
+              const viaTransport = move?.viaTransport;
+              const coastalStrike = move?.coastalStrike;
+              const label = target.type === 'attack'
+                ? (coastalStrike ? (t?.type === 'sea' ? 'Coastal fire' : 'Bombard') : 'Attack')
+                : viaTransport ? 'Amphibious' : 'Move';
+              const className = viaTransport ? 'transport' : coastalStrike ? 'coastal-strike' : target.type;
+              return `<span class="drag-target-hint ${className}">${label}: ${this.escapeHtml(t?.name ?? target.id)}</span>`;
             }).join('')}
           </div>`;
         }
@@ -2774,7 +3119,58 @@ export class HUD {
       detailsEl.classList.add('content-refresh');
     }
 
+    this.refreshUnitStackSelector();
     this.updateActionButtons();
+  }
+
+  private buildSimpleTerritoryDetails(territory: NonNullable<ReturnType<typeof this.state.getSelectedTerritory>>): string {
+    const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+    const ownerName = owner?.name ?? 'Neutral';
+    const ownerColor = owner?.color ?? '#666';
+    const faction = this.state.getCurrentFaction();
+    const isOwned = territory.owner === faction?.id;
+    const phase = this.state.currentPhase;
+    const isMovement = isMovementPhase(phase);
+    const displayUnits = territory.units.filter(pu => {
+      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+      return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
+    });
+    const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
+    const readyUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
+    const attackTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => m.isAttack).length : 0;
+    const moveTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => !m.isAttack).length : 0;
+    const action = (() => {
+      if (isOwned && ['purchase', 'production', 'build'].includes(phase)) return territory.hasFactory ? 'Good place to mobilize.' : 'Select a factory territory to build.';
+      if (isOwned && attackTargets > 0) return `${attackTargets} attack target${attackTargets === 1 ? '' : 's'} in range.`;
+      if (isOwned && moveTargets > 0) return `${moveTargets} movement option${moveTargets === 1 ? '' : 's'} open.`;
+      if (!isOwned && owner) return owner.isEnemyOf(faction?.id ?? '') ? 'Enemy territory. Attack from an adjacent friendly territory.' : 'Not controlled by you.';
+      return 'No immediate action here.';
+    })();
+    const tags = [
+      territory.isCapital ? 'Capital' : '',
+      territory.hasFactory ? 'Factory' : '',
+      territory.isLand() ? `${territory.production} IPC` : 'Sea zone',
+    ].filter(Boolean);
+
+    return `
+      <div class="simple-territory-card">
+        <div class="simple-territory-owner">
+          <span style="background:${ownerColor};"></span>
+          <strong>${this.escapeHtml(ownerName)}</strong>
+        </div>
+        <div class="simple-territory-tags">${tags.map(tag => `<span>${this.escapeHtml(tag)}</span>`).join('')}</div>
+        <div class="simple-territory-action">
+          <small>Best Action</small>
+          <strong>${this.escapeHtml(action)}</strong>
+        </div>
+        <div class="simple-territory-grid">
+          <div><small>Units</small><strong>${totalUnits}</strong></div>
+          <div><small>Ready</small><strong>${readyUnits}</strong></div>
+          <div><small>Income</small><strong>${territory.isLand() ? `+${territory.production}` : '-'}</strong></div>
+        </div>
+        ${isOwned && readyUnits < totalUnits ? '<div class="acted-explainer">Acted units are already here, but cannot move again until your next turn.</div>' : ''}
+      </div>
+    `;
   }
 
   /**
@@ -2787,57 +3183,16 @@ export class HUD {
     const turnStyle = this.gameConfig.turnStyle;
     const isHumanTurn = faction?.controlledBy === 'human';
 
-    const moveBtn = document.getElementById('btn-move') as HTMLButtonElement;
-    const attackBtn = document.getElementById('btn-attack') as HTMLButtonElement;
     const buildBtn = document.getElementById('btn-build') as HTMLButtonElement;
     const endBtn = document.getElementById('btn-end-phase') as HTMLButtonElement;
 
     // Determine which phases allow which actions based on turn style
     const phaseStr = phase as string;
-    const { movementPhase, buildPhase, combatPhase, endPhase: isEndPhase } = getHudPhaseFlags(phaseStr);
-    const hasAttackTargets = movementPhase && this.validMoves.some(m => m.isAttack);
+    const { buildPhase, combatPhase, endPhase: isEndPhase } = getHudPhaseFlags(phaseStr);
+    const movementPhase = isMovementPhase(phase);
 
-    // Move button - enabled during movement phases with owned territory selected that has available units
-    if (moveBtn) {
-      // Check for units that haven't acted yet this turn
-      const hasAvailableUnits = territory && territory.owner === faction?.id && 
-        territory.units.some(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
-      const moveState = getMoveButtonState({
-        movementPhase,
-        isHumanTurn,
-        hasAvailableUnits: Boolean(hasAvailableUnits),
-      });
-      const canMove = moveState.canMove;
-      moveBtn.disabled = !canMove;
-      moveBtn.innerHTML = moveState.labelHtml;
-      moveBtn.title = moveState.title;
-    }
-
-    // Attack button - opens battle preview when selected territory has attack targets
-    if (attackBtn) {
-      const attackState = getAttackButtonState({
-        movementPhase,
-        combatPhase,
-        isHumanTurn,
-        hasAttackTargets,
-        pendingMoveCount: this.state.pendingMoves.length,
-      });
-      attackBtn.innerHTML = attackState.labelHtml;
-      attackBtn.disabled = attackState.disabled;
-      attackBtn.title = attackState.title;
-    }
-
-    // Phase-active class: highlight buttons relevant to the current phase
-    const allActionBtns = [moveBtn, attackBtn, buildBtn];
-    for (const b of allActionBtns) b?.classList.remove('phase-active');
-    if (movementPhase) {
-      moveBtn?.classList.add('phase-active');
-      if (hasAttackTargets) attackBtn?.classList.add('phase-active');
-    }
-    if (buildPhase) buildBtn?.classList.add('phase-active');
-    if (combatPhase) attackBtn?.classList.add('phase-active');
-
-    // Build/Mobilize button - enabled during purchase/build/production phase
+    buildBtn?.classList.remove('phase-active');
+    if (buildPhase || (turnStyle === 'move_for_move' && isHumanTurn)) buildBtn?.classList.add('phase-active');
     if (buildBtn) {
       buildBtn.textContent = '🏭 Mobilize';
       
@@ -2912,16 +3267,36 @@ export class HUD {
 
     // End Phase button — show next phase name and keyboard hint
     if (endBtn) {
+      const mfmView = this.gameConfig.turnStyle === 'move_for_move'
+        ? buildMoveForMoveView(this.state, this.turnManager)
+        : null;
+      const quickPlayEndTurn = isQuickPlayEndTurn(turnStyle, phaseStr, isHumanTurn);
       const endState = getEndPhaseButtonState({
-        isEndPhase,
-        nextLabel: this.getNextPhaseLabel(phaseStr),
+        isEndPhase: isEndPhase || quickPlayEndTurn,
+        nextLabel: quickPlayEndTurn
+          ? 'End Turn'
+          : (mfmView?.endButtonLabel ?? getNextPhaseButtonLabel(phaseStr, turnStyle, this.gameConfig.simpleMode)),
         isHumanTurn,
         noPendingMoves: this.state.pendingMoves.length === 0,
         noActiveCombat: !this.combatUI.getActiveCombat(),
         noSelection: !this.state.selectedTerritoryId,
       });
-      endBtn.innerHTML = endState.labelHtml;
-      endBtn.classList.toggle('btn-end-phase-pulse', endState.shouldPulse);
+      endBtn.innerHTML = mfmView
+        ? `${mfmView.canEndTurn ? '✓' : '➡️'} ${mfmView.endButtonLabel} <kbd class="kbd-hint">↵</kbd>`
+        : endState.labelHtml;
+      if (mfmView) {
+        endBtn.disabled = !mfmView.canEndTurn;
+        endBtn.title = mfmView.canEndTurn
+          ? 'Collect income and pass to the next player'
+          : 'Only the active turn player can end the turn';
+      } else {
+        endBtn.disabled = false;
+      }
+      endBtn.classList.toggle('btn-end-phase-pulse', mfmView ? mfmView.canEndTurn && endState.shouldPulse : endState.shouldPulse);
+    }
+
+    if (this.gameConfig.turnStyle === 'move_for_move') {
+      this.syncMoveForMoveChrome();
     }
 
     // Shortcut badge on Build button
@@ -2933,6 +3308,19 @@ export class HUD {
     }
 
     // Update context helper with current action guidance
+    const stackLabel = formatActiveStackLabel(
+      this.state,
+      territory ?? null,
+      this.stackCommand.getSelectedUnitType(),
+      this.stackCommand.getSelectedMoveCount(),
+      (id) => this.unitIcon(id),
+      this.stackCommand.isSelectAllTypes(),
+    );
+    const guidanceCounts = countStackGuidanceTargets(this.validMoveController.getValidMoves());
+    const readyStackCount = territory ? countReadyUnitStacks(this.state, territory) : 0;
+    const activeStackLabel = stackLabel && territory && movementPhase
+      ? formatStackGuidanceLine(territory.name, stackLabel, guidanceCounts)
+      : stackLabel;
     const contextTip = this.phaseGuidance.updateContextHelper({
       phase,
       faction,
@@ -2942,83 +3330,23 @@ export class HUD {
       isMovementPhase: movementPhase,
       isCombatPhase: combatPhase,
       isEndPhase,
+      activeStackLabel,
+      selectAllTypes: this.stackCommand.isSelectAllTypes(),
+      readyStackCount,
     });
     if (contextTip) this.showFirstTimeTip(contextTip.tipId, contextTip.message);
   }
 
   /**
-   * Get the next phase display label for the End Phase button
-   */
-  private getNextPhaseLabel(currentPhase: string): string {
-    const sequences: Record<string, string[]> = {
-      quick: ['build', 'move', 'attack', 'end'],
-      classic: ['purchase', 'combat_move', 'combat', 'noncombat_move', 'production', 'collect_income'],
-      simple: ['move', 'attack', 'build', 'collect_income'],
-      civilization: ['orders', 'resolve'],
-      chess: ['action'],
-    };
-    const shortNames: Record<string, string> = {
-      purchase: 'Mobilize', combat_move: 'Combat Move', combat: 'Combat',
-      noncombat_move: 'Non-Combat Move', production: 'Mobilize', collect_income: 'Collect Income',
-      build: 'Mobilize', move: 'Move', attack: 'Attack', end: 'End Turn',
-      orders: 'Orders', resolve: 'Resolve', action: 'Action',
-    };
-    const style = this.gameConfig.turnStyle as string;
-    const seq = sequences[style] ?? sequences['quick'];
-    const idx = seq.indexOf(currentPhase);
-    const nextPhase = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
-    return nextPhase ? (shortNames[nextPhase] ?? nextPhase) : 'Next';
-  }
-  /**
    * Update valid move highlights
    */
   private updateValidMoves(): void {
-    const territory = this.state.getSelectedTerritory();
-    const faction = this.state.getCurrentFaction();
-    const phase = this.state.currentPhase;
-
-    if (!territory || territory.owner !== faction?.id) {
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.updateMapReadabilityLegend();
-      return;
-    }
-
-    // Check if current phase allows movement
-    if (!isMovementPhase(phase)) {
-      this.renderer.clearValidMoveTargets();
-      this.validMoves = [];
-      this.updateMapReadabilityLegend();
-      return;
-    }
-
-    // Get valid moves for all unit types in territory
-    const allMoves: ValidMove[] = [];
-    // Determine if attacks are allowed based on phase and turn style
-    const isCombatMove = isAttackMovePhase(phase);
-
-    for (const pu of territory.units) {
-      const moves = this.movementValidator.getValidMoves(
-        pu.unitTypeId,
-        territory.id,
-        isCombatMove
-      );
-      allMoves.push(...moves);
-    }
-
-    const { moveTargets, attackTargets } = splitMoveAndAttackTargets(allMoves);
-
-    this.validMoves = allMoves;
-    this.renderer.setValidMoveTargets(moveTargets, attackTargets);
-    this.applyOverlay();
-    this.updateActionButtons();
-    this.updateMapReadabilityLegend();
+    this.validMoveController.updateValidMoves();
   }
 
-  private applyOverlay(): void { this.overlayController.apply(); }
   cycleOverlay(): void {
     this.overlayController.cycle();
-    this.updateMapReadabilityLegend();
+    this.validMoveController.updateMapReadabilityLegend();
   }
 
   focusTerritory(territoryId: string): void {
@@ -3028,56 +3356,117 @@ export class HUD {
   }
 
   private updateMapReadabilityLegend(): void {
-    const targetParent = document.getElementById('war-room-content') ?? document.getElementById('app');
-    let legend = document.getElementById('map-readability-legend');
-    if (!legend) {
-      legend = document.createElement('div');
-      legend.id = 'map-readability-legend';
-    }
-    if (targetParent && legend.parentElement !== targetParent) {
-      targetParent.appendChild(legend);
-    }
-    legend.classList.add('war-room-section', 'overlay-legend-section');
-
-    const mode = this.overlayController?.getMode() ?? 'off';
-    const moveCount = this.validMoves.filter(m => !m.isAttack).length;
-    const attackCount = this.validMoves.filter(m => m.isAttack).length;
-    const mobilizeCount = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize).length;
-    const selected = this.state.getSelectedTerritory();
-    const selectedText = selected ? selected.name : 'No territory selected';
-    const modeLabels: Record<string, string> = {
-      off: 'Overlay Off',
-      range: 'Range',
-      threat: 'Threats',
-      economic: 'Economy',
-    };
-
-    legend.innerHTML = `
-      <div class="map-legend-title">${this.escapeHtml(modeLabels[mode])}</div>
-      <div class="map-legend-row"><span class="legend-swatch selected"></span><span>${this.escapeHtml(selectedText)}</span></div>
-      <div class="map-legend-row"><span class="legend-swatch move"></span><span>${moveCount} move</span></div>
-      <div class="map-legend-row"><span class="legend-swatch attack"></span><span>${attackCount} attack</span></div>
-      <div class="map-legend-row"><span class="legend-swatch build"></span><span>${mobilizeCount} mobilize</span></div>
-    `;
-    legend.classList.toggle('quiet', mode === 'off' && moveCount === 0 && attackCount === 0 && mobilizeCount === 0);
+    this.validMoveController.updateMapReadabilityLegend();
   }
 
   /**
-   * Handle move button click
+   * Resolve queued combat (combat phase).
    */
-  private onMoveClick(): void {
-    this.showToast('Click a highlighted territory to move units there', 'info');
+  resolveCombat(): void {
+    this.combatUI.onAttackClick();
   }
 
-  /**
-   * Handle attack button click - START COMBAT RESOLUTION
-   */
-  private onAttackClick(): void {
-    if (isAttackMovePhase(this.state.currentPhase)) {
-      this.onAttackShortcut();
+  private setupUnitDrag(): void {
+    new MapMoveDragController(this.renderer, {
+      canDragFrom: (territoryId) => this.canStartUnitDragFrom(territoryId),
+      onDragStart: (fromTerritoryId) => {
+        if (this.state.selectedTerritoryId !== fromTerritoryId) {
+          this.state.selectTerritory(fromTerritoryId);
+          this.updateSelectionInfo();
+        }
+        this.prepareUnitDrag(fromTerritoryId);
+      },
+      onDragHover: () => undefined,
+      onDragDrop: (fromTerritoryId, toTerritoryId) => this.handleUnitDragDrop(fromTerritoryId, toTerritoryId),
+      onDragCancel: () => undefined,
+      getDropKind: (fromTerritoryId, toTerritoryId) => this.getUnitDropKind(fromTerritoryId, toTerritoryId),
+    });
+  }
+
+  private canStartUnitDragFrom(territoryId: string): boolean {
+    if (!MapMoveDragController.canDragFromTerritory(this.state, territoryId)) return false;
+    const territory = this.state.territories.get(territoryId);
+    if (!territory) return false;
+
+    const ready = territory.units.filter(pu => territory.getAvailableUnitCount(pu.unitTypeId) > 0);
+    if (ready.length === 0) return false;
+
+    if (this.stackCommand.isSelectAllTypes()) {
+      return ready.some(pu => {
+        const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+        return unitType && !isRangedStrikeUnit(unitType);
+      });
+    }
+
+    if (this.stackCommand.selectedUnitType && ready.some(pu => pu.unitTypeId === this.stackCommand.selectedUnitType)) {
+      const unitType = this.state.unitRegistry.get(this.stackCommand.selectedUnitType);
+      if (unitType && isRangedStrikeUnit(unitType)) return false;
+      return true;
+    }
+
+    return ready.some(pu => {
+      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
+      return unitType && !isRangedStrikeUnit(unitType);
+    });
+  }
+
+  private prepareUnitDrag(fromTerritoryId: string): void {
+    if (this.state.selectedTerritoryId !== fromTerritoryId) {
+      this.state.selectTerritory(fromTerritoryId);
+    }
+    const territory = this.state.territories.get(fromTerritoryId);
+    if (territory && !this.stackCommand.isSelectAllTypes()) {
+      this.stackCommand.autoSelectUnitType(territory);
+    }
+    this.updateValidMoves();
+  }
+
+  private getUnitDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind {
+    if (fromTerritoryId === toTerritoryId) return 'invalid';
+    if (this.state.selectedTerritoryId !== fromTerritoryId || this.validMoveController.getValidMoves().length === 0) {
+      this.prepareUnitDrag(fromTerritoryId);
+    }
+    const move = resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toTerritoryId, 'move')
+      ?? resolveValidMoveAtTarget(this.validMoveController.getValidMoves(), toTerritoryId, 'attack');
+    if (!move) return 'invalid';
+    // Movement rules trump fog display — adjacent "?" tiles can still be valid move/attack targets.
+    return move.isAttack ? 'attack' : 'move';
+  }
+
+  private explainInvalidUnitDrop(fromTerritoryId: string, toTerritoryId: string): void {
+    const toTerritory = this.state.territories.get(toTerritoryId);
+    const faction = this.state.getCurrentFaction();
+    if (toTerritory && faction && toTerritory.owner && faction.isEnemyOf(toTerritory.owner)) {
+      if (isNonCombatMovePhase(this.state.currentPhase)) {
+        this.showToast('Cannot attack during Non-Combat Movement — advance to Combat Movement first.', 'info');
+        return;
+      }
+    }
+
+    const fromTerritory = this.state.territories.get(fromTerritoryId);
+    const unitTypeId = this.stackCommand.selectedUnitType ?? this.validMoveController.getValidMovesUnitTypeId();
+    if (fromTerritory && unitTypeId) {
+      const available = fromTerritory.getAvailableUnitCount(unitTypeId);
+      if (available <= 0) {
+        this.showToast('That unit already moved this turn.', 'info');
+        return;
+      }
+    }
+
+    this.showToast('That destination is out of range or not reachable by the selected unit.', 'info');
+  }
+
+  private handleUnitDragDrop(fromTerritoryId: string, toTerritoryId: string): void {
+    const kind = this.getUnitDropKind(fromTerritoryId, toTerritoryId);
+    if (kind === 'invalid') {
+      this.explainInvalidUnitDrop(fromTerritoryId, toTerritoryId);
       return;
     }
-    this.combatUI.onAttackClick();
+    if (kind === 'move') {
+      this.executePlayerMove(fromTerritoryId, toTerritoryId, false);
+    } else if (kind === 'attack') {
+      this.combatUI.showBattlePreview(fromTerritoryId, toTerritoryId);
+    }
   }
 
   /**
@@ -3099,7 +3488,7 @@ export class HUD {
       return;
     }
 
-    const attackTargets = this.validMoves.filter(m => m.isAttack);
+    const attackTargets = this.validMoveController.getValidMoves().filter(m => m.isAttack);
     if (attackTargets.length === 0) {
       this.showToast('No valid attack targets from here', 'info');
       return;
@@ -3116,7 +3505,8 @@ export class HUD {
    * Handle build button click
    */
   private onBuildClick(): void {
-    this.productionUI.showFactoryHub();
+    this.updateMobilizationHighlights();
+    this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
   }
 
   private onFortifyClick(): void {
@@ -3152,39 +3542,40 @@ export class HUD {
    */
   private onEndPhaseClick(): void {
     const phase = this.state.currentPhase as string;
+    const turnStyle = this.gameConfig.turnStyle;
+    const faction = this.state.getCurrentFaction();
+    const isQuickHumanPlay = turnStyle === 'quick' && phase === 'play' && faction?.controlledBy === 'human';
 
-    // Execute pending moves at end of movement phases
-    if (phase === 'noncombat_move' || phase === 'move') {
+    // Execute pending moves at end of movement phases (classic queue — not move-for-move)
+    if ((phase === 'noncombat_move' || phase === 'move') && turnStyle !== 'move_for_move') {
       this.movementValidator.executeAllPendingMoves();
     }
-
-    // Handle production/build phase - new mobilization system
-    // Units are now mobilized directly at territories, no reserve/deploy flow needed
 
     // Clear pending moves when ending combat/attack/resolve phase
     if (phase === 'combat' || phase === 'attack' || phase === 'resolve') {
       this.state.pendingMoves = [];
     }
 
-    // For quick mode 'end' phase, collect income
-    if (phase === 'end') {
-      const faction = this.state.getCurrentFaction();
-      if (faction) {
-        const income = this.state.calculateIncome(faction.id);
-        faction.addIPCs(income);
-        this.showToast(`+${income} IPCs collected!`, 'success');
-        soundManager.play('income');
-      }
-    }
-
     // Production preview before leaving build phase
-    const isBuildPhase = ['purchase', 'build', 'production'].includes(phase);
-    if (isBuildPhase) {
+    const isLegacyBuildPhase = ['purchase', 'build', 'production'].includes(phase);
+    if (isLegacyBuildPhase && turnStyle !== 'move_for_move' && phase !== 'play') {
       this.showProductionPreview();
     }
 
     this.stopTurnTimer();
-    this.turnManager.advancePhase();
+    const isIncomePhase = phase === 'end' || phase === 'collect_income';
+    const isMfmEndTurn = turnStyle === 'move_for_move' && phase === 'play';
+    if (faction?.controlledBy === 'human' && (isIncomePhase || isMfmEndTurn || isQuickHumanPlay)) {
+      this.showTurnRecap();
+    }
+
+    if (isQuickHumanPlay) {
+      // One click: play → end (income on phase_start) → next faction
+      this.turnManager.advancePhase();
+      this.turnManager.advancePhase();
+    } else {
+      this.turnManager.advancePhase();
+    }
     this.renderer.render();
     this.renderMinimap();
   }
@@ -3280,13 +3671,10 @@ export class HUD {
       const isNext = idx === (currentIdx + 1) % factions.length;
       const statusClass = isCurrent ? 'current' : (isNext ? 'next' : '');
       const displayName = isCurrent ? faction.name : faction.name.split(' ')[0];
-      const dotStyle = isCurrent
-        ? `background:${faction.color};box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;`
-        : `background:${faction.color};`;
 
       html += `
         <div class="turn-order-item ${statusClass}" title="${faction.name}">
-          <div class="turn-order-dot" style="${dotStyle}"></div>
+          <div class="faction-emblem turn-order-emblem" data-faction="${faction.id}" style="--faction-color:${faction.color};${isCurrent ? `box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;` : ''}"></div>
           <span>${displayName}</span>
         </div>
       `;
@@ -3327,7 +3715,7 @@ export class HUD {
 
       html += `
         <div class="faction-row ${isCurrent ? 'current' : ''} ${isDefeated ? 'defeated' : ''}">
-          <div class="faction-color" style="background: ${color};"></div>
+          <div class="faction-emblem faction-panel-emblem" data-faction="${faction.id}" style="--faction-color:${color};"></div>
           <div class="faction-info">
             <div class="faction-name">${faction.name}</div>
             <div class="faction-bars">
@@ -3390,7 +3778,7 @@ export class HUD {
     const content = document.getElementById('tooltip-content');
     if (!tooltip || !content) return;
 
-    const icon = UNIT_ICONS[unitTypeId] || '⬜';
+    const icon = this.unitIcon(unitTypeId);
 
     // Tech bonuses for current faction
     const faction = this.state.getCurrentFaction();
@@ -3506,6 +3894,7 @@ export class HUD {
   showNewGameModal(): void {
     const modal = document.getElementById('new-game-modal');
     const mapSelect = document.getElementById('map-select') as HTMLSelectElement;
+    this.pruneUnplaytestedTurnStyles();
     if (mapSelect) {
       const list = getMapList();
       mapSelect.innerHTML = list.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
@@ -3516,6 +3905,61 @@ export class HUD {
     this.refreshSetupFactionOptions();
     this.syncSetupHelpers();
     if (modal) modal.classList.remove('hidden');
+  }
+
+  /** Hide experimental turn styles from the setup dropdown. */
+  private pruneUnplaytestedTurnStyles(): void {
+    const select = document.getElementById('turn-style') as HTMLSelectElement | null;
+    if (!select) return;
+    for (const style of ['chess', 'action']) {
+      select.querySelector(`option[value="${style}"]`)?.remove();
+    }
+    if (!select.value || !select.querySelector(`option[value="${select.value}"]`)) {
+      select.value = 'quick';
+    }
+  }
+
+  /** One-click defaults for a balanced first game (world map, guided quick play). */
+  applyRecommendedSetup(): void {
+    const setSelect = (id: string, value: string) => {
+      const el = document.getElementById(id) as HTMLSelectElement | null;
+      if (el) el.value = value;
+    };
+    const setCheck = (id: string, checked: boolean) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el) el.checked = checked;
+    };
+
+    setSelect('map-select', 'grid');
+    setSelect('unit-era', 'wwii');
+    setSelect('game-mode', 'vs-ai');
+    setSelect('player-faction', 'atlantic_alliance');
+    setSelect('turn-style', 'quick');
+    setSelect('victory-type', 'capitals');
+    setSelect('setup-ai-difficulty', 'medium');
+    setSelect('setup-ai-personality', 'default');
+    setSelect('ai-opponent-count', 'all');
+    setSelect('turn-limit', '50');
+    setCheck('preset-hold10', false);
+    setCheck('fog-of-war', true);
+    setCheck('auto-save', true);
+    setCheck('simple-mode', true);
+
+    const era = (document.getElementById('unit-era') as HTMLSelectElement)?.value as UnitEra;
+    const descEl = document.getElementById('unit-era-description');
+    if (descEl && UNIT_ERA_INFO[era]) descEl.textContent = UNIT_ERA_INFO[era].description;
+
+    const style = (document.getElementById('turn-style') as HTMLSelectElement)?.value as TurnStyle;
+    const turnDesc = document.getElementById('turn-style-description');
+    if (turnDesc && TURN_STYLE_INFO[style]) turnDesc.textContent = TURN_STYLE_INFO[style].description;
+
+    document.getElementById('victory-capitals-row')?.classList.remove('hidden');
+    document.getElementById('victory-domination-row')?.classList.add('hidden');
+    document.getElementById('victory-economic-row')?.classList.add('hidden');
+
+    this.refreshSetupFactionOptions();
+    this.syncSetupHelpers();
+    this.showToast('Recommended setup applied', 'success');
   }
 
   /**
@@ -3548,6 +3992,9 @@ export class HUD {
     if (mapId === 'tutorial') turnLimit = Math.min(turnLimit, 15);
     const fogOfWar = (document.getElementById('fog-of-war') as HTMLInputElement)?.checked ?? true;
     const autoSave = (document.getElementById('auto-save') as HTMLInputElement)?.checked ?? true;
+    const simpleMode = (document.getElementById('simple-mode') as HTMLInputElement)?.checked ?? true;
+    const aiDifficulty = ((document.getElementById('setup-ai-difficulty') as HTMLSelectElement)?.value || settings.getSetting('aiDifficulty')) as 'easy' | 'medium' | 'hard';
+    const aiPersonality = (document.getElementById('setup-ai-personality') as HTMLSelectElement)?.value || settings.getSetting('aiPersonality') || 'default';
 
     const setupFactions = this.getSetupFactionsForMap(mapId);
     const playableSetupFactions = setupFactions.filter(f => f.isPlayable);
@@ -3587,19 +4034,15 @@ export class HUD {
     const pickedOpponents = opponentSelect
       ? Array.from(opponentSelect.selectedOptions).map(o => o.value).filter(id => allCandidateOpponents.includes(id))
       : allCandidateOpponents.slice();
-    const effectivePickedOpponents = pickedOpponents.length > 0 ? pickedOpponents : allCandidateOpponents.slice();
     const countRaw = opponentCountSelect?.value ?? 'all';
-    const opponentCap = countRaw === 'all' ? effectivePickedOpponents.length : Math.max(1, Math.min(parseInt(countRaw) || effectivePickedOpponents.length, effectivePickedOpponents.length));
-    const aiOpponents = effectivePickedOpponents.slice(0, opponentCap);
 
-    // Active set = humans + their declared allies + chosen AI opponents
-    const activeIds = new Set<string>(humanFactions);
-    for (const humanId of humanFactions) {
-      const human = setupFactions.find(f => f.id === humanId);
-      for (const ally of human?.allies ?? []) activeIds.add(ally);
-    }
-    for (const id of aiOpponents) activeIds.add(id);
-    const activeFactionIds = Array.from(activeIds);
+    const matchSetup = resolveMatchSetup({
+      mode: mode as 'vs-ai' | 'hotseat',
+      humanFactionIds: humanFactions,
+      availableFactions: setupFactions,
+      pickedOpponentIds: mode === 'vs-ai' ? pickedOpponents : [],
+      opponentCountRaw: mode === 'vs-ai' ? countRaw : 'all',
+    });
 
     // Update game config
     this.gameConfig = {
@@ -3607,25 +4050,33 @@ export class HUD {
       mapId,
       unitEra,
       mode: mode as 'vs-ai' | 'hotseat',
-      humanFactions,
-      aiOpponents,
-      aiOpponentCount: countRaw === 'all' ? 0 : opponentCap,
-      activeFactionIds,
+      humanFactions: matchSetup.humanFactionIds,
+      aiOpponents: matchSetup.aiOpponentIds,
+      aiOpponentCount: matchSetup.aiOpponentCount,
+      activeFactionIds: matchSetup.activeFactionIds,
       turnStyle: turnStyle as TurnStyle,
       victoryType: victoryType as VictoryType,
-      capitalsToWin,
+      capitalsToWin: normalizeCapitalsToWinForMatch(
+        capitalsToWin,
+        matchSetup.activeFactionIds,
+        matchSetup.humanFactionIds,
+        setupFactions,
+      ),
       territoriesPercent,
       economicTarget,
       turnLimit,
       fogOfWar,
       autoSave,
+      simpleMode,
+      aiDifficulty,
+      aiPersonality,
       startTime: Date.now(),
     };
 
     // Update faction controllers and active flag for the new game
     for (const faction of this.state.factionRegistry.getAll()) {
-      faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
-      faction.isActive = activeIds.has(faction.id);
+      faction.controlledBy = matchSetup.humanFactionIds.includes(faction.id) ? 'human' : 'ai';
+      faction.isActive = matchSetup.activeFactionIds.includes(faction.id);
     }
 
     this.hideNewGameModal();
@@ -3646,16 +4097,6 @@ export class HUD {
     // Emit game started event
     this.events.emit('gameStarted', { config: this.gameConfig });
 
-    // Initialize FOW button visual state to match config
-    const fogBtn = document.getElementById('btn-fog-toggle');
-    if (fogBtn) {
-      const on = this.gameConfig.fogOfWar;
-      fogBtn.style.opacity = on ? '1' : '0.45';
-      fogBtn.style.borderColor = on ? 'rgba(99, 179, 237, 0.7)' : '';
-      fogBtn.style.boxShadow = on ? '0 0 8px rgba(99, 179, 237, 0.35)' : '';
-      fogBtn.title = on ? 'Fog of war ON — scouts reveal adjacent tiles. Click to disable.' : 'Fog of war OFF — click to enable';
-    }
-
     this.showToast('Game started!', 'success');
     this.maybeOfferTutorial();
   }
@@ -3666,7 +4107,7 @@ export class HUD {
     return this.state.factionRegistry.getAll().map(f => f.serialize());
   }
 
-  private getSelectedSetupMap(): { id: string; name: string; data?: MapData; factions: FactionData[] } {
+  private getSelectedSetupMap(): { id: string; name: string; data?: MapData; factions: FactionData[]; description?: string } {
     const mapSelect = document.getElementById('map-select') as HTMLSelectElement | null;
     const id = mapSelect?.value ?? this.gameConfig.mapId ?? 'grid';
     const entry = getMapEntry(id);
@@ -3675,6 +4116,7 @@ export class HUD {
       name: entry?.name ?? mapSelect?.selectedOptions[0]?.textContent?.trim() ?? 'Selected map',
       data: entry?.data,
       factions: this.getSetupFactionsForMap(id),
+      description: entry?.description,
     };
   }
 
@@ -3689,6 +4131,8 @@ export class HUD {
     const hotseatSelect = document.getElementById('human-factions') as HTMLSelectElement | null;
     const opponentSelect = document.getElementById('ai-opponents') as HTMLSelectElement | null;
     const opponentCount = document.getElementById('ai-opponent-count') as HTMLSelectElement | null;
+    const aiDifficulty = document.getElementById('setup-ai-difficulty') as HTMLSelectElement | null;
+    const aiPersonality = document.getElementById('setup-ai-personality') as HTMLSelectElement | null;
     const previousPlayer = playerSelect?.value;
     const previousHotseat = new Set(Array.from(hotseatSelect?.selectedOptions ?? []).map(o => o.value));
     const previousOpponents = new Set(Array.from(opponentSelect?.selectedOptions ?? []).map(o => o.value));
@@ -3738,13 +4182,28 @@ export class HUD {
         : 'all';
       opponentCount.parentElement?.classList.toggle('hidden', maxOpponents === 0);
     }
+
+    if (aiDifficulty) aiDifficulty.value = this.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty') ?? 'medium';
+    if (aiPersonality) {
+      const current = this.gameConfig.aiPersonality ?? settings.getSetting('aiPersonality') ?? 'default';
+      const options = [
+        { id: 'default', name: 'Balanced Mix', description: 'Uses the standard balanced doctrine' },
+        ...AI_PERSONALITIES
+          .filter(p => p.id !== 'balanced')
+          .map(p => ({ id: p.id, name: p.name, description: p.description })),
+      ];
+      aiPersonality.innerHTML = options
+        .map(p => `<option value="${this.escapeHtml(p.id)}" title="${this.escapeHtml(p.description)}">${this.escapeHtml(p.name)}</option>`)
+        .join('');
+      aiPersonality.value = options.some(p => p.id === current) ? current : 'default';
+    }
   }
 
   private updateMapInfoCard(): void {
     const card = document.getElementById('map-info-card');
     if (!card) return;
 
-    const { name, data, factions } = this.getSelectedSetupMap();
+    const { name, data, factions, description } = this.getSelectedSetupMap();
     if (!data) {
       card.classList.add('hidden');
       return;
@@ -3757,11 +4216,19 @@ export class HUD {
     const startingUnits = (data.startingUnits ?? []).reduce((sum, s) => sum + s.units.reduce((inner, u) => inner + u.count, 0), 0);
     const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
     const navalTag = sea > 0 || coastal > 0 ? 'Naval routes' : 'Land focused';
-    const sizeTag = data.territories.length >= 80 ? 'Large map' : data.territories.length >= 40 ? 'Medium map' : 'Small map';
+    const sizeTag =
+      data.territories.length >= 400
+        ? 'Very large map (fine grid)'
+        : data.territories.length >= 80
+          ? 'Large map'
+          : data.territories.length >= 40
+            ? 'Medium map'
+            : 'Small map';
 
     card.classList.remove('hidden');
     card.innerHTML = `
       <div class="map-info-title">${this.escapeHtml(name)}</div>
+      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${this.escapeHtml(description)}</div>` : ''}
       <div class="map-info-tags">
         <span>${this.escapeHtml(sizeTag)}</span>
         <span>${this.escapeHtml(navalTag)}</span>
@@ -3826,6 +4293,7 @@ export class HUD {
     const mode = (document.getElementById('game-mode') as HTMLSelectElement | null)?.value ?? 'vs-ai';
     document.getElementById('hotseat-options')?.classList.toggle('hidden', mode !== 'hotseat');
     document.getElementById('vs-ai-options')?.classList.toggle('hidden', mode !== 'vs-ai');
+    document.getElementById('vs-ai-opponent-options')?.classList.toggle('hidden', mode !== 'vs-ai');
     this.updateMapInfoCard();
 
     const turnStyle = ((document.getElementById('turn-style') as HTMLSelectElement | null)?.value ?? 'quick') as TurnStyle;
@@ -3835,6 +4303,12 @@ export class HUD {
     const unitEra = ((document.getElementById('unit-era') as HTMLSelectElement | null)?.value ?? 'wwii') as UnitEra;
     const eraDesc = document.getElementById('unit-era-description');
     if (eraDesc && UNIT_ERA_INFO[unitEra]) eraDesc.textContent = UNIT_ERA_INFO[unitEra].description;
+
+    const simpleModeInput = document.getElementById('simple-mode') as HTMLInputElement | null;
+    if (simpleModeInput && simpleModeInput.dataset.synced !== '1') {
+      simpleModeInput.checked = this.gameConfig.simpleMode ?? true;
+      simpleModeInput.dataset.synced = '1';
+    }
 
     const victoryType = (document.getElementById('victory-type') as HTMLSelectElement | null)?.value ?? 'capitals';
     document.getElementById('victory-capitals-row')?.classList.toggle('hidden', victoryType !== 'capitals');
@@ -3874,6 +4348,9 @@ export class HUD {
     const turnLimitValue = (document.getElementById('turn-limit') as HTMLSelectElement | null)?.value ?? '50';
     const fogOfWar = (document.getElementById('fog-of-war') as HTMLInputElement | null)?.checked ?? true;
     const autoSave = (document.getElementById('auto-save') as HTMLInputElement | null)?.checked ?? true;
+    const simpleMode = (document.getElementById('simple-mode') as HTMLInputElement | null)?.checked ?? this.gameConfig.simpleMode ?? true;
+    const aiDifficulty = ((document.getElementById('setup-ai-difficulty') as HTMLSelectElement | null)?.value ?? this.gameConfig.aiDifficulty ?? 'medium') as 'easy' | 'medium' | 'hard';
+    const aiPersonality = (document.getElementById('setup-ai-personality') as HTMLSelectElement | null)?.value ?? this.gameConfig.aiPersonality ?? 'default';
 
     let playerText = 'Single player vs AI';
     if (mode === 'hotseat') {
@@ -3904,6 +4381,11 @@ export class HUD {
       ? 'Recommended first game'
       : 'Custom setup';
     const playableCount = setupMap.factions.filter(f => f.isPlayable).length;
+    const opponentSummary = this.describeSetupOpponents(mode, setupMap.factions);
+    const doctrine = aiPersonality === 'default'
+      ? 'balanced AI'
+      : `${AI_PERSONALITIES.find(p => p.id === aiPersonality)?.name ?? aiPersonality} AI`;
+    const setupPlan = this.buildSetupPlanLine(mapId, victoryType, turnStyle, aiDifficulty, aiPersonality);
     const mapStats = setupMap.data
       ? `${setupMap.data.territories.length} territories, ${playableCount} playable factions`
       : `${playableCount} playable factions`;
@@ -3911,11 +4393,69 @@ export class HUD {
     summary.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:center;margin-bottom:0.35rem;">
         <strong style="color:#86efac;">${recommended}</strong>
-        <span style="color:#94a3b8;font-size:0.78rem;">${fogOfWar ? 'Fog on' : 'Fog off'} · ${autoSave ? 'Autosave on' : 'Autosave off'}</span>
+        <span style="color:#94a3b8;font-size:0.78rem;">${simpleMode ? 'Simple mode' : 'Advanced mode'} · ${fogOfWar ? 'Fog on' : 'Fog off'} · ${autoSave ? 'Autosave on' : 'Autosave off'}</span>
       </div>
       <div>${mapName} · ${UNIT_ERA_INFO[unitEra]?.name ?? unitEra} · ${TURN_STYLE_INFO[turnStyle]?.name ?? turnStyle}</div>
       <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText} · ${mapStats}</div>
+      ${opponentSummary ? `<div style="color:#cbd5e1;margin-top:0.25rem;">${this.escapeHtml(opponentSummary)}</div>` : ''}
+      <div style="color:#bfdbfe;margin-top:0.35rem;">Plan: ${this.escapeHtml(setupPlan)} · ${aiDifficulty} ${this.escapeHtml(doctrine)}</div>
     `;
+  }
+
+  private describeSetupOpponents(mode: string, setupFactions: FactionData[]): string {
+    if (mode !== 'vs-ai') return '';
+
+    const playable = setupFactions.filter(f => f.isPlayable);
+    const playerFactionId = (document.getElementById('player-faction') as HTMLSelectElement | null)?.value;
+    const humanFactionIds = playerFactionId && playerFactionId !== 'random'
+      ? [playerFactionId]
+      : [playable[0]?.id].filter(Boolean) as string[];
+    const opponentSelect = document.getElementById('ai-opponents') as HTMLSelectElement | null;
+    const allCandidates = playable.filter(f => !humanFactionIds.includes(f.id)).map(f => f.id);
+    const pickedOpponents = opponentSelect
+      ? Array.from(opponentSelect.selectedOptions).map(o => o.value).filter(id => allCandidates.includes(id))
+      : allCandidates;
+    const countRaw = (document.getElementById('ai-opponent-count') as HTMLSelectElement | null)?.value ?? 'all';
+    const matchSetup = resolveMatchSetup({
+      mode: 'vs-ai',
+      humanFactionIds,
+      availableFactions: setupFactions,
+      pickedOpponentIds: pickedOpponents,
+      opponentCountRaw: countRaw,
+    });
+    if (matchSetup.aiOpponentIds.length === 0) return 'No AI opponents on this map';
+
+    const names = matchSetup.aiOpponentIds
+      .map(id => setupFactions.find(f => f.id === id)?.name ?? id)
+      .join(', ');
+    const countLabel = matchSetup.aiOpponentIds.length === 1 ? '1 AI opponent' : `${matchSetup.aiOpponentIds.length} AI opponents`;
+    return `${countLabel}: ${names}`;
+  }
+
+  private buildSetupPlanLine(mapId: string, victoryType: VictoryType, turnStyle: TurnStyle, aiDifficulty: string, aiPersonality: string): string {
+    const mapPlan = mapId.includes('mega')
+      ? 'expect broad fronts; use overlays and secure factories early'
+      : mapId.includes('pacific') || mapId.includes('archipelago')
+        ? 'control sea lanes before overcommitting land forces'
+        : mapId.includes('skirmish') || mapId === 'tutorial'
+          ? 'short opening; first captures decide tempo'
+          : 'balance capital defense with one early border attack';
+    const victoryPlan = victoryType === 'economic'
+      ? 'protect production'
+      : victoryType === 'domination'
+        ? 'expand steadily'
+        : victoryType === 'elimination'
+          ? 'preserve armies'
+          : 'watch enemy capitals';
+    const aiPlan = aiDifficulty === 'hard' || ['aggressive', 'blitz', 'adaptive'].includes(aiPersonality)
+      ? 'AI pressure will arrive early'
+      : aiPersonality === 'economic'
+        ? 'AI will build before striking'
+        : aiPersonality === 'defensive'
+          ? 'AI will punish weak attacks'
+          : 'AI posture is flexible';
+    const pace = turnStyle === 'classic' ? 'classic pacing' : turnStyle === 'quick' ? 'faster decisions' : 'variant pacing';
+    return `${mapPlan}; ${victoryPlan}; ${aiPlan}; ${pace}`;
   }
 
   private maybeOfferTutorial(): void {
@@ -4540,6 +5080,9 @@ export class HUD {
   }
 
   private getMobilizationAdvice(): string {
+    const navalHint = this.getNavalMobilizationAdvice();
+    if (navalHint) return navalHint;
+
     const options = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize);
     const best = options.sort((a, b) => {
       const aValue = (a.territory.isCapital ? 8 : 0) + (a.territory.hasFactory ? 6 : 0) + a.units.reduce((s, u) => s + u.count, 0);
@@ -4548,6 +5091,15 @@ export class HUD {
     })[0];
     if (!best) return 'No affordable mobilization is available. Preserve IPCs or advance the phase.';
     return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
+  }
+
+  private getNavalMobilizationAdvice(): string | null {
+    const mapId = this.gameConfig.mapId ?? 'grid';
+    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island') && !mapId.includes('world')) return null;
+    const coastal = this.mobilizationSystem.getMobilizationOptions()
+      .find(o => o.canMobilize && o.type === 'coastal');
+    if (!coastal) return null;
+    return `Mobilize marines at ${coastal.territory.name} (${coastal.cost} IPC) for island assaults. Ground units can cross oceans automatically.`;
   }
 
   private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {
@@ -4571,7 +5123,7 @@ export class HUD {
 
   private getBestMovementSource(factionId: string): { territoryId: string; label: string; detail: string; attacks: number; moves: number } | null {
     const phase = this.state.currentPhase;
-    const allowAttacks = ['combat_move', 'move', 'orders', 'action'].includes(phase);
+    const allowAttacks = isAttackMovePhase(phase);
     const candidates: Array<{ territoryId: string; label: string; detail: string; attacks: number; moves: number; score: number }> = [];
 
     for (const territory of this.state.territories.values()) {
@@ -4618,6 +5170,53 @@ export class HUD {
     return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
   }
 
+  private getMovementCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
+    headline: string;
+    detail: string;
+    primaryLabel: string;
+    primaryAction: string;
+    territoryId?: string;
+    secondaryLabel?: string;
+    secondaryAction?: string;
+  } {
+    const selected = this.state.getSelectedTerritory();
+    const selectedReady = selected?.owner === faction.id
+      ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
+      : 0;
+    const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
+
+    if (source && 'id' in source) {
+      return {
+        headline: `Use ${source.name}`,
+        detail: `${selectedReady} ready unit${selectedReady === 1 ? '' : 's'} selected. Green is movement, red is attack.`,
+        primaryLabel: 'Do It',
+        primaryAction: 'recommended-action',
+        territoryId: source.id,
+        secondaryLabel: 'Threats',
+        secondaryAction: 'threat-overlay',
+      };
+    }
+    if (source) {
+      return {
+        headline: source.label,
+        detail: source.detail,
+        primaryLabel: 'Do It',
+        primaryAction: 'recommended-action',
+        territoryId: source.territoryId,
+        secondaryLabel: 'Focus',
+        secondaryAction: 'focus-territory',
+      };
+    }
+    return {
+      headline: 'No ready movement',
+      detail: 'All available units have acted or no legal destinations are open.',
+      primaryLabel: getAdvisorEndLabel(this.gameConfig.turnStyle, this.state.currentPhase as string),
+      primaryAction: 'end-phase',
+      secondaryLabel: 'Threats',
+      secondaryAction: 'threat-overlay',
+    };
+  }
+
   private getTurnCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
     headline: string;
     detail: string;
@@ -4629,71 +5228,58 @@ export class HUD {
   } {
     const phase = this.state.currentPhase as string;
 
-    if (['purchase', 'production', 'build'].includes(phase)) {
+    if (phase === 'play') {
       const target = this.getBestMobilizationTarget();
       if (target) {
         return {
           headline: target.label,
           detail: target.detail,
-          primaryLabel: 'Focus',
-          primaryAction: 'focus-territory',
+          primaryLabel: 'Do It',
+          primaryAction: 'recommended-action',
           territoryId: target.territoryId,
-          secondaryLabel: 'Objectives',
-          secondaryAction: 'show-objectives',
+          secondaryLabel: 'Focus',
+          secondaryAction: 'focus-territory',
+        };
+      }
+      return this.getMovementCoach(faction);
+    }
+
+    if (isBuildPhase(phase)) {
+      const target = this.getBestMobilizationTarget();
+      if (target) {
+        return {
+          headline: target.label,
+          detail: target.detail,
+          primaryLabel: 'Do It',
+          primaryAction: 'recommended-action',
+          territoryId: target.territoryId,
+          secondaryLabel: 'Focus',
+          secondaryAction: 'focus-territory',
         };
       }
       return {
         headline: 'No affordable mobilization',
         detail: `Keep ${faction.ipcs} IPCs or advance to movement.`,
-        primaryLabel: 'Objectives',
-        primaryAction: 'show-objectives',
+        primaryLabel: getAdvisorEndLabel(this.gameConfig.turnStyle, phase),
+        primaryAction: 'end-phase',
+        secondaryLabel: 'Objectives',
+        secondaryAction: 'show-objectives',
       };
     }
 
-    if (['combat_move', 'noncombat_move', 'move', 'orders', 'action'].includes(phase)) {
-      const selected = this.state.getSelectedTerritory();
-      const selectedReady = selected?.owner === faction.id
-        ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
-        : 0;
-      const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
-
-      if (source && 'id' in source) {
-        return {
-          headline: `Use ${source.name}`,
-          detail: `${selectedReady} ready unit${selectedReady === 1 ? '' : 's'} selected. Green is movement, red is attack.`,
-          primaryLabel: 'Range',
-          primaryAction: 'range-overlay',
-          territoryId: source.id,
-          secondaryLabel: 'Threats',
-          secondaryAction: 'threat-overlay',
-        };
-      }
-      if (source) {
-        return {
-          headline: source.label,
-          detail: source.detail,
-          primaryLabel: 'Focus',
-          primaryAction: 'focus-territory',
-          territoryId: source.territoryId,
-          secondaryLabel: 'Threats',
-          secondaryAction: 'threat-overlay',
-        };
-      }
-      return {
-        headline: 'No ready movement',
-        detail: 'All available units have acted or no legal destinations are open.',
-        primaryLabel: 'Threats',
-        primaryAction: 'threat-overlay',
-      };
+    if (isMovementPhase(phase)) {
+      return this.getMovementCoach(faction);
     }
 
-    if (['combat', 'attack', 'resolve'].includes(phase)) {
+    if (isCombatPhase(phase)) {
       const battles = this.state.pendingMoves.length;
       return {
         headline: battles > 0 ? 'Resolve queued battles' : 'No battles queued',
         detail: battles > 0 ? `${battles} battle${battles === 1 ? '' : 's'} waiting in combat resolution.` : 'Advance when ready.',
-        primaryLabel: 'Threats',
-        primaryAction: 'threat-overlay',
+        primaryLabel: battles > 0 ? 'Resolve' : getAdvisorEndLabel(this.gameConfig.turnStyle, phase),
+        primaryAction: battles > 0 ? 'recommended-action' : 'end-phase',
+        secondaryLabel: 'Threats',
+        secondaryAction: 'threat-overlay',
       };
     }
 
@@ -4701,8 +5287,8 @@ export class HUD {
     return {
       headline: ['collect_income', 'end'].includes(phase) ? `Collect +${income} IPC` : 'Check the board',
       detail: ['collect_income', 'end'].includes(phase) ? 'End the turn after income resolves.' : 'Use objectives and threat overlay to decide your next commitment.',
-      primaryLabel: 'Objectives',
-      primaryAction: 'show-objectives',
+      primaryLabel: ['collect_income', 'end'].includes(phase) ? 'End Turn' : 'Objectives',
+      primaryAction: ['collect_income', 'end'].includes(phase) ? 'end-phase' : 'show-objectives',
       secondaryLabel: 'Threats',
       secondaryAction: 'threat-overlay',
     };
@@ -4712,9 +5298,35 @@ export class HUD {
     if (territoryId) {
       this.renderer.centerOnTerritory(territoryId);
       this.state.selectTerritory(territoryId);
+      this.updateSelectionInfo();
+      this.updateValidMoves();
     }
 
-    if (action === 'range-overlay') {
+    if (action === 'recommended-action') {
+      const phase = this.state.currentPhase as string;
+      if (phase === 'play') {
+        const mobilizeTarget = this.getBestMobilizationTarget();
+        if (mobilizeTarget) {
+          this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
+        } else if (isAttackMovePhase(phase)) {
+          const attacks = this.validMoveController.getValidMoves().filter(m => m.isAttack);
+          if (attacks.length > 0) this.onAttackShortcut();
+          else this.overlayController.setMode('range');
+        }
+      } else if (isBuildPhase(phase)) {
+        this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
+      } else if (isAttackMovePhase(phase)) {
+        const attacks = this.validMoveController.getValidMoves().filter(m => m.isAttack);
+        if (attacks.length > 0) this.onAttackShortcut();
+        else this.overlayController.setMode('range');
+      } else if (isCombatPhase(phase)) {
+        this.combatUI.onAttackClick();
+      }
+    } else if (action === 'end-phase') {
+      document.getElementById('btn-end-phase')?.click();
+    } else if (action === 'focus-territory') {
+      this.showToast('Focused recommended territory', 'info');
+    } else if (action === 'range-overlay') {
       this.overlayController.setMode('range');
       this.showToast('Movement and attack range shown', 'info');
     } else if (action === 'threat-overlay') {
@@ -4771,6 +5383,7 @@ export class HUD {
       economyLine: `${faction.ipcs} IPC, +${income}/turn`,
       coach,
       mobilizationAdvice: this.getMobilizationAdvice(),
+      simpleMode: this.gameConfig.simpleMode,
     });
   }
 
@@ -4974,4 +5587,3 @@ export class HUD {
   }
 
 }
-

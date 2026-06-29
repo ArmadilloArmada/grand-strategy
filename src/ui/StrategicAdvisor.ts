@@ -16,6 +16,7 @@ export interface StrategicAdvisorData {
   economyLine?: string;
   coach?: StrategicAdvisorCoach;
   mobilizationAdvice?: string;
+  simpleMode?: boolean;
 }
 
 export class StrategicAdvisor {
@@ -29,19 +30,17 @@ export class StrategicAdvisor {
     }
 
     const coach = data.coach;
+    const simpleClass = data.simpleMode ? ' simple-mode-advisor' : '';
     panel.classList.remove('hidden');
+    panel.classList.toggle('copilot', Boolean(data.simpleMode));
     panel.innerHTML = `
       <div class="strategic-advisor-header">
-        <span>Strategic Intent</span>
+        <span>${data.simpleMode ? 'Command Co-Pilot' : 'Strategic Intent'}</span>
         <button id="btn-advisor-collapse" title="Collapse advisor">-</button>
       </div>
-      <div class="strategic-advisor-body">
-        <div class="advisor-row" data-type="objective"><span>Objective</span><strong>${this.escape(data.objectiveLine ?? '')}</strong></div>
-        <div class="advisor-row" data-type="danger"><span>Danger</span><strong>${this.escape(data.threatLine ?? '')}</strong></div>
-        <div class="advisor-row" data-type="opportunity"><span>Opportunity</span><strong>${this.escape(data.opportunityLine ?? '')}</strong></div>
-        <div class="advisor-row" data-type="economy"><span>Economy</span><strong>${this.escape(data.economyLine ?? '')}</strong></div>
+      <div class="strategic-advisor-body${simpleClass}">
         <div class="advisor-next-action">
-          <span>Next Step</span>
+          <span>${data.simpleMode ? 'Do This Next' : 'Next Step'}</span>
           <strong>${this.escape(coach.headline)}</strong>
           <small>${this.escape(coach.detail)}</small>
           <div class="advisor-actions">
@@ -49,6 +48,10 @@ export class StrategicAdvisor {
             ${coach.secondaryAction && coach.secondaryLabel ? this.renderActionButton(coach.secondaryAction, coach.secondaryLabel, coach.territoryId) : ''}
           </div>
         </div>
+        <div class="advisor-row" data-type="objective"><span>Goal</span><strong>${this.escape(data.objectiveLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="danger"><span>Danger</span><strong>${this.escape(data.threatLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="opportunity"><span>Chance</span><strong>${this.escape(data.opportunityLine ?? '')}</strong></div>
+        <div class="advisor-row" data-type="economy"><span>Economy</span><strong>${this.escape(data.economyLine ?? '')}</strong></div>
         <div class="advisor-advice">${data.mobilizationAdvice ? `Recommended: ${this.escape(data.mobilizationAdvice)}` : ''}</div>
       </div>
     `;

@@ -21,6 +21,7 @@ describe('StrategicAdvisor', () => {
       opportunityLine: 'Weak border',
       economyLine: '20 IPC, +8/turn',
       mobilizationAdvice: 'Mobilize the capital.',
+      simpleMode: true,
       coach: {
         headline: 'Take the port',
         detail: 'Your armor has a clean lane.',
@@ -34,6 +35,8 @@ describe('StrategicAdvisor', () => {
 
     const panel = document.getElementById('strategic-advisor-panel');
     expect(panel?.classList.contains('hidden')).toBe(false);
+    expect(panel?.classList.contains('copilot')).toBe(true);
+    expect(panel?.textContent).toContain('Do This Next');
     expect(panel?.textContent).toContain('Capture the port');
     expect(panel?.textContent).toContain('Take the port');
 

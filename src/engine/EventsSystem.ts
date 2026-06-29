@@ -6,6 +6,7 @@
 import { GameState } from './GameState';
 import { Territory } from '../data/Territory';
 import { Faction } from '../data/Faction';
+import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export interface GameEvent {
   id: string;
@@ -162,6 +163,49 @@ export const STRATEGIC_EVENTS: GameEvent[] = [
     effects: [{ type: 'movement_bonus', value: -1, duration: 1 }],
     weight: 8,
     cooldownTurns: 4,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'frontline_crisis',
+    name: 'Frontline Crisis',
+    description: 'A contested border has become unstable. Reinforce the line or exploit the chaos quickly.',
+    type: 'choice',
+    icon: '⚠',
+    effects: [],
+    choices: [
+      {
+        id: 'rush_reserves',
+        text: 'Rush reserves to the line (+2 Infantry, -6 IPCs)',
+        cost: 6,
+        effects: [{ type: 'unit_spawn', unitType: 'infantry', value: 2, target: 'frontline' }],
+      },
+      {
+        id: 'authorize_offensive',
+        text: 'Authorize an offensive (+1 attack this turn)',
+        effects: [{ type: 'attack_bonus', value: 1, target: 'all', duration: 1 }],
+      },
+      {
+        id: 'hold_position',
+        text: 'Hold position (+1 defense for 2 turns)',
+        effects: [{ type: 'defense_bonus', value: 1, target: 'frontline', duration: 2 }],
+      },
+    ],
+    weight: 9,
+    cooldownTurns: 6,
+    conditions: [{ type: 'at_war' }, { type: 'territory_count', value: 2, comparison: 'gte' }],
+  },
+  {
+    id: 'war_room_breakthrough',
+    name: 'War Room Breakthrough',
+    description: 'Staff officers identify a weak point in the enemy line.',
+    type: 'positive',
+    icon: '★',
+    effects: [
+      { type: 'intel_reveal' },
+      { type: 'movement_bonus', value: 1, duration: 1 },
+    ],
+    weight: 7,
+    cooldownTurns: 7,
     conditions: [{ type: 'at_war' }],
   },
   
@@ -655,6 +699,78 @@ export const STRATEGIC_EVENTS: GameEvent[] = [
     cooldownTurns: 7,
     conditions: [{ type: 'at_war' }],
   },
+  {
+    id: 'drone_strike_intel',
+    name: 'Drone Strike Intel',
+    description: 'Reconnaissance drones map enemy positions ahead of your next offensive.',
+    type: 'positive',
+    icon: '🛰️',
+    effects: [
+      { type: 'intel_reveal' },
+      { type: 'attack_bonus', value: 1, duration: 1 },
+    ],
+    weight: 6,
+    cooldownTurns: 8,
+    conditions: [{ type: 'winning' }],
+  },
+  {
+    id: 'sanctions_package',
+    name: 'Sanctions Package',
+    description: 'International sanctions drain your treasury as trade routes tighten.',
+    type: 'negative',
+    icon: '📉',
+    effects: [{ type: 'ipc_penalty', value: 12 }],
+    weight: 5,
+    cooldownTurns: 9,
+    conditions: [{ type: 'ipc_amount', value: 30, comparison: 'gt' }],
+  },
+  {
+    id: 'partisan_network',
+    name: 'Partisan Network',
+    description: 'Resistance cells offer to strike behind enemy lines — at a price.',
+    type: 'choice',
+    icon: '🕵️',
+    effects: [],
+    choices: [
+      {
+        id: 'fund_partisans',
+        text: 'Fund partisan strike (-8 IPCs, spawn infantry at frontline)',
+        cost: 8,
+        effects: [{ type: 'unit_spawn', unitType: 'infantry', value: 1, target: 'frontline' }],
+      },
+      {
+        id: 'boost_morale',
+        text: 'Broadcast victories to boost morale',
+        effects: [{ type: 'morale_boost', value: 2 }],
+      },
+    ],
+    weight: 6,
+    cooldownTurns: 10,
+    conditions: [{ type: 'at_war' }],
+  },
+  {
+    id: 'lend_lease_convoy',
+    name: 'Lend-Lease Convoy',
+    description: 'Allied supply ships arrive with war materiel. Choose how to distribute the shipment.',
+    type: 'choice',
+    icon: '🚢',
+    effects: [],
+    choices: [
+      {
+        id: 'take_tanks',
+        text: 'Accept armored shipment (spawn 1 tank at capital)',
+        effects: [{ type: 'unit_spawn', unitType: 'tank', value: 1, target: 'capital' }],
+      },
+      {
+        id: 'take_funds',
+        text: 'Liquidate for cash (+15 IPCs)',
+        effects: [{ type: 'ipc_bonus', value: 15 }],
+      },
+    ],
+    weight: 7,
+    cooldownTurns: 8,
+    conditions: [{ type: 'losing' }],
+  },
 ];
 
 export class EventsSystem {
@@ -757,7 +873,13 @@ export class EventsSystem {
       case 'unit_spawn': {
         const targetTerritory = this.getTargetTerritory(effect.target, factionId);
         if (targetTerritory && effect.unitType) {
-          targetTerritory.addUnits(effect.unitType, effect.value || 1);
+          spawnUnitsOnTerritory(
+            this.state,
+            factionId,
+            targetTerritory.id,
+            effect.unitType,
+            effect.value || 1,
+          );
         }
         break;
       }

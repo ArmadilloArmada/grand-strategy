@@ -32,8 +32,8 @@ export function getPhasesForStyle(style: TurnStyle): string[] {
       ];
 
     case "quick":
-      // Simplified 3-phase system - combat happens during move
-      return ["build", "move", "end"];
+      // One command phase (mobilize + move + attack), then end turn
+      return ["play", "end"];
 
     case "civilization":
       // Civ-style: units move OR attack
@@ -42,6 +42,10 @@ export function getPhasesForStyle(style: TurnStyle): string[] {
     case "chess":
       // Chess-style: one action then opponent goes
       return ["action"];
+
+    case "move_for_move":
+      // Freeform: build anytime, alternating moves, end turn to collect
+      return ["play"];
 
     default:
       return [
@@ -72,6 +76,7 @@ export function getPhaseDisplayName(phase: string, _style: TurnStyle): string {
     build: "⚔️ Mobilize Forces",
     move: "🚶 Move Units",
     attack: "⚔️ Attack Enemies",
+    play: "⚔️ Command Forces",
     end: "💵 End Turn & Collect",
 
     // Civ phases
@@ -113,12 +118,19 @@ export function isMoveOrAttackOnly(style: TurnStyle): boolean {
   return style === "civilization";
 }
 
+/** Alternating single-move segment during the shared move phase */
+export function isMoveForMoveStyle(style: TurnStyle): boolean {
+  return style === "move_for_move";
+}
+
 /**
  * Get phase tips for players
  */
 export function getPhaseTip(phase: string, style: TurnStyle): string {
   if (style === "quick") {
     switch (phase) {
+      case "play":
+        return "Mobilize (🏭), move units, and attack enemies — then End Turn";
       case "build":
         return "Click territories to mobilize defenders";
       case "move":
@@ -147,12 +159,16 @@ export function getPhaseTip(phase: string, style: TurnStyle): string {
     return "Make ONE action: move a unit OR attack with a unit";
   }
 
+  if (style === "move_for_move") {
+    return "Build anytime (🏭), move or attack one stack at a time, then End Turn";
+  }
+
   // Classic tips
   switch (phase) {
     case "purchase":
       return "Click territories to mobilize defenders";
     case "combat_move":
-      return "Move units toward enemies to attack";
+      return "Attack enemies or move toward the front — artillery bombards without advancing";
     case "combat":
       return "Roll dice to resolve battles";
     case "noncombat_move":

@@ -24,7 +24,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    chunkSizeWarningLimit: 600,
+    // Game + engine ship in one main chunk; maps/units are already split via manualChunks.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),

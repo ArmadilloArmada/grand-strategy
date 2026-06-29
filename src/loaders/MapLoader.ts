@@ -10,6 +10,8 @@ export interface MapData {
   version: string;
   width: number;
   height: number;
+  /** When true, the east and west map edges connect (world map Pacific wrap). */
+  wrapHorizontal?: boolean;
   territories: TerritoryData[];
   startingUnits: StartingUnits[];
 }
@@ -32,6 +34,12 @@ export class MapLoader {
    */
   loadMap(mapData: MapData): void {
     const startingUnits = mapData.startingUnits ?? [];
+
+    this.state.mapLayout = {
+      width: mapData.width,
+      height: mapData.height,
+      wrapHorizontal: Boolean(mapData.wrapHorizontal),
+    };
 
     // Clear existing territories
     this.state.territories.clear();
@@ -63,7 +71,15 @@ export class MapLoader {
       if (issues.length > 0) {
         throw new Error(`Strict map topology enabled; map has ${issues.length} issue(s): ${issues[0]}`);
       }
-      return { ...mapData, territories: this.cloneTerritories(mapData.territories) };
+      const territories = this.cloneTerritories(mapData.territories);
+      const cellSize = this.inferGridCellSize(mapData);
+      if (cellSize) {
+        this.applyGridAdjacency(territories, cellSize, undefined, mapData.wrapHorizontal, mapData.width, mapData.height);
+      } else {
+        this.ensureCoastalSeaAccess(territories);
+      }
+      this.ensureBidirectionalAdjacency(territories);
+      return { ...mapData, territories };
     }
 
     const cellSize = this.inferGridCellSize(mapData);
@@ -80,7 +96,6 @@ export class MapLoader {
       occupied.set(key, territory);
     }
 
-    const generatedIds = new Set<string>();
     const cols = Math.ceil(mapData.width / cellSize);
     const rows = Math.ceil(mapData.height / cellSize);
 
@@ -91,7 +106,6 @@ export class MapLoader {
         const x = col * cellSize;
         const y = row * cellSize;
         const id = `sea_auto_${row}_${col}`;
-        generatedIds.add(id);
         const sea: TerritoryData = {
           id,
           name: 'Sea',
@@ -110,27 +124,60 @@ export class MapLoader {
       }
     }
 
-    for (const territory of territories) {
-      const [x, y] = territory.polygon[0];
-      const [col, row] = this.gridCoords(x, y, cellSize);
-      const neighborKeys = [
-        `${col},${row - 1}`,
-        `${col + 1},${row}`,
-        `${col},${row + 1}`,
-        `${col - 1},${row}`,
-      ];
-      const merged = new Set(territory.adjacentTo);
-      for (const key of neighborKeys) {
-        const neighbor = occupied.get(key);
-        if (neighbor && neighbor.id !== territory.id) merged.add(neighbor.id);
-      }
-      territory.adjacentTo = Array.from(merged);
-    }
+    this.applyGridAdjacency(territories, cellSize, occupied, mapData.wrapHorizontal, mapData.width, mapData.height);
 
     this.ensureCoastalSeaAccess(territories);
     this.ensureBidirectionalAdjacency(territories);
 
     return { ...mapData, territories };
+  }
+
+  /** Merge 8-way grid neighbors into adjacentTo (orthogonal + diagonal). */
+  private applyGridAdjacency(
+    territories: TerritoryData[],
+    cellSize: number,
+    occupied?: Map<string, TerritoryData>,
+    wrapHorizontal = false,
+    mapWidth?: number,
+    mapHeight?: number,
+  ): void {
+    const index = occupied ?? new Map<string, TerritoryData>();
+    if (!occupied) {
+      for (const territory of territories) {
+        if (territory.polygon.length === 0) continue;
+        const key = this.gridKey(territory.polygon[0][0], territory.polygon[0][1], cellSize);
+        index.set(key, territory);
+      }
+    }
+
+    const cols = mapWidth ? Math.round(mapWidth / cellSize) : null;
+    const rows = mapHeight ? Math.round(mapHeight / cellSize) : null;
+    const offsets: Array<[number, number]> = [
+      [0, -1], [1, 0], [0, 1], [-1, 0],
+      [-1, -1], [1, -1], [-1, 1], [1, 1],
+    ];
+
+    for (const territory of territories) {
+      if (territory.polygon.length === 0) continue;
+      const [x, y] = territory.polygon[0];
+      const [col, row] = this.gridCoords(x, y, cellSize);
+      const merged = new Set(territory.adjacentTo);
+      for (const [dc, dr] of offsets) {
+        const nr = row + dr;
+        if (rows != null && (nr < 0 || nr >= rows)) continue;
+        let nc = col + dc;
+        if (cols != null) {
+          if (wrapHorizontal) {
+            nc = ((nc % cols) + cols) % cols;
+          } else if (nc < 0 || nc >= cols) {
+            continue;
+          }
+        }
+        const neighbor = index.get(`${nc},${nr}`);
+        if (neighbor && neighbor.id !== territory.id) merged.add(neighbor.id);
+      }
+      territory.adjacentTo = Array.from(merged);
+    }
   }
 
   private cloneTerritories(territories: TerritoryData[]): TerritoryData[] {

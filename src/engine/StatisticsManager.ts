@@ -25,6 +25,8 @@ export interface FactionStats {
   diplomaticAlliancesFormed: number;
   diplomaticBetrayals: number;
   fortificationsBuilt: number;
+  tacticalBattlesPlayed: number;
+  tacticalBattlesWon: number;
 }
 
 export interface GameStatsSnapshot {
@@ -57,6 +59,8 @@ function defaultStats(factionId: string): FactionStats {
     diplomaticAlliancesFormed: 0,
     diplomaticBetrayals: 0,
     fortificationsBuilt: 0,
+    tacticalBattlesPlayed: 0,
+    tacticalBattlesWon: 0,
   };
 }
 
@@ -149,6 +153,12 @@ class StatisticsManager {
 
   trackFortificationBuilt(factionId: string): void {
     this.getFactionStats(factionId).fortificationsBuilt++;
+  }
+
+  trackTacticalBattle(factionId: string, won: boolean): void {
+    const stats = this.getFactionStats(factionId);
+    stats.tacticalBattlesPlayed++;
+    if (won) stats.tacticalBattlesWon++;
   }
 
   getAllStats(): GameStatsSnapshot {

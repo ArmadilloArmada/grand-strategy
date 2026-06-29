@@ -4,12 +4,30 @@
 
 import { GameState } from '../engine/GameState';
 import { CombatResolver, CombatState } from '../engine/CombatResolver';
+import {
+  countTerritoryDefendersIncludingOffshore,
+  buildStrategicDefenderPreview,
+  canLandUnitStrikeNaval,
+} from '../engine/NavalSystem';
+import {
+  computePreviewCombatTotals,
+  estimateVictoryChance,
+  type PreviewAttackerEntry,
+} from '../engine/combatPreviewOdds';
+import { getTerritoryNeighborIds } from '../engine/gridAdjacency';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { soundManager } from '../audio/SoundManager';
 import { battleLog } from './BattleLog';
 import { UNIT_ICONS } from './hudConstants';
 import { generateBattleNarrative } from '../engine/BattleNarrator';
 import { settings } from './Settings';
+import { statisticsManager } from '../engine/StatisticsManager';
+import {
+  applyTacticalVictoryBonuses,
+  type TacticalOutcomeMeta,
+} from '../engine/TacticalBattleEngine';
+import { TacticalBattleUI } from './TacticalBattleUI';
+import { MovementValidator } from '../engine/MovementValidator';
 
 export interface CombatCallbacks {
   showToast(msg: string, type: 'success' | 'info' | 'error'): void;
@@ -17,6 +35,9 @@ export interface CombatCallbacks {
   updateFactionPanel(): void;
   updateSelectionInfo(): void;
   updateActionButtons(): void;
+  afterUnitAction?: (fromId?: string, toId?: string) => void;
+  getSelectedUnitType?: () => string | null;
+  getSelectedMoveCount?: () => number | null;
 }
 
 export interface BattlePreviewStats {
@@ -40,6 +61,10 @@ export class CombatUI {
   private pendingCombats: string[] = [];
   private pendingAttackFrom: string | null = null;
   private pendingAttackTarget: string | null = null;
+  private tacticalBattleUI = new TacticalBattleUI();
+  private lastCombatWasTactical = false;
+  private pendingTacticalMeta: TacticalOutcomeMeta | null = null;
+  private previewKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(
     private state: GameState,
@@ -61,6 +86,8 @@ export class CombatUI {
     const modal = document.getElementById('combat-modal');
     if (modal) {
       modal.classList.remove('hidden');
+      modal.classList.remove('combat-preview-open');
+      modal.classList.add('combat-battle-open');
       document.getElementById('combat-phase-preview')?.classList.add('hidden');
       const battlePhase = document.getElementById('combat-phase-battle');
       if (battlePhase) {
@@ -73,6 +100,7 @@ export class CombatUI {
     }
 
     soundManager.play('combat_start');
+    soundManager.playMusic('combat');
 
     const territoryEl = document.getElementById('combat-territory');
     const territory = this.state.territories.get(combat.territoryId);
@@ -323,10 +351,12 @@ export class CombatUI {
     const combatTerritory = this.state.territories.get(this.activeCombat.territoryId);
     if (!combatTerritory) return;
 
-    for (const adjId of combatTerritory.adjacentTo) {
+    for (const adjId of getTerritoryNeighborIds(this.state, combatTerritory)) {
       const adj = this.state.territories.get(adjId);
       if (adj?.owner === this.activeCombat.attackingFactionId) {
         this.combatResolver.processRetreat(this.activeCombat, adjId);
+        soundManager.play('retreat');
+        soundManager.playMusic('gameplay');
         this.callbacks.showToast('Forces retreated!', 'info');
         this.finishCurrentCombat();
         return;
@@ -342,8 +372,12 @@ export class CombatUI {
   }
 
   finishCurrentCombat(): void {
+    let handoffFrom: string | undefined;
+    let handoffTo: string | undefined;
     if (this.activeCombat) {
       const combat = this.activeCombat;
+      handoffFrom = combat.sourceTerritory ?? undefined;
+      handoffTo = combat.territoryId;
       const sourceTerritory = combat.sourceTerritory ? this.state.territories.get(combat.sourceTerritory) : null;
       const targetTerritory = this.state.territories.get(combat.territoryId);
 
@@ -353,7 +387,46 @@ export class CombatUI {
         }
       }
 
+      let tacticalSavedUnits = 0;
+      if (this.pendingTacticalMeta || this.lastCombatWasTactical) {
+        combat.resolvedTactically = true;
+      }
+      if (this.pendingTacticalMeta) {
+        combat.tacticalCleanWin = this.pendingTacticalMeta.cleanWin;
+        if (combat.winner === 'attacker') {
+          const bonus = applyTacticalVictoryBonuses(combat, this.pendingTacticalMeta);
+          tacticalSavedUnits = bonus.savedUnits;
+        }
+      }
+
       this.combatResolver.finalizeCombat(combat);
+
+      if (combat.stayInPlace && sourceTerritory) {
+        for (const cu of combat.attackers) {
+          const surviving = cu.count - cu.casualties;
+          if (surviving <= 0) continue;
+          sourceTerritory.addUnits(cu.unitType.id, surviving);
+          sourceTerritory.markUnitsActed(cu.unitType.id, surviving);
+        }
+      } else if (sourceTerritory && combat.winner !== 'attacker') {
+        for (const cu of combat.attackers) {
+          const surviving = cu.count - cu.casualties;
+          if (surviving <= 0) continue;
+          sourceTerritory.addUnits(cu.unitType.id, surviving);
+          sourceTerritory.markUnitsActed(cu.unitType.id, surviving);
+        }
+      } else if (combat.winner === 'attacker') {
+        for (const cu of combat.attackers) {
+          const surviving = cu.count - cu.casualties;
+          if (surviving <= 0) continue;
+          if (cu.unitType.domain === 'sea' && sourceTerritory?.type === 'sea') {
+            sourceTerritory.markUnitsActed(cu.unitType.id, surviving);
+          } else if (cu.unitType.domain !== 'sea') {
+            const dest = this.state.territories.get(combat.territoryId);
+            dest?.markUnitsActed(cu.unitType.id, surviving);
+          }
+        }
+      }
 
       const attackerLosses: Record<string, number> = {};
       for (const cu of combat.attackers) {
@@ -363,14 +436,48 @@ export class CombatUI {
       for (const cu of combat.defenders) {
         if (cu.casualties > 0) defenderLosses[cu.unitType.id] = (defenderLosses[cu.unitType.id] ?? 0) + cu.casualties;
       }
+      const attackerLossText = this.formatLosses(attackerLosses);
+      const defenderLossText = this.formatLosses(defenderLosses);
+      const targetName = targetTerritory?.name ?? combat.territoryId;
+      const recap = combat.stayInPlace
+        ? (combat.winner === 'attacker'
+          ? `Barrage on ${targetName} succeeded. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+          : combat.winner === 'defender'
+          ? `${targetName} held after barrage. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+          : `${targetName} emptied. Both sides destroyed.`)
+        : (combat.winner === 'attacker'
+        ? `Captured ${targetName}. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+        : combat.winner === 'defender'
+        ? `${targetName} held. Lost ${attackerLossText}; enemy lost ${defenderLossText}.`
+        : `${targetName} emptied. Both sides destroyed.`);
 
       if (combat.winner === 'attacker') {
-        this.callbacks.showToast(`Victory! Captured ${targetTerritory?.name}!`, 'success');
+        this.callbacks.showToast(recap, 'success');
         soundManager.play('capture');
       } else if (combat.winner === 'defender') {
-        this.callbacks.showToast(`Attack failed. ${targetTerritory?.name} holds!`, 'info');
+        this.callbacks.showToast(recap, 'info');
       } else {
-        this.callbacks.showToast('Both sides destroyed!', 'info');
+        this.callbacks.showToast(recap, 'info');
+      }
+      const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      battleLog.logCombat(this.state.turnNumber, attackerFaction?.name ?? 'Attacker', attackerFaction?.color ?? '#94a3b8', recap);
+
+      if (this.lastCombatWasTactical || this.pendingTacticalMeta) {
+        const won = combat.winner === 'attacker';
+        statisticsManager.trackTacticalBattle(combat.attackingFactionId, won);
+        if (won && tacticalSavedUnits > 0) {
+          this.callbacks.showToast(
+            `Tactical victory! Morale boosted — ${tacticalSavedUnits} unit${tacticalSavedUnits === 1 ? '' : 's'} saved.`,
+            'success',
+          );
+        } else if (won && this.pendingTacticalMeta?.cleanWin) {
+          this.callbacks.showToast('Clean tactical victory! Troops hold the line with high morale.', 'success');
+        } else if (won) {
+          this.callbacks.showToast('Tactical victory secured.', 'success');
+        }
+        this.lastCombatWasTactical = false;
+        this.pendingTacticalMeta = null;
+        soundManager.playMusic('gameplay');
       }
 
       // Battle narrative
@@ -408,7 +515,22 @@ export class CombatUI {
     this.renderer.render();
     this.callbacks.renderMinimap();
     this.callbacks.updateFactionPanel();
+    if (handoffFrom) {
+      this.callbacks.afterUnitAction?.(handoffFrom, handoffTo);
+    } else {
+      this.callbacks.afterUnitAction?.();
+    }
     this.startNextCombat();
+  }
+
+  private formatLosses(losses: Record<string, number>): string {
+    const parts = Object.entries(losses)
+      .filter(([, count]) => count > 0)
+      .map(([unitTypeId, count]) => {
+        const unit = this.state.unitRegistry.get(unitTypeId);
+        return `${count} ${unit?.name ?? unitTypeId}`;
+      });
+    return parts.length > 0 ? parts.join(', ') : 'nothing';
   }
 
   closeCombatModal(): void {
@@ -556,7 +678,7 @@ export class CombatUI {
       }
     }
 
-    if (!territory.owner || territory.getTotalUnitCount() === 0) {
+    if (!territory.owner || countTerritoryDefendersIncludingOffshore(this.state, territoryId, territory.owner) === 0) {
       const currentFaction = this.state.getCurrentFaction();
       if (currentFaction) {
         territory.owner = currentFaction.id;
@@ -575,10 +697,12 @@ export class CombatUI {
       return;
     }
 
+    const sourceTerritoryId = attackingMoves[0]?.fromTerritoryId;
     const combat = this.combatResolver.initiateCombat(
       territoryId,
       this.state.currentFactionId,
-      attackingUnits
+      attackingUnits,
+      sourceTerritoryId,
     );
 
     if (combat) {
@@ -586,17 +710,7 @@ export class CombatUI {
       const distinctSources = new Set(attackingMoves.map(m => m.fromTerritoryId));
       if (distinctSources.size > 1) combat.flankingBonus = 1;
 
-      // Air superiority: defending fighters intercept attacking air units pre-combat
-      const interceptResult = this.combatResolver.performFighterIntercept(combat);
-      if (interceptResult.hits > 0) {
-        const faction = this.state.getCurrentFaction();
-        if (faction) {
-          battleLog.logCombat(
-            this.state.turnNumber, faction.name, faction.color,
-            `✈️ Air intercept: ${interceptResult.hits} hit(s) on attacking air units`
-          );
-        }
-      }
+      this.runPreCombatPhases(combat, territoryId);
 
       this.activeCombat = combat;
       const atkFaction = this.state.factionRegistry.get(combat.attackingFactionId);
@@ -616,6 +730,77 @@ export class CombatUI {
 
   // ==================== BATTLE PREVIEW ====================
 
+  /** Log pre-combat phases in the battle modal and battle log. */
+  private runPreCombatPhases(combat: CombatState, _territoryId: string): void {
+    const atkFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+    const preCombat = this.combatResolver.runPreCombatPhases(combat);
+    const logEl = document.getElementById('combat-log');
+    let logHtml = logEl?.innerHTML ?? '';
+
+    const appendLog = (line: string) => {
+      logHtml += line;
+      if (logEl) logEl.innerHTML = logHtml;
+    };
+
+    if (preCombat.shoreBombardment && preCombat.shoreBombardment.rolls.length > 0) {
+      if (preCombat.shoreBombardment.hits > 0 && atkFaction) {
+        battleLog.logCombat(
+          this.state.turnNumber,
+          atkFaction.name,
+          atkFaction.color,
+          `🚢 Shore bombardment: ${preCombat.shoreBombardment.hits} hit(s) on the garrison before the assault`,
+        );
+      }
+      appendLog(`<div class="round-header">🚢 Shore Bombardment</div>`);
+      appendLog(`<div class="preview-combat-note compact">Defenders cannot fire back during shore bombardment.</div>`);
+      for (const roll of preCombat.shoreBombardment.rolls) {
+        const icon = UNIT_ICONS[roll.unitTypeId] || '⬜';
+        const cls = roll.isCritical ? 'critical' : (roll.isHit ? 'hit' : 'miss');
+        const hitText = roll.isCritical ? '💥💥 CRITICAL!' : (roll.isHit ? '💥 HIT!' : 'miss');
+        appendLog(`<div class="${cls}">${icon} ${roll.unitName}: <span class="dice">${roll.roll}</span> vs ${roll.targetValue} → ${hitText}</div>`);
+      }
+      appendLog(`<div><strong>Bombardment total: ${preCombat.shoreBombardment.hits} hit(s)</strong></div>`);
+    }
+
+    if (preCombat.coastalArtillery && preCombat.coastalArtillery.rolls.length > 0) {
+      if (preCombat.coastalArtillery.hits > 0 && atkFaction) {
+        battleLog.logCombat(
+          this.state.turnNumber,
+          atkFaction.name,
+          atkFaction.color,
+          `💥 Coastal artillery: ${preCombat.coastalArtillery.hits} hit(s) on the fleet before the engagement`,
+        );
+      }
+      appendLog(`<div class="round-header">💥 Coastal Artillery Barrage</div>`);
+      appendLog(`<div class="preview-combat-note compact">Ships cannot return fire during the opening barrage.</div>`);
+      for (const roll of preCombat.coastalArtillery.rolls) {
+        const icon = UNIT_ICONS[roll.unitTypeId] || '⬜';
+        const cls = roll.isCritical ? 'critical' : (roll.isHit ? 'hit' : 'miss');
+        const hitText = roll.isCritical ? '💥💥 CRITICAL!' : (roll.isHit ? '💥 HIT!' : 'miss');
+        appendLog(`<div class="${cls}">${icon} ${roll.unitName}: <span class="dice">${roll.roll}</span> vs ${roll.targetValue} → ${hitText}</div>`);
+      }
+      appendLog(`<div><strong>Artillery barrage total: ${preCombat.coastalArtillery.hits} hit(s)</strong></div>`);
+    }
+
+    if (preCombat.submarineStrike && preCombat.submarineStrike.hits > 0 && atkFaction) {
+      battleLog.logCombat(
+        this.state.turnNumber,
+        atkFaction.name,
+        atkFaction.color,
+        `🐟 Submarine strike: ${preCombat.submarineStrike.hits} hit(s) before defenders respond`,
+      );
+    }
+
+    if (preCombat.airIntercept && preCombat.airIntercept.hits > 0 && atkFaction) {
+      battleLog.logCombat(
+        this.state.turnNumber,
+        atkFaction.name,
+        atkFaction.color,
+        `✈️ Air intercept: ${preCombat.airIntercept.hits} hit(s) on attacking air units`,
+      );
+    }
+  }
+
   showBattlePreview(fromId: string, toId: string): void {
     this.pendingAttackFrom = fromId;
     this.pendingAttackTarget = toId;
@@ -623,11 +808,16 @@ export class CombatUI {
     const fromTerritory = this.state.territories.get(fromId);
     const toTerritory = this.state.territories.get(toId);
     if (!fromTerritory || !toTerritory) return;
+    const thisRef = this;
+    const sourceTerritory = fromTerritory;
+    const targetTerritory = toTerritory;
 
     // Open combined modal in preview phase
     const modal = document.getElementById('combat-modal');
     if (modal) {
       modal.classList.remove('hidden');
+      modal.classList.add('combat-preview-open');
+      modal.classList.remove('combat-battle-open');
       document.getElementById('combat-phase-battle')?.classList.add('hidden');
       document.getElementById('combat-phase-preview')?.classList.remove('hidden');
       const title = document.getElementById('combat-modal-title');
@@ -637,44 +827,56 @@ export class CombatUI {
     const territoryEl = document.getElementById('preview-territory');
     let territoryLabel = `Attack on ${toTerritory.name}`;
     if (toTerritory.isCapital || toTerritory.hasFactory) {
-      territoryLabel += ' ⚠️ +1 Defense Bonus';
+      territoryLabel += ' · +1 defense bonus';
     }
     if (territoryEl) territoryEl.textContent = territoryLabel;
 
-    let artilleryCount = 0;
-    let infantryCount = 0;
+    const selectedUnitType = this.callbacks.getSelectedUnitType?.() ?? null;
+    const hqMoveCount = this.callbacks.getSelectedMoveCount?.() ?? null;
     const attackerUnitsEl = document.getElementById('preview-attacker-units');
-    let attackPower = 0;
     let attackerHtml = '';
-    const readyAttackers: { unitTypeId: string; count: number }[] = [];
+    const readyAttackers: PreviewAttackerEntry[] = [];
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (unitType && unitType.attack > 0) {
-        const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
-        if (readyCount <= 0) continue;
-        readyAttackers.push({ unitTypeId: pu.unitTypeId, count: readyCount });
-        if (pu.unitTypeId === 'artillery') artilleryCount += readyCount;
-        if (pu.unitTypeId === 'infantry') infantryCount += readyCount;
-        const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
-        const actedCount = pu.count - readyCount;
-        const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
-        attackerHtml += `
-          <div class="unit-select-row">
-            <span>${icon} ${unitType.name}${actedText} <small style="color:#666">(Atk:${unitType.attack})</small></span>
-            <div class="unit-stepper">
+      if (!unitType || unitType.attack <= 0) continue;
+      if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
+      const readyCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
+      if (readyCount <= 0) continue;
+      const defaultCount = selectedUnitType && pu.unitTypeId === selectedUnitType && hqMoveCount
+        ? Math.min(hqMoveCount, readyCount)
+        : readyCount;
+      readyAttackers.push({ unitTypeId: pu.unitTypeId, unitType, count: defaultCount });
+      const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
+      const actedCount = pu.count - readyCount;
+      const actedText = actedCount > 0 ? ` <small class="preview-muted">(${actedCount} acted)</small>` : '';
+      attackerHtml += `
+          <div class="unit-select-row compact">
+            <span class="unit-select-label">${icon} ${unitType.name}${actedText}<em>Atk ${unitType.attack}</em></span>
+            <div class="unit-stepper compact">
               <button type="button" class="stepper-dec" data-uid="${pu.unitTypeId}">−</button>
               <input type="number" class="unit-count-input" data-unit-type-id="${pu.unitTypeId}"
-                value="${readyCount}" min="0" max="${readyCount}" style="width:3rem;text-align:center;">
+                value="${defaultCount}" min="0" max="${readyCount}">
               <button type="button" class="stepper-inc" data-uid="${pu.unitTypeId}" data-max="${readyCount}">+</button>
             </div>
           </div>`;
-        attackPower += readyCount * unitType.attack;
-      }
     }
-    const boostedInfantry = Math.min(artilleryCount, infantryCount);
-    if (boostedInfantry > 0) {
-      attackerHtml += `<div style="color:#059669;margin-top:0.5rem"><small>🎯 Artillery boosts ${boostedInfantry} infantry (+${boostedInfantry} attack)</small></div>`;
-      attackPower += boostedInfantry;
+    const defendingFactionId = toTerritory.owner ?? '';
+    const defenderPreview = defendingFactionId
+      ? buildStrategicDefenderPreview(this.state, toTerritory.id, defendingFactionId)
+      : [];
+    const previewTotals = computePreviewCombatTotals(
+      this.state,
+      fromTerritory,
+      toTerritory,
+      readyAttackers,
+      defenderPreview,
+      this.state.getCurrentFaction()?.id ?? '',
+    );
+    if (previewTotals.artilleryBoost > 0) {
+      attackerHtml += `<div class="preview-combat-note compact">🎯 Artillery +${previewTotals.artilleryBoost} atk</div>`;
+    }
+    if (previewTotals.combinedArmsBonus > 0) {
+      attackerHtml += `<div class="preview-combat-note compact">⚔️ Combined arms +${previewTotals.combinedArmsBonus} atk</div>`;
     }
     if (attackerUnitsEl) {
       attackerUnitsEl.innerHTML = attackerHtml || '<em>No units</em>';
@@ -683,86 +885,289 @@ export class CombatUI {
         btn.addEventListener('click', () => {
           const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
           if (input) input.value = String(Math.max(0, Number(input.value) - 1));
+          updatePreviewFromInputs();
         });
       });
       attackerUnitsEl.querySelectorAll<HTMLButtonElement>('.stepper-inc').forEach(btn => {
         btn.addEventListener('click', () => {
           const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${btn.dataset.uid}"]`);
           if (input) input.value = String(Math.min(Number(btn.dataset.max ?? 99), Number(input.value) + 1));
+          updatePreviewFromInputs();
         });
+      });
+      attackerUnitsEl.querySelectorAll<HTMLInputElement>('.unit-count-input').forEach(input => {
+        input.addEventListener('input', updatePreviewFromInputs);
+        input.addEventListener('change', updatePreviewFromInputs);
       });
     }
 
     const defenderUnitsEl = document.getElementById('preview-defender-units');
-    let defensePower = 0;
     let defenderHtml = '';
-    for (const pu of toTerritory.units) {
-      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      if (unitType) {
-        const icon = UNIT_ICONS[pu.unitTypeId] || '⬜';
-        defenderHtml += `<div>${icon} ${pu.count}× ${unitType.name} <small style="color:#666">(Def:${unitType.defense})</small></div>`;
-        defensePower += pu.count * unitType.defense;
-      }
+    for (const entry of defenderPreview) {
+      const icon = UNIT_ICONS[entry.unitType.id] || '⬜';
+      const offshoreLabel = entry.offshore
+        ? ` <small class="preview-muted">(offshore${entry.seaZoneName ? `: ${entry.seaZoneName}` : ''})</small>`
+        : '';
+      defenderHtml += `<div class="preview-defender-row"><span>${icon} ${entry.count}× ${entry.unitType.name}${offshoreLabel}</span><em>Def ${entry.unitType.defense}</em></div>`;
     }
     if (toTerritory.isCapital || toTerritory.hasFactory) {
-      defenderHtml += `<div style="color:#dc2626;margin-top:0.5rem"><small>🏰 Terrain bonus: +1 defense first round</small></div>`;
+      defenderHtml += `<div class="preview-combat-note compact warn">🏰 +1 def round 1</div>`;
     }
     if (defenderUnitsEl) defenderUnitsEl.innerHTML = defenderHtml || '<em>Undefended!</em>';
 
-    let effectiveDefense = defensePower;
-    if (toTerritory.isCapital || toTerritory.hasFactory) {
-      const defenderUnitCount = toTerritory.units.reduce((sum, u) => sum + u.count, 0);
-      effectiveDefense += defenderUnitCount;
-    }
-
-    const previewStats = this.calculateBattlePreviewStats(readyAttackers, toTerritory.units, attackPower, defensePower, effectiveDefense);
+    const previewStats = this.calculateBattlePreviewStats(
+      readyAttackers.map(a => ({ unitTypeId: a.unitTypeId, count: a.count })),
+      defenderPreview.map(entry => ({ unitTypeId: entry.unitType.id, count: entry.count })),
+      previewTotals,
+    );
     const attackPowerEl = document.getElementById('preview-attacker-power');
     if (attackPowerEl) {
-      attackPowerEl.innerHTML = `Attack Power: ${previewStats.attackPower}<br><small>Expected hits: ${previewStats.expectedAttackerHits.toFixed(1)}</small>`;
+      const muted = previewTotals.engageableAttackPower < previewTotals.rawAttackPower
+        ? ` <small class="preview-muted">(${previewTotals.rawAttackPower} raw)</small>`
+        : '';
+      attackPowerEl.innerHTML = `Atk ${previewStats.attackPower}${muted} · ~${previewStats.expectedAttackerHits.toFixed(1)} hits`;
     }
 
     const defensePowerEl = document.getElementById('preview-defender-power');
     if (defensePowerEl) {
       const bonusText = previewStats.effectiveDefense > previewStats.defensePower
-        ? ` <small>(effective ${previewStats.effectiveDefense})</small>` : '';
-      defensePowerEl.innerHTML = `Defense Power: ${previewStats.defensePower}${bonusText}<br><small>Expected hits: ${previewStats.expectedDefenderHits.toFixed(1)}</small>`;
+        ? ` (${previewStats.effectiveDefense} eff.)` : '';
+      const muted = previewTotals.engageableDefensePower < previewTotals.rawDefensePower
+        ? ` <small class="preview-muted">(${previewTotals.rawDefensePower} raw)</small>`
+        : '';
+      defensePowerEl.innerHTML = `Def ${previewStats.defensePower}${bonusText}${muted} · ~${previewStats.expectedDefenderHits.toFixed(1)} hits`;
+    }
+
+    const domainNote = this.buildDomainCombatNote(
+      readyAttackers.map(a => ({ unitType: a.unitType, count: a.count })),
+      defenderPreview.map(d => ({ unitType: d.unitType, count: d.count })),
+    );
+
+    if (domainNote) {
+      defenderHtml += domainNote;
+      if (defenderUnitsEl) defenderUnitsEl.innerHTML = defenderHtml;
     }
 
     const oddsEl = document.getElementById('odds-display');
     if (oddsEl) {
       oddsEl.textContent = `~${Math.round(previewStats.odds * 100)}%`;
-      oddsEl.className = previewStats.riskClass;
+      oddsEl.className = `preview-odds-pct ${previewStats.riskClass}`;
     }
 
     const summaryEl = document.getElementById('preview-risk-summary');
+    const consequenceSummaryEl = this.getPreviewConsequenceEl();
+    const swingFactorsEl = this.getPreviewSwingFactorsEl();
+    this.renderPreviewOutcome(fromId, toId, previewStats, summaryEl, consequenceSummaryEl, swingFactorsEl);
+    this.updateBattlePreviewActions(previewStats, toTerritory, defenderPreview.reduce((sum, entry) => sum + entry.count, 0));
+    this.attachPreviewKeyboard();
+
+    function updatePreviewFromInputs(): void {
+      if (!attackerUnitsEl) return;
+      const selectedAttackers: PreviewAttackerEntry[] = [];
+
+      for (const pu of sourceTerritory.units) {
+        const unitType = thisRef.state.unitRegistry.get(pu.unitTypeId);
+        if (!unitType || unitType.attack <= 0) continue;
+        if (selectedUnitType && pu.unitTypeId !== selectedUnitType) continue;
+        const readyCount = sourceTerritory.getAvailableUnitCount(pu.unitTypeId);
+        const input = attackerUnitsEl.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
+        const count = input
+          ? Math.max(0, Math.min(readyCount, Math.floor(Number(input.value) || 0)))
+          : readyCount;
+        if (input && Number(input.value) !== count) input.value = String(count);
+        if (count <= 0) continue;
+        selectedAttackers.push({ unitTypeId: pu.unitTypeId, unitType, count });
+      }
+
+      const nextTotals = computePreviewCombatTotals(
+        thisRef.state,
+        sourceTerritory,
+        targetTerritory,
+        selectedAttackers,
+        defenderPreview,
+        thisRef.state.getCurrentFaction()?.id ?? '',
+      );
+      const nextStats = thisRef.calculateBattlePreviewStats(
+        selectedAttackers.map(a => ({ unitTypeId: a.unitTypeId, count: a.count })),
+        defenderPreview.map(entry => ({ unitTypeId: entry.unitType.id, count: entry.count })),
+        nextTotals,
+      );
+      if (attackPowerEl) {
+        const muted = nextTotals.engageableAttackPower < nextTotals.rawAttackPower
+          ? ` <small class="preview-muted">(${nextTotals.rawAttackPower} raw)</small>`
+          : '';
+        attackPowerEl.innerHTML = `Atk ${nextStats.attackPower}${muted} · ~${nextStats.expectedAttackerHits.toFixed(1)} hits`;
+      }
+      if (defensePowerEl) {
+        const bonusText = nextStats.effectiveDefense > nextStats.defensePower
+          ? ` (${nextStats.effectiveDefense} eff.)` : '';
+        const muted = nextTotals.engageableDefensePower < nextTotals.rawDefensePower
+          ? ` <small class="preview-muted">(${nextTotals.rawDefensePower} raw)</small>`
+          : '';
+        defensePowerEl.innerHTML = `Def ${nextStats.defensePower}${bonusText}${muted} · ~${nextStats.expectedDefenderHits.toFixed(1)} hits`;
+      }
+      if (oddsEl) {
+        oddsEl.textContent = `~${Math.round(nextStats.odds * 100)}%`;
+        oddsEl.className = `preview-odds-pct ${nextStats.riskClass}`;
+      }
+      thisRef.renderPreviewOutcome(fromId, toId, nextStats, summaryEl, consequenceSummaryEl, swingFactorsEl);
+      const defenderCount = defenderPreview.reduce((sum, entry) => sum + entry.count, 0);
+      thisRef.updateBattlePreviewActions(nextStats, targetTerritory, defenderCount);
+    }
+  }
+
+  private buildDomainCombatNote(
+    attackers: Array<{ unitType: import('../data/Unit').UnitType; count: number }>,
+    defenders: Array<{ unitType: import('../data/Unit').UnitType; count: number }>,
+  ): string {
+    if (attackers.length === 0 || defenders.length === 0) return '';
+
+    const infantryOnly = attackers.every(
+      atk => atk.unitType.domain === 'land' && !canLandUnitStrikeNaval(atk.unitType),
+    );
+    const hasNavalDefenders = defenders.some(def => def.unitType.domain === 'sea');
+    const hasLandAttackersVsLand = attackers.some(atk => atk.unitType.domain === 'land')
+      && defenders.some(def => def.unitType.domain === 'land');
+    const hasNavalAttackersVsLand = attackers.some(atk => atk.unitType.domain === 'sea')
+      && defenders.some(def => def.unitType.domain === 'land');
+
+    const notes: string[] = [];
+    if (infantryOnly && hasNavalDefenders && !hasLandAttackersVsLand) {
+      notes.push('Infantry can return fire on ships at reduced strength (-1 attack). Artillery is much more effective.');
+    }
+    if (hasNavalAttackersVsLand) {
+      notes.push('Fleet opens with shore bombardment, then both sides fight using cross-domain rules (infantry cannot hit ships).');
+    }
+    if (attackers.some(atk => canLandUnitStrikeNaval(atk.unitType)) && hasNavalDefenders) {
+      notes.push('Coastal artillery can fire on ships; the fleet cannot shoot back during the opening barrage.');
+    }
+
+    if (notes.length === 0) return '';
+    return `<div class="preview-combat-note compact warn">${notes.join(' ')}</div>`;
+  }
+
+  /** Whether tactical mode is worth highlighting for this preview. */
+  isTacticalRecommended(
+    stats: BattlePreviewStats,
+    toTerritory: { isCapital?: boolean; hasFactory?: boolean },
+  ): boolean {
+    if (stats.defenderUnitCount === 0) return false;
+    if (toTerritory.isCapital || toTerritory.hasFactory) return true;
+    if (stats.odds >= 0.35 && stats.odds <= 0.65) return true;
+    if (stats.riskClass === 'bad' && stats.attackerUnitCount >= 2) return true;
+    return false;
+  }
+
+  private updateBattlePreviewActions(
+    stats: BattlePreviewStats,
+    toTerritory: { isCapital?: boolean; hasFactory?: boolean; name?: string },
+    defenderCount: number,
+  ): void {
+    const tacticalEnabled = settings.getSetting('tacticalBattles') ?? true;
+    const showTactical = tacticalEnabled && defenderCount > 0;
+    const tacticalBtn = document.getElementById('btn-play-tactical') as HTMLButtonElement | null;
+    const recommended = showTactical && this.isTacticalRecommended(stats, toTerritory);
+
+    if (tacticalBtn) {
+      tacticalBtn.disabled = !showTactical;
+      tacticalBtn.classList.toggle('hidden', !showTactical);
+      tacticalBtn.classList.toggle('recommended', recommended);
+      tacticalBtn.title = showTactical ? 'Command units on a tactical map (T)' : '';
+    }
+
+    let hintEl = document.getElementById('preview-tactical-hint');
+    if (!hintEl) {
+      hintEl = document.createElement('p');
+      hintEl.id = 'preview-tactical-hint';
+      hintEl.className = 'preview-tactical-hint';
+      document.querySelector('.combat-preview-actions')?.prepend(hintEl);
+    }
+    if (!showTactical) {
+      hintEl.classList.add('hidden');
+      hintEl.textContent = '';
+      return;
+    }
+    hintEl.classList.remove('hidden');
+    hintEl.textContent = recommended
+      ? 'Contested battle — Play Tactical (T) for finer control and fewer losses.'
+      : 'Optional: Play Tactical (T) to command units on a mini-map.';
+
+    if (recommended && !localStorage.getItem('tactical-coach-seen')) {
+      localStorage.setItem('tactical-coach-seen', '1');
+      this.callbacks.showToast(
+        'Tip: Press T or Play Tactical to command units on a grid — clean wins save casualties and boost morale.',
+        'info',
+      );
+    }
+  }
+
+  private attachPreviewKeyboard(): void {
+    this.detachPreviewKeyboard();
+    this.previewKeyHandler = (event: KeyboardEvent) => {
+      const modal = document.getElementById('combat-modal');
+      if (!modal || modal.classList.contains('hidden') || !modal.classList.contains('combat-preview-open')) return;
+      const tag = (event.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (event.key === 't' || event.key === 'T') {
+        const tacticalBtn = document.getElementById('btn-play-tactical') as HTMLButtonElement | null;
+        if (!tacticalBtn || tacticalBtn.disabled || tacticalBtn.classList.contains('hidden')) return;
+        event.preventDefault();
+        this.confirmTacticalAttackFromPreview();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        this.confirmAttackFromPreview(true);
+      }
+    };
+    document.addEventListener('keydown', this.previewKeyHandler, true);
+  }
+
+  private detachPreviewKeyboard(): void {
+    if (!this.previewKeyHandler) return;
+    document.removeEventListener('keydown', this.previewKeyHandler, true);
+    this.previewKeyHandler = null;
+  }
+
+  private getPreviewConsequenceEl(): HTMLElement {
+    let el = document.getElementById('preview-consequence-summary');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'preview-consequence-summary';
+      document.getElementById('preview-odds')?.appendChild(el);
+    }
+    return el;
+  }
+
+  private getPreviewSwingFactorsEl(): HTMLElement {
+    let el = document.getElementById('preview-swing-factors');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'preview-swing-factors';
+      document.getElementById('preview-odds')?.appendChild(el);
+    }
+    return el;
+  }
+
+  private renderPreviewOutcome(
+    fromId: string,
+    toId: string,
+    stats: BattlePreviewStats,
+    summaryEl: HTMLElement | null,
+    consequenceEl: HTMLElement,
+    swingFactorsEl: HTMLElement,
+  ): void {
     if (summaryEl) {
-      summaryEl.className = `preview-risk-summary ${previewStats.riskClass}`;
-      summaryEl.innerHTML = `
-        <strong>${previewStats.riskLabel}</strong>
-        <span>${previewStats.riskDetail}</span>
-        <small>${previewStats.commitmentAdvice}</small>
-      `;
+      summaryEl.className = `preview-risk-summary ${stats.riskClass} compact`;
+      summaryEl.innerHTML = `<strong>${stats.riskLabel}</strong><span>${stats.riskDetail}</span>`;
     }
-
-    let consequenceEl = document.getElementById('preview-consequence-summary');
-    if (!consequenceEl) {
-      consequenceEl = document.createElement('div');
-      consequenceEl.id = 'preview-consequence-summary';
-      summaryEl?.after(consequenceEl);
-    }
-    consequenceEl.className = `preview-consequence-summary ${previewStats.riskClass}`;
-    consequenceEl.innerHTML = this.buildBattleConsequenceSummary(fromId, toId, previewStats);
-
-    let factorsEl = document.getElementById('preview-swing-factors');
-    if (!factorsEl) {
-      factorsEl = document.createElement('div');
-      factorsEl.id = 'preview-swing-factors';
-      consequenceEl.after(factorsEl);
-    }
-    factorsEl.className = 'preview-swing-factors';
-    factorsEl.innerHTML = previewStats.swingFactors.length > 0
-      ? previewStats.swingFactors.map(factor => `<span>${factor}</span>`).join('')
-      : '<span>No special modifiers spotted.</span>';
+    consequenceEl.className = `preview-consequence-summary ${stats.riskClass} compact`;
+    consequenceEl.textContent = this.buildBattleConsequenceSummary(fromId, toId, stats);
+    swingFactorsEl.className = 'preview-swing-factors compact';
+    swingFactorsEl.innerHTML = stats.swingFactors.length > 0
+      ? stats.swingFactors.map(factor => `<span>${factor}</span>`).join('')
+      : '';
   }
 
   private buildBattleConsequenceSummary(fromId: string, toId: string, stats: BattlePreviewStats): string {
@@ -791,35 +1196,44 @@ export class CombatUI {
     if (enemyCounterSources > 0) stakes.push(`${enemyCounterSources} counterattack lane${enemyCounterSources === 1 ? '' : 's'}`);
 
     const commitment = sourceEnemyPressure > 0 && sourceUnitsAfterCommit <= 1
-      ? `Warning: this commits most of ${from.name} while ${sourceEnemyPressure} enemy unit${sourceEnemyPressure === 1 ? '' : 's'} can pressure it.`
-      : `Commitment: ${sourceUnitsAfterCommit} unit${sourceUnitsAfterCommit === 1 ? '' : 's'} remain in ${from.name}.`;
+      ? `Thin border: ${sourceUnitsAfterCommit} left in ${from.name}.`
+      : `${sourceUnitsAfterCommit} remain in ${from.name}.`;
 
     const tempo = stats.odds >= 0.65
-      ? 'Likely creates momentum if you can hold it next turn.'
+      ? 'Hold next turn for momentum.'
       : stats.odds < 0.5
-        ? 'A failed attack may leave your border thin.'
-        : 'Expect a trade unless reinforced.';
+        ? 'Failed attack risks the border.'
+        : 'Could trade either way.';
 
-    return `
-      <strong>Strategic consequence</strong>
-      <span>Stake: ${stakes.join(', ') || `+${targetValue} strategic value`}.</span>
-      <span>Likely first round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}. ${tempo}</span>
-      <span>${commitment}</span>
-    `;
+    const stake = stakes.join(', ') || `+${targetValue} value`;
+    return `Lose ~${likelyAttackerLosses}, kill ~${likelyDefenderLosses} · ${stake} · ${tempo} ${commitment}`;
   }
 
   calculateBattlePreviewStats(
     attackerUnits: { unitTypeId: string; count: number }[],
     defenderUnits: { unitTypeId: string; count: number }[],
-    attackPower: number,
-    defensePower: number,
-    effectiveDefense: number
+    totals: import('../engine/combatPreviewOdds').PreviewCombatTotals,
   ): BattlePreviewStats {
     const attackerUnitCount = attackerUnits.reduce((sum, unit) => sum + unit.count, 0);
     const defenderUnitCount = defenderUnits.reduce((sum, unit) => sum + unit.count, 0);
-    const odds = this.calculateBattleOdds(attackPower, effectiveDefense);
-    const expectedAttackerHits = attackPower / 6;
-    const expectedDefenderHits = effectiveDefense / 6;
+    const attackPower = totals.effectiveAttackPower;
+    const defensePower = totals.engageableDefensePower > 0
+      ? totals.engageableDefensePower
+      : totals.rawDefensePower;
+    const effectiveDefense = totals.effectiveDefensePower;
+    const diceSides = this.state.rules.diceSides ?? 6;
+
+    const odds = estimateVictoryChance(
+      attackPower,
+      effectiveDefense,
+      attackerUnitCount,
+      defenderUnitCount,
+      totals.expectedPreCombatDefenderHits,
+      totals.expectedPreCombatAttackerHits,
+      diceSides,
+    );
+    const expectedAttackerHits = attackPower / diceSides + totals.expectedPreCombatDefenderHits;
+    const expectedDefenderHits = effectiveDefense / diceSides + totals.expectedPreCombatAttackerHits;
 
     let riskLabel = 'Balanced fight';
     let riskClass: BattlePreviewStats['riskClass'] = 'even';
@@ -860,9 +1274,11 @@ export class CombatUI {
         ? `Avoid unless the target is decisive or reinforced. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`
         : `Caution: this can trade either way. First round: lose ~${likelyAttackerLosses}, destroy ~${likelyDefenderLosses}.`;
 
-    const swingFactors: string[] = [];
+    const swingFactors: string[] = [...totals.modifierSwingFactors];
     if (defenderUnitCount === 0) swingFactors.push('No defenders');
-    if (effectiveDefense > defensePower) swingFactors.push(`Defense bonus +${effectiveDefense - defensePower}`);
+    if (effectiveDefense > defensePower && !swingFactors.some(f => f.startsWith('Terrain/fort'))) {
+      swingFactors.push(`Defense bonus +${effectiveDefense - defensePower}`);
+    }
     if (expectedAttackerHits >= defenderUnitCount && defenderUnitCount > 0) swingFactors.push('Possible one-round clear');
     if (expectedDefenderHits >= attackerUnitCount && attackerUnitCount > 0) swingFactors.push('Attack force could be wiped');
     if (attackPower >= effectiveDefense * 2 && defenderUnitCount > 0) swingFactors.push('Power advantage');
@@ -885,19 +1301,12 @@ export class CombatUI {
     };
   }
 
+  /** @deprecated Use estimateVictoryChance — kept for tests that pass raw power pairs. */
   calculateBattleOdds(attackPower: number, defensePower: number): number {
-    if (defensePower === 0) return 0.95;
-    const ratio = attackPower / defensePower;
-    if (ratio >= 3) return 0.95;
-    if (ratio >= 2) return 0.85;
-    if (ratio >= 1.5) return 0.70;
-    if (ratio >= 1) return 0.50;
-    if (ratio >= 0.75) return 0.35;
-    if (ratio >= 0.5) return 0.20;
-    return 0.10;
+    return estimateVictoryChance(attackPower, defensePower, 1, defensePower > 0 ? 1 : 0, 0, 0);
   }
 
-  confirmAttackFromPreview(): void {
+  confirmAttackFromPreview(autoResolve = false, tactical = false): void {
     if (!this.pendingAttackFrom || !this.pendingAttackTarget) return;
 
     const fromTerritory = this.state.territories.get(this.pendingAttackFrom);
@@ -915,6 +1324,7 @@ export class CombatUI {
     for (const pu of fromTerritory.units) {
       const unitType = this.state.unitRegistry.get(pu.unitTypeId);
       if (unitType && unitType.attack > 0) {
+        if (this.callbacks.getSelectedUnitType?.() && pu.unitTypeId !== this.callbacks.getSelectedUnitType?.()) continue;
         const availableCount = fromTerritory.getAvailableUnitCount(pu.unitTypeId);
         if (availableCount <= 0) continue;
         const input = attackerUnitsEl?.querySelector<HTMLInputElement>(`input[data-unit-type-id="${pu.unitTypeId}"]`);
@@ -933,33 +1343,55 @@ export class CombatUI {
       return;
     }
 
-    const defendingUnits: { unitTypeId: string; count: number }[] = [];
-    for (const pu of toTerritory.units) {
-      defendingUnits.push({ unitTypeId: pu.unitTypeId, count: pu.count });
-    }
+    const defendingFactionId = toTerritory.owner;
+    const hasDefenders = defendingFactionId
+      ? countTerritoryDefendersIncludingOffshore(this.state, toTerritory.id, defendingFactionId) > 0
+      : false;
 
-    if (defendingUnits.length === 0) {
+    if (!hasDefenders) {
       this.closeBattlePreview();
-      for (const au of attackingUnits) {
-        fromTerritory.removeUnits(au.unitTypeId, au.count);
+      const movementValidator = new MovementValidator(this.state);
+      const stayInPlace = attackingUnits.every(au => {
+        const ut = this.state.unitRegistry.get(au.unitTypeId);
+        return ut && movementValidator.isRangedStrike(fromTerritory, toTerritory, ut);
+      });
+      if (stayInPlace) {
+        for (const au of attackingUnits) {
+          fromTerritory.markUnitsActed(au.unitTypeId, au.count);
+        }
+        this.callbacks.showToast(`Barrage on ${toTerritory.name} complete.`, 'success');
+      } else {
+        for (const au of attackingUnits) {
+          fromTerritory.removeUnits(au.unitTypeId, au.count);
+        }
+        toTerritory.owner = faction.id;
+        toTerritory.units = [];
+        for (const au of attackingUnits) {
+          toTerritory.addUnits(au.unitTypeId, au.count);
+          toTerritory.markUnitsActed(au.unitTypeId, au.count);
+        }
+        this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
+        soundManager.play('capture');
+        battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
       }
-      toTerritory.owner = faction.id;
-      toTerritory.units = [];
-      for (const au of attackingUnits) {
-        toTerritory.addUnits(au.unitTypeId, au.count);
-      }
-      this.callbacks.showToast(`Captured ${toTerritory.name}!`, 'success');
-      soundManager.play('capture');
-      battleLog.logCapture(this.state.turnNumber, faction.name, faction.color, toTerritory.name);
       this.renderer.render();
       this.callbacks.renderMinimap();
+      this.callbacks.afterUnitAction?.(fromTerritory.id, toTerritory.id);
       return;
     }
+
+    const movementValidator = new MovementValidator(this.state);
+    const stayInPlace = attackingUnits.every(au => {
+      const ut = this.state.unitRegistry.get(au.unitTypeId);
+      return ut && movementValidator.isRangedStrike(fromTerritory, toTerritory, ut);
+    });
 
     const combat = this.combatResolver.initiateCombat(
       toTerritory.id,
       faction.id,
-      attackingUnits
+      attackingUnits,
+      fromTerritory.id,
+      { stayInPlace },
     );
 
     if (!combat) {
@@ -968,16 +1400,55 @@ export class CombatUI {
       return;
     }
 
-    combat.sourceTerritory = fromTerritory.id;
+    this.runPreCombatPhases(combat, toTerritory.id);
+
+    if (tactical) {
+      this.lastCombatWasTactical = true;
+      this.detachPreviewKeyboard();
+      this.activeCombat = combat;
+      this.closeBattlePreview();
+      const attackerFaction = this.state.factionRegistry.get(combat.attackingFactionId);
+      battleLog.logCombat(this.state.turnNumber, attackerFaction?.name ?? faction.name, attackerFaction?.color ?? faction.color, `Tactical battle at ${toTerritory.name}`);
+      this.tacticalBattleUI.show(
+        combat,
+        toTerritory.name,
+        toTerritory.type,
+        (completedCombat, meta) => {
+          this.activeCombat = completedCombat;
+          this.pendingTacticalMeta = meta ?? null;
+          this.finishCurrentCombat();
+        },
+        () => {
+          this.lastCombatWasTactical = false;
+          this.activeCombat = combat;
+          this.onAutoResolve();
+          this.onCloseCombat();
+        },
+      );
+      return;
+    }
+
     this.showCombatModal(combat);
     soundManager.play('combat_start');
     battleLog.logCombat(this.state.turnNumber, faction.name, faction.color, `Attacking ${toTerritory.name}`);
+
+    if (autoResolve) {
+      this.onAutoResolve();
+      this.onCloseCombat();
+      return;
+    }
 
     this.renderer.render();
     this.callbacks.updateSelectionInfo();
   }
 
+  confirmTacticalAttackFromPreview(): void {
+    if (!(settings.getSetting('tacticalBattles') ?? true)) return;
+    this.confirmAttackFromPreview(false, true);
+  }
+
   closeBattlePreview(): void {
+    this.detachPreviewKeyboard();
     const modal = document.getElementById('combat-modal');
     if (modal) modal.classList.add('hidden');
     this.pendingAttackFrom = null;
@@ -986,29 +1457,48 @@ export class CombatUI {
 
   // ==================== STRATEGIC BOMBING ====================
 
-  /** Show the strategic bombing dialog if the current faction has bombers. */
-  showStrategicBombingModal(): void {
-    const faction = this.state.getCurrentFaction();
-    if (!faction) return;
+  /** Split bombers evenly across factory targets (remainder to first targets). */
+  static allocateBombersAcrossTargets(totalBombers: number, targetCount: number): number[] {
+    if (targetCount <= 0) return [];
+    const base = Math.floor(totalBombers / targetCount);
+    const remainder = totalBombers % targetCount;
+    return Array.from({ length: targetCount }, (_, i) => base + (i < remainder ? 1 : 0));
+  }
 
-    // Count bombers in all owned territories
-    let totalBombers = 0;
+  private countAvailableBombers(factionId: string): number {
+    let total = 0;
     for (const t of this.state.territories.values()) {
-      if (t.owner !== faction.id) continue;
+      if (t.owner !== factionId) continue;
       for (const u of t.units) {
         const type = this.state.unitRegistry.get(u.unitTypeId);
-        if (type?.id.includes('bomber') || type?.id.includes('strategic')) {
-          totalBombers += u.count;
+        if (type?.canStrategicBomb || type?.id.includes('bomber') || type?.id.includes('strategic')) {
+          total += u.count;
         }
       }
     }
+    return total;
+  }
 
+  private countAntiAirInTerritory(territoryId: string): number {
+    const territory = this.state.territories.get(territoryId);
+    if (!territory) return 0;
+    return territory.units.reduce((sum, u) => {
+      const id = this.state.unitRegistry.get(u.unitTypeId)?.id ?? '';
+      return id.includes('aa') || id.includes('anti_air') ? sum + u.count : sum;
+    }, 0);
+  }
+
+  /** Bomb every eligible enemy factory in one action — no target selection needed. */
+  executeStrategicBombing(): void {
+    const faction = this.state.getCurrentFaction();
+    if (!faction) return;
+
+    const totalBombers = this.countAvailableBombers(faction.id);
     if (totalBombers === 0) {
       this.callbacks.showToast('No bombers available for strategic bombing.', 'info');
       return;
     }
 
-    // Build target list: enemy territories with factories
     const targets = Array.from(this.state.territories.values()).filter(t =>
       t.owner && faction.isEnemyOf(t.owner) && t.hasFactory && !t.isFactoryDisabled(this.state.turnNumber)
     );
@@ -1018,64 +1508,42 @@ export class CombatUI {
       return;
     }
 
-    const modal = document.getElementById('strategic-bombing-modal');
-    const select = document.getElementById('sb-target-select') as HTMLSelectElement | null;
-    const infoEl = document.getElementById('sb-bomber-info');
-    const resultEl = document.getElementById('sb-result');
+    const allocations = CombatUI.allocateBombersAcrossTargets(totalBombers, targets.length);
+    let totalDamage = 0;
+    let totalLosses = 0;
+    let factoriesHit = 0;
 
-    if (!modal || !select) return;
+    for (let i = 0; i < targets.length; i++) {
+      const bombers = allocations[i];
+      if (bombers <= 0) continue;
 
-    select.innerHTML = targets.map(t =>
-      `<option value="${t.id}">${t.name} (${this.state.factionRegistry.get(t.owner ?? '')?.name ?? 'Unknown'})</option>`
-    ).join('');
+      const target = targets[i];
+      const aaCount = this.countAntiAirInTerritory(target.id);
+      const result = this.combatResolver.resolveStrategicBombing(target.id, faction.id, bombers, aaCount);
 
-    if (infoEl) infoEl.textContent = `You have ${totalBombers} bomber(s) available. Each rolls 1d6 damage. AA guns intercept on a roll of 1.`;
-    if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
-
-    modal.classList.remove('hidden');
-
-    const launchBtn = document.getElementById('btn-sb-launch');
-    const cancelBtn = document.getElementById('btn-sb-cancel');
-
-    const handleLaunch = () => {
-      const targetId = select.value;
-      const targetTerritory = this.state.territories.get(targetId);
-      if (!targetTerritory) return;
-
-      // Count AA guns in target territory
-      const aaCount = targetTerritory.units
-        .filter(u => this.state.unitRegistry.get(u.unitTypeId)?.id.includes('aa') ||
-                     this.state.unitRegistry.get(u.unitTypeId)?.id.includes('anti_air'))
-        .reduce((s, u) => s + u.count, 0);
-
-      const result = this.combatResolver.resolveStrategicBombing(targetId, faction.id, totalBombers, aaCount);
-
-      if (resultEl) {
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = result.totalDamage > 0
-          ? `<strong style="color:#ef4444;">💥 Factory hit!</strong><br>
-             Bombers: ${totalBombers - result.bomberLosses}/${totalBombers} survived.<br>
-             Damage rolls: [${result.damageRolls.join(', ')}] = <strong>${result.totalDamage}</strong> damage.<br>
-             Factory disabled for ${Math.max(1, Math.floor(result.totalDamage / 3))} turn(s).`
-          : `<strong style="color:#888;">Mission failed — all bombers intercepted (${result.bomberLosses} lost).</strong>`;
-      }
-
-      launchBtn?.removeEventListener('click', handleLaunch);
-      launchBtn!.textContent = 'Done';
-      launchBtn!.onclick = () => { modal.classList.add('hidden'); launchBtn!.textContent = '🚀 Launch Mission'; launchBtn!.onclick = null; };
+      totalDamage += result.totalDamage;
+      totalLosses += result.bomberLosses;
+      if (result.totalDamage > 0) factoriesHit++;
 
       battleLog.logCombat(
         this.state.turnNumber,
         faction.name,
         faction.color,
-        `💣 Strategic bombing of ${targetTerritory.name}: ${result.totalDamage} damage, ${result.bomberLosses} bombers lost.`
+        `💣 Strategic bombing of ${target.name}: ${result.totalDamage} damage, ${result.bomberLosses} bombers lost.`
       );
+    }
 
-      this.renderer.render();
-    };
+    const summary = factoriesHit > 0
+      ? `💣 Bombed ${factoriesHit} factor${factoriesHit === 1 ? 'y' : 'ies'} for ${totalDamage} total damage (${totalLosses} bomber${totalLosses === 1 ? '' : 's'} lost).`
+      : `💣 Bombing run complete — ${totalLosses} bomber${totalLosses === 1 ? '' : 's'} lost, no factory damage.`;
 
-    launchBtn?.removeEventListener('click', handleLaunch);
-    launchBtn?.addEventListener('click', handleLaunch);
-    cancelBtn!.onclick = () => modal.classList.add('hidden');
+    this.callbacks.showToast(summary, totalDamage > 0 ? 'success' : 'info');
+    this.renderer.render();
+    this.callbacks.updateActionButtons();
+  }
+
+  /** @deprecated Use executeStrategicBombing — kept for legacy callers. */
+  showStrategicBombingModal(): void {
+    this.executeStrategicBombing();
   }
 }
