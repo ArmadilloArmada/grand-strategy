@@ -27,3 +27,9 @@ jobs:
 
       - name: Release check (tests, maps, build)
         run: npm run release:check
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E golden path smoke
+        run: npm run test:e2e
