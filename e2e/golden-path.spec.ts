@@ -29,4 +29,11 @@ test.describe('Golden path', () => {
     await expect(turnStyle.locator('option[value="chess"]')).toHaveCount(0);
     await expect(turnStyle.locator('option[value="action"]')).toHaveCount(0);
   });
+
+  test('ribbon End Turn is enabled after briefing', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#btn-quick-simple').click();
+    await page.locator('#btn-start-command').click();
+    await expect(page.locator('.ribbon-center #btn-end-phase')).toBeEnabled();
+  });
 });

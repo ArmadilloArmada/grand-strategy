@@ -615,6 +615,15 @@ export class CampaignManager {
     });
   }
 
+  /** True when every primary mission objective is currently satisfied. */
+  areMissionObjectivesMet(
+    mission: CampaignMission,
+    state: CampaignGameState,
+    humanFactionId: string,
+  ): boolean {
+    return this.checkObjectives(mission, state, humanFactionId).every(result => result.met);
+  }
+
   /** Check bonus objectives completion.
    * Bonus "survive" objectives mean "complete within X turns", so the check
    * is turnNumber <= target (the opposite of a main survive objective).

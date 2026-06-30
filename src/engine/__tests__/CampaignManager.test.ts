@@ -320,3 +320,19 @@ describe('CampaignManager — theater campaign', () => {
     expect(mission?.id).toBe('theater_1');
   });
 });
+
+describe('CampaignManager — areMissionObjectivesMet', () => {
+  it('returns true only when every primary objective is met', () => {
+    const cm = makeManager();
+    const mission = CAMPAIGNS.find(c => c.id === 'tutorial_campaign')!.missions[0]!;
+    const state = makeGameState({
+      territoriesOwnedBy: () => [{ id: 'contested_territory', name: 'Contested' }],
+    });
+
+    cm.trackUnitsDestroyed(1);
+    cm.trackTacticalVictory(1);
+
+    expect(cm.areMissionObjectivesMet(mission, state, 'atlantic_alliance')).toBe(true);
+    expect(cm.areMissionObjectivesMet(mission, makeGameState(), 'atlantic_alliance')).toBe(false);
+  });
+});

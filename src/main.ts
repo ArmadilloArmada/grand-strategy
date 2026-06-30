@@ -684,11 +684,14 @@ class Game {
             const defenderLosses = (combat.defenders as Array<{ casualties: number }>)
               ?.reduce((sum: number, d: { casualties: number }) => sum + (d.casualties ?? 0), 0) ?? 0;
             if (defenderLosses > 0) campaignManager.trackUnitsDestroyed(defenderLosses);
-            if (combat.captured) campaignManager.trackCapture(combat.territoryId);
+            if (combat.winner === 'attacker') {
+              campaignManager.trackCapture(combat.territoryId);
+            }
             if ((combat as { resolvedTactically?: boolean }).resolvedTactically && combat.winner === 'attacker') {
               campaignManager.trackTacticalVictory(1);
             }
           }
+          this.checkCampaignMissionProgress();
         }),
         this.state.on('territory_mobilized', (e) => {
           if (!this.activeCampaignId) return;
@@ -697,7 +700,11 @@ class Game {
           if (humanFactions.includes(data?.factionId) && data?.count) {
             campaignManager.trackUnitsProduced(data.count as number);
           }
-        })
+          this.checkCampaignMissionProgress();
+        }),
+        this.state.on('units_moved', () => {
+          this.checkCampaignMissionProgress();
+        }),
       );
     }
 
@@ -1987,6 +1994,7 @@ class Game {
       this.hud.updatePhaseInfo();
       this.renderer.render();
       this.updateCampaignObjectivesPanel();
+      this.checkCampaignMissionProgress();
       return; // STOP - wait for human input
     }
     
@@ -2352,6 +2360,41 @@ class Game {
    * Refresh the campaign mission objectives sidebar panel.
    * Shown only when an active campaign mission is in progress.
    */
+  private buildCampaignGameState() {
+    return {
+      turnNumber: this.state.turnNumber,
+      territoriesOwnedBy: (fId: string) =>
+        Array.from(this.state.territories.values())
+          .filter(t => t.owner === fId)
+          .map(t => ({ id: t.id, name: t.name })),
+      totalUnitsKilled: 0,
+      totalUnitsProduced: 0,
+    };
+  }
+
+  private checkCampaignMissionProgress(): void {
+    if (!this.activeCampaignId || !this.activeMission) return;
+
+    const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
+    if (!humanFactionId) return;
+
+    this.updateCampaignObjectivesPanel();
+
+    if (!campaignManager.areMissionObjectivesMet(
+      this.activeMission,
+      this.buildCampaignGameState(),
+      humanFactionId,
+    )) {
+      return;
+    }
+
+    if (this.lastGameWinnerFaction === humanFactionId) return;
+
+    soundManager.play('achievement');
+    this.lastGameWinnerFaction = humanFactionId;
+    this.state.emit('victory', { winner: humanFactionId, factionId: humanFactionId });
+  }
+
   private updateCampaignObjectivesPanel(): void {
     const panel = document.getElementById('campaign-objectives-panel');
     const listEl = document.getElementById('campaign-objectives-list');
@@ -2364,15 +2407,7 @@ class Game {
     }
 
     const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
-    const gameState = {
-      turnNumber: this.state.turnNumber,
-      territoriesOwnedBy: (fId: string) =>
-        Array.from(this.state.territories.values())
-          .filter(t => t.owner === fId)
-          .map(t => ({ id: t.id, name: t.name })),
-      totalUnitsKilled: 0,
-      totalUnitsProduced: 0,
-    };
+    const gameState = this.buildCampaignGameState();
 
     const results = campaignManager.checkObjectives(this.activeMission, gameState, humanFactionId);
 

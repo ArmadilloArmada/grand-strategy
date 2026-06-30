@@ -72,6 +72,7 @@ import { formatActiveStackLabel } from './hud/UnitStackCommand';
 import { UnitStackCommandController } from './hud/UnitStackCommandController';
 import { ValidMoveController } from './hud/ValidMoveController';
 import { AdvancedFeaturesMenu } from './hud/AdvancedFeaturesMenu';
+import { reportInvalidMove } from './hud/InvalidMoveFeedback';
 import { countStackGuidanceTargets, formatStackGuidanceLine } from './hud/stackGuidance';
 import { isAttackMovePhase, isBuildPhase, isCombatPhase, isMovementPhase, isNonCombatMovePhase, resolveMovePhaseContext } from './hud/PhaseHelpers';
 import { MapMoveDragController, type UnitDropKind } from './MapMoveDragController';
@@ -115,7 +116,6 @@ export class HUD {
   private tutorialController!: TutorialController;
   private undoController!: UndoController;
   private overlayController!: OverlayController;
-  private advancedMenu = new AdvancedFeaturesMenu();
 
   // Faction panel collapsed state
   private factionPanelCollapsed: boolean = false;
@@ -209,6 +209,7 @@ export class HUD {
   private handoffStackAfterAction(fromId: string, toId?: string): void {
     this.stackCommand.handoffAfterAction(fromId, toId);
     this.updateUndoButton();
+    this.updateActionButtons();
     this.updateStrategicAdvisor();
   }
 
@@ -252,7 +253,6 @@ export class HUD {
       updateActionButtons: () => this.updateActionButtons(),
       afterUnitAction: (fromId?: string, toId?: string) => {
         if (fromId) this.handoffStackAfterAction(fromId, toId);
-        this.handleMoveForMovePass();
       },
       getSelectedUnitType: () => {
         if (this.stackCommand.isSelectAllTypes()) return null;
@@ -1990,6 +1990,10 @@ export class HUD {
       this.combatUI.showBattlePreview(moveResolution.fromId, moveResolution.toId);
       return;
     }
+    if (moveResolution.kind === 'executeMove') {
+      this.executePlayerMove(moveResolution.fromId, moveResolution.toId, false);
+      return;
+    }
 
     // Selecting a new territory — auto-select largest stack with all units ready.
     this.renderer.startContinuousRender();
@@ -2087,6 +2091,7 @@ export class HUD {
   private executePlayerMove(fromId: string, toId: string, _isAttack: boolean): void {
     // Prevent moving to same territory
     if (fromId === toId) {
+      reportInvalidMove('Select a different territory to move or attack.');
       return;
     }
 
@@ -2095,9 +2100,11 @@ export class HUD {
     const faction = this.state.getCurrentFaction();
 
     if (!fromTerritory || !toTerritory || !faction) {
+      reportInvalidMove('That move is not available right now.');
       return;
     }
     if (!canIssueOrdersFromTerritory(fromTerritory, faction.id)) {
+      reportInvalidMove('You can only issue orders from territories you control.');
       return;
     }
 
@@ -2302,11 +2309,6 @@ export class HUD {
     `;
     
     banner.classList.add('visible');
-    
-    // Auto-hide after a delay
-    setTimeout(() => {
-      banner?.classList.remove('visible');
-    }, 1500);
   }
 
   private addAIActivity(message: string, action?: string): void {
@@ -2316,6 +2318,7 @@ export class HUD {
   }
 
   hideAIActivityBanner(): void {
+    document.getElementById('ai-activity-banner')?.classList.remove('visible');
     aiActivityFeed.hideBanner();
   }
 
@@ -3545,6 +3548,10 @@ export class HUD {
     const turnStyle = this.gameConfig.turnStyle;
     const faction = this.state.getCurrentFaction();
     const isQuickHumanPlay = turnStyle === 'quick' && phase === 'play' && faction?.controlledBy === 'human';
+
+    if (faction?.controlledBy === 'human') {
+      soundManager.play('phase_end');
+    }
 
     // Execute pending moves at end of movement phases (classic queue — not move-for-move)
     if ((phase === 'noncombat_move' || phase === 'move') && turnStyle !== 'move_for_move') {

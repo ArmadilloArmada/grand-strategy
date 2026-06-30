@@ -1719,6 +1719,12 @@ export class AIController {
               toTerritoryId: moveToward.territoryId,
               path: moveToward.path,
             });
+            const dest = this.state.territories.get(moveToward.territoryId);
+            this.state.emit('ai_thinking', {
+              message: `Repositioning to ${dest?.name ?? moveToward.territoryId}`,
+              action: 'move',
+              territoryId: moveToward.territoryId,
+            });
             ex.count -= toMove;
           }
         }

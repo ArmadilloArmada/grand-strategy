@@ -51,6 +51,7 @@ export class UnitStackCommandController {
   }
 
   resetForNewTurn(): void {
+    this.selectedMoveCount = null;
   }
 
   clearSelection(): void {

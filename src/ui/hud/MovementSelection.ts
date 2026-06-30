@@ -6,6 +6,7 @@ import { isFullAntiNavalStriker } from '../../engine/NavalSystem';
 export type TerritorySelectionMoveResolution =
   | { kind: 'refresh' }
   | { kind: 'previewAttack'; fromId: string; toId: string }
+  | { kind: 'executeMove'; fromId: string; toId: string }
   | { kind: 'none' };
 
 /** Units that strike from range without entering the target tile. */
@@ -53,9 +54,14 @@ export function resolveTerritorySelectionMove(args: {
   }
 
   const validMove = validMoves.find((move) => move.territoryId === territoryId);
-  if (!validMove?.isAttack) return { kind: 'none' };
+  if (validMove?.isAttack) {
+    return { kind: 'previewAttack', fromId: previousTerritoryId, toId: territoryId };
+  }
+  if (validMove && !validMove.isAttack) {
+    return { kind: 'executeMove', fromId: previousTerritoryId, toId: territoryId };
+  }
 
-  return { kind: 'previewAttack', fromId: previousTerritoryId, toId: territoryId };
+  return { kind: 'none' };
 }
 
 /** Unit stack that owns the currently highlighted move/attack targets. */

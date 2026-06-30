@@ -15,13 +15,13 @@ describe('MovementSelection', () => {
       { territoryId: 'far', path: ['home', 'mid', 'far'], movementCost: 3, isAttack: false },
     ];
 
-    it('does not move on click — only selects or attacks', () => {
+    it('executes a friendly move on click when the tile is highlighted', () => {
       expect(resolveTerritorySelectionMove({
         phaseIsMovement: true,
         territoryId: 'far',
         previousTerritoryId: 'home',
         validMoves: fighterMoves,
-      })).toEqual({ kind: 'none' });
+      })).toEqual({ kind: 'executeMove', fromId: 'home', toId: 'far' });
     });
 
     it('previews an attack before changing the active stack', () => {
