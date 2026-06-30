@@ -44,6 +44,7 @@ import { selectTrait, ALL_TRAITS } from './engine/CommanderProgression';
 import type { Commander, CommanderTraitId } from './data/Territory';
 import type { UnitTypeData } from './data/Unit';
 import { bootstrapGame } from './app/bootstrap';
+import { attachE2EBrowserApi } from './e2e/browserApi';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -388,13 +389,20 @@ class Game {
 
     console.log('✓ Game initialized!');
 
+    attachE2EBrowserApi({
+      startE2ETutorialMatch: () => this.startE2ETutorialMatch(),
+      readE2ESnapshot: () => this.hud.readE2ESnapshot(),
+      runE2EUnitAction: (fromId, toId, allTypes) => this.hud.runE2EUnitAction(fromId, toId, allTypes),
+      runE2EConfirmAttack: () => this.hud.runE2EConfirmAttack(),
+      runE2EEndTurn: () => this.hud.runE2EEndTurn(),
+      dismissE2EOverlays: () => this.hud.dismissE2EOverlays(),
+      e2eBoostTerritory: (territoryId, unitTypeId, count) => this.hud.e2eBoostTerritory(territoryId, unitTypeId, count),
+    });
+
     // Set up drag for panels visible on the main menu screen
     dragManager.setup();
   }
 
-  /**
-   * Quick start a new game with preset settings
-   */
   quickStart(turnStyle: 'classic' | 'quick'): void {
     const isQuick = turnStyle === 'quick';
     this.hud.gameConfig = {
@@ -2422,6 +2430,41 @@ class Game {
 
     panel.classList.remove('hidden');
     document.getElementById('objectives-panel')?.classList.add('hidden');
+  }
+
+  /**
+   * Deterministic tutorial match for Playwright — tutorial map, quick turns, no coaching noise.
+   */
+  startE2ETutorialMatch(): void {
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: 'tutorial',
+      mode: 'vs-ai',
+      humanFactions: ['atlantic_alliance'],
+      aiOpponents: ['eastern_bloc'],
+      aiOpponentCount: 1,
+      turnStyle: 'quick',
+      simpleMode: true,
+      guidedOnboarding: true,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: 'capitals',
+      capitalsToWin: 1,
+      turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
   }
 
   /**

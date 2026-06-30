@@ -5593,4 +5593,56 @@ export class HUD {
     });
   }
 
+  /** Playwright / dev automation — not used by production UI. */
+  runE2EUnitAction(fromId: string, toId: string, allTypes = false): 'move' | 'attack' | 'invalid' {
+    this.focusTerritory(fromId);
+    if (allTypes) {
+      this.stackCommand.selectAllUnitTypes(false);
+    }
+    this.prepareUnitDrag(fromId);
+    const kind = this.getUnitDropKind(fromId, toId);
+    if (kind === 'invalid') return 'invalid';
+    this.handleUnitDragDrop(fromId, toId);
+    return kind;
+  }
+
+  runE2EConfirmAttack(): void {
+    this.combatUI.confirmAttackFromPreview(true);
+  }
+
+  runE2EEndTurn(): void {
+    this.onEndPhaseClick();
+  }
+
+  readE2ESnapshot(): import('../e2e/browserApi').E2ESnapshot {
+    const faction = this.state.getCurrentFaction();
+    const owners: Record<string, string | null> = {};
+    for (const [id, territory] of this.state.territories) {
+      owners[id] = territory.owner;
+    }
+    return {
+      turnNumber: this.state.turnNumber,
+      phase: this.state.currentPhase,
+      currentFactionId: this.state.currentFactionId,
+      isHumanTurn: faction?.controlledBy === 'human',
+      owners,
+    };
+  }
+
+  dismissE2EOverlays(): void {
+    document.getElementById('scenario-briefing-overlay')?.remove();
+    document.getElementById('turn-recap-card')?.remove();
+    document.getElementById('phase-recap-card')?.remove();
+    document.getElementById('event-modal')?.classList.add('hidden');
+    document.getElementById('campaign-briefing-overlay')?.remove();
+    document.getElementById('first-war-room')?.remove();
+  }
+
+  e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void {
+    const territory = this.state.territories.get(territoryId);
+    if (!territory || count <= 0) return;
+    territory.addUnits(unitTypeId, count);
+    this.renderer.render();
+    this.renderMinimap();
+  }
 }
