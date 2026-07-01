@@ -5,18 +5,20 @@ Use this checklist during the final stabilization pass before cutting a release 
 ## 1) Build and Automated Validation
 
 - [ ] `npm ci` (or `npm install`) succeeds on a clean workspace
-- [ ] `npm run validate:maps` passes
-- [ ] `npm run build` passes
-- [ ] `npx tsc --noEmit` passes
-- [ ] `npx vitest run --reporter=basic` passes
+- [x] `npm run validate:maps` passes
+- [x] `npm run build` passes
+- [x] `npx tsc --noEmit` passes
+- [x] `npx vitest run --reporter=basic` passes
+- [x] `npm run test:e2e` passes (golden path + tutorial turn/combat + campaign mission 1 + save/load)
 
 ## 2) Core Gameplay Smoke (Single Player)
 
-- [ ] Start new game on Tutorial map
-- [ ] Complete one full turn without UI lockups
+- [x] Start new game on Tutorial map _(automated via Playwright `__gsE2E`)_
+- [x] Complete one full turn without UI lockups _(E2E: capture + End Turn + AI cycle)_
 - [ ] Build/mobilize units and confirm they deploy correctly
-- [ ] Enter combat and resolve at least one battle
-- [ ] End turn and verify AI takes its turn
+- [x] Enter combat and resolve at least one battle _(E2E combat smoke)_
+- [x] End turn and verify AI takes its turn _(E2E turn cycle)_
+- [ ] Complete Basic Training mission 1 by hand and confirm debrief _(E2E covers automation path)_
 
 ## 3) Active Faction Scope Regression
 

@@ -168,15 +168,16 @@ describe('CampaignManager — checkObjectives', () => {
     expect(destroyResult!.met).toBe(true);
   });
 
-  it('tactical_win objective: met when tactical victories tracked', () => {
+  it('defend objective: met when target territory is held', () => {
     const cm = makeManager();
-    cm.trackTacticalVictory(1);
     const mission = CAMPAIGNS[0].missions[0];
-    const state = makeGameState();
+    const state = makeGameState({
+      territoriesOwnedBy: () => [{ id: 'contested_territory', name: 'Contested' }],
+    });
     const results = cm.checkObjectives(mission, state, 'player');
-    const tacticalResult = results.find(r => r.objective.id === 'obj3');
-    expect(tacticalResult!.met).toBe(true);
-    expect(tacticalResult!.progress).toBe('1/1');
+    const defendResult = results.find(r => r.objective.id === 'obj3');
+    expect(defendResult!.met).toBe(true);
+    expect(defendResult!.progress).toBe('✓ Held');
   });
 
   it('produce objective: met when produced count >= target', () => {
@@ -330,7 +331,6 @@ describe('CampaignManager — areMissionObjectivesMet', () => {
     });
 
     cm.trackUnitsDestroyed(1);
-    cm.trackTacticalVictory(1);
 
     expect(cm.areMissionObjectivesMet(mission, state, 'atlantic_alliance')).toBe(true);
     expect(cm.areMissionObjectivesMet(mission, makeGameState(), 'atlantic_alliance')).toBe(false);

@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test';
 import {
+  completeVictoryToCampaignDebrief,
+  dismissE2EOverlays,
   e2eConfirmAttack,
   e2eEndTurn,
   e2eMove,
+  e2eQuickLoad,
+  e2eQuickSave,
   readSnapshot,
   setupFastE2E,
+  startCampaignMission,
   startTutorialMatch,
   waitForHumanTurn,
 } from './helpers';
@@ -96,5 +101,56 @@ test.describe('Tutorial smoke', () => {
 
     const snap = await readSnapshot(page);
     expect(snap.owners.enemy_capital).toBe('atlantic_alliance');
+  });
+
+  test('quick save and load preserves territory ownership', async ({ page }) => {
+    await page.goto('/?e2e=1');
+    await startTutorialMatch(page);
+
+    await e2eMove(page, 'player_capital', 'contested_territory', true);
+    let snap = await readSnapshot(page);
+    expect(snap.owners.contested_territory).toBe('atlantic_alliance');
+
+    expect(await e2eQuickSave(page)).toBe(true);
+
+    await page.reload();
+    await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
+    expect(await e2eQuickLoad(page)).toBe(true);
+
+    snap = await readSnapshot(page);
+    expect(snap.owners.contested_territory).toBe('atlantic_alliance');
+    expect(snap.isHumanTurn).toBe(true);
+  });
+});
+
+test.describe('Campaign smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupFastE2E(page);
+  });
+
+  test('completes Basic Training mission 1 and shows debrief', async ({ page }) => {
+    await page.goto('/?e2e=1');
+    await startCampaignMission(page, 'tutorial_campaign', 'tutorial_1');
+
+    await e2eMove(page, 'player_capital', 'contested_territory', true);
+    await e2eEndTurn(page);
+    await waitForHumanTurn(page, 2);
+    await dismissE2EOverlays(page);
+
+    await page.evaluate(() => {
+      (window as unknown as {
+        __gsE2E: { e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void };
+      }).__gsE2E.e2eBoostTerritory('contested_territory', 'tank', 6);
+    });
+
+    const attackKind = await e2eMove(page, 'contested_territory', 'enemy_capital', true);
+    expect(attackKind).toBe('attack');
+    await e2eConfirmAttack(page);
+
+    await completeVictoryToCampaignDebrief(page);
+
+    await expect(page.locator('#campaign-debriefing-overlay')).toContainText(/MISSION COMPLETE/i);
+    await expect(page.locator('#campaign-debriefing-overlay')).toContainText(/Building an Army/i);
+    await expect(page.locator('#debrief-next-btn')).toBeVisible();
   });
 });

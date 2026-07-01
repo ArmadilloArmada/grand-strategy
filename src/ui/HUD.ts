@@ -5635,7 +5635,9 @@ export class HUD {
     document.getElementById('phase-recap-card')?.remove();
     document.getElementById('event-modal')?.classList.add('hidden');
     document.getElementById('campaign-briefing-overlay')?.remove();
+    document.getElementById('campaign-debriefing-overlay')?.remove();
     document.getElementById('first-war-room')?.remove();
+    document.getElementById('victory-modal')?.remove();
   }
 
   e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void {

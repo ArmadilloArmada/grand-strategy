@@ -17,7 +17,8 @@ import { soundManager } from './audio/SoundManager';
 // New feature imports
 import { achievementManager } from './engine/AchievementManager';
 import { statisticsManager } from './engine/StatisticsManager';
-import { campaignManager, CampaignMission } from './engine/CampaignManager';
+import { campaignManager, CampaignMission, CAMPAIGNS } from './engine/CampaignManager';
+import { renderCampaignObjectivesPanel } from './ui/hud/CampaignObjectivesPanel';
 import { tutorialManager } from './engine/TutorialManager';
 import { replayManager } from './engine/ReplayManager';
 import { steamManager } from './engine/SteamManager';
@@ -397,6 +398,9 @@ class Game {
       runE2EEndTurn: () => this.hud.runE2EEndTurn(),
       dismissE2EOverlays: () => this.hud.dismissE2EOverlays(),
       e2eBoostTerritory: (territoryId, unitTypeId, count) => this.hud.e2eBoostTerritory(territoryId, unitTypeId, count),
+      startE2ECampaignMission: (campaignId, missionId) => this.startE2ECampaignMission(campaignId, missionId),
+      runE2EQuickSave: () => this.runE2EQuickSave(),
+      runE2EQuickLoad: () => this.runE2EQuickLoad(),
     });
 
     // Set up drag for panels visible on the main menu screen
@@ -999,8 +1003,11 @@ class Game {
               mapId: mission.mapId,
               mode: 'vs-ai',
               humanFactions: [missionFaction],
-              turnStyle: 'classic',
+              turnStyle: 'quick',
+              simpleMode: true,
+              guidedOnboarding: mission.difficulty === 'easy',
               victoryType: 'capitals',
+              capitalsToWin: 99,
               turnLimit: 50,
               fogOfWar: true,
               autoSave: true,
@@ -2404,32 +2411,78 @@ class Game {
   }
 
   private updateCampaignObjectivesPanel(): void {
-    const panel = document.getElementById('campaign-objectives-panel');
-    const listEl = document.getElementById('campaign-objectives-list');
-    const nameEl = document.getElementById('campaign-mission-name');
-    if (!panel || !listEl || !nameEl) return;
-
     if (!this.activeCampaignId || !this.activeMission) {
-      panel.classList.add('hidden');
+      renderCampaignObjectivesPanel(null, []);
       return;
     }
 
     const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
     const gameState = this.buildCampaignGameState();
-
     const results = campaignManager.checkObjectives(this.activeMission, gameState, humanFactionId);
+    renderCampaignObjectivesPanel(this.activeMission, results);
+  }
 
-    nameEl.textContent = this.activeMission.name;
-    listEl.innerHTML = results.map(r => {
-      const icon = r.met ? '✅' : '⬜';
-      return `<div style="display:flex;gap:6px;align-items:flex-start;">
-        <span style="flex-shrink:0;">${icon}</span>
-        <span style="${r.met ? 'color:#4ade80;' : ''}">${r.objective.description} <span style="color:#5b9bd5;">(${r.progress})</span></span>
-      </div>`;
-    }).join('');
+  private runE2EQuickSave(): boolean {
+    if (!this.isGameStarted) return false;
+    return this.saveManager.quickSave();
+  }
 
-    panel.classList.remove('hidden');
-    document.getElementById('objectives-panel')?.classList.add('hidden');
+  private runE2EQuickLoad(): boolean {
+    if (!this.saveManager.quickLoad()) return false;
+    this.applyLoadedMatchSettings();
+    this.hud.updateTurnInfo();
+    this.isGameStarted = true;
+    this.hideMainMenu();
+    this.scheduleFitMapToCommandLayout();
+    return true;
+  }
+
+  /**
+   * Deterministic campaign mission for Playwright.
+   */
+  startE2ECampaignMission(campaignId: string, missionId: string): void {
+    const campaign = CAMPAIGNS.find(c => c.id === campaignId);
+    const mission = campaign?.missions.find(m => m.id === missionId);
+    if (!campaign || !mission) return;
+
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+
+    this.activeCampaignId = campaignId;
+    this.activeMission = mission;
+    this.lastGameWinnerFaction = null;
+    campaignManager.activeCampaignId = campaignId;
+    campaignManager.activeMissionId = mission.id;
+    campaignManager.resetCounters();
+    campaignManager.startCampaign(campaignId);
+
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: mission.mapId,
+      mode: 'vs-ai',
+      humanFactions: [mission.faction],
+      aiOpponents: ['eastern_bloc'],
+      aiOpponentCount: 1,
+      turnStyle: 'quick',
+      simpleMode: true,
+      guidedOnboarding: false,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: 'capitals',
+      capitalsToWin: 99,
+      turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
   }
 
   /**
@@ -2455,7 +2508,7 @@ class Game {
       aiOpponentCount: 1,
       turnStyle: 'quick',
       simpleMode: true,
-      guidedOnboarding: true,
+      guidedOnboarding: false,
       fogOfWar: false,
       autoSave: false,
       aiDifficulty: 'easy',

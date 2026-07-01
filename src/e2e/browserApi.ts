@@ -12,12 +12,15 @@ export interface E2ESnapshot {
 
 export interface E2EHost {
   startE2ETutorialMatch(): void;
+  startE2ECampaignMission(campaignId: string, missionId: string): void;
   readE2ESnapshot(): E2ESnapshot;
   runE2EUnitAction(fromId: string, toId: string, allTypes?: boolean): 'move' | 'attack' | 'invalid';
   runE2EConfirmAttack(): void;
   runE2EEndTurn(): void;
   dismissE2EOverlays(): void;
   e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void;
+  runE2EQuickSave(): boolean;
+  runE2EQuickLoad(): boolean;
 }
 
 export function shouldAttachE2EBrowserApi(): boolean {

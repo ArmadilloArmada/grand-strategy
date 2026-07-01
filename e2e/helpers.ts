@@ -34,6 +34,42 @@ export async function startTutorialMatch(page: Page): Promise<void> {
   await page.locator('.ribbon-center #btn-end-phase').waitFor({ state: 'visible' });
 }
 
+export async function startCampaignMission(page: Page, campaignId: string, missionId: string): Promise<void> {
+  await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
+  await page.evaluate(({ campaign, mission }) => {
+    (window as unknown as {
+      __gsE2E: { startE2ECampaignMission(campaignId: string, missionId: string): void };
+    }).__gsE2E.startE2ECampaignMission(campaign, mission);
+  }, { campaign: campaignId, mission: missionId });
+  await page.locator('#game-canvas').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('#campaign-objectives-panel').waitFor({ state: 'visible', timeout: 10_000 });
+}
+
+export async function e2eQuickSave(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    return (window as unknown as { __gsE2E: { runE2EQuickSave(): boolean } }).__gsE2E.runE2EQuickSave();
+  });
+}
+
+export async function e2eQuickLoad(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    return (window as unknown as { __gsE2E: { runE2EQuickLoad(): boolean } }).__gsE2E.runE2EQuickLoad();
+  });
+}
+
+export async function dismissE2EOverlays(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __gsE2E: { dismissE2EOverlays(): void } }).__gsE2E.dismissE2EOverlays();
+  });
+}
+
+export async function completeVictoryToCampaignDebrief(page: Page): Promise<void> {
+  const mainMenuBtn = page.locator('#btn-victory-main-menu');
+  await mainMenuBtn.waitFor({ state: 'visible', timeout: 15_000 });
+  await mainMenuBtn.click();
+  await page.locator('#campaign-debriefing-overlay').waitFor({ state: 'visible', timeout: 10_000 });
+}
+
 export async function readSnapshot(page: Page): Promise<E2ESnapshot> {
   return page.evaluate(() => {
     return (window as unknown as { __gsE2E: { readE2ESnapshot(): E2ESnapshot } }).__gsE2E.readE2ESnapshot();

@@ -71,7 +71,7 @@ export const CAMPAIGNS: Campaign[] = [
         objectives: [
           { id: 'obj1', description: 'Capture the Contested Territory', type: 'capture', target: 'contested_territory' },
           { id: 'obj2', description: 'Win a battle', type: 'destroy', target: 1 },
-          { id: 'obj3', description: 'Win 1 tactical battle', type: 'tactical_win', target: 1 },
+          { id: 'obj3', description: 'Hold the Contested Territory', type: 'defend', target: 'contested_territory' },
         ],
         rewards: [
           { type: 'ipcs', value: 10, description: '+10 IPCs for next mission' },
