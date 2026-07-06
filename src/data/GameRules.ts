@@ -31,13 +31,21 @@ export interface GameRulesData {
   phases: GamePhase[];
 }
 
-export type GamePhase = 
+export type GamePhase =
   | 'purchase'
   | 'combat_move'
   | 'combat'
   | 'noncombat_move'
   | 'production'
-  | 'collect_income';
+  | 'collect_income'
+  | 'play'
+  | 'end'
+  | 'build'
+  | 'move'
+  | 'attack'
+  | 'orders'
+  | 'resolve'
+  | 'action';
 
 export class GameRules {
   public readonly name: string;

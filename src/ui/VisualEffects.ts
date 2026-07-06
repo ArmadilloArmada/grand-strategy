@@ -115,6 +115,8 @@ export class VisualEffects {
         this.drawSmokeParticle(p);
       } else if (p.type === 'star') {
         this.drawStarParticle(p);
+      } else if (p.type === 'muzzle') {
+        this.drawMuzzleParticle(p);
       }
       
       this.ctx.restore();
@@ -166,6 +168,21 @@ export class VisualEffects {
     }
     this.ctx.closePath();
     this.ctx.fill();
+  }
+
+  private drawMuzzleParticle(p: Particle): void {
+    const size = Math.max(0, p.size * (p.life / p.maxLife));
+    this.ctx.fillStyle = p.color;
+    this.ctx.shadowBlur = 12;
+    this.ctx.shadowColor = p.color;
+    this.ctx.beginPath();
+    this.ctx.moveTo(size, 0);
+    this.ctx.lineTo(-size * 0.35, -size * 0.42);
+    this.ctx.lineTo(-size * 0.12, 0);
+    this.ctx.lineTo(-size * 0.35, size * 0.42);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.shadowBlur = 0;
   }
 
   private spawnParticles(
@@ -231,6 +248,15 @@ export class VisualEffects {
     const colors = ['#FFD700', '#FFF', '#4ECDC4'];
     this.spawnParticles(x, y, 25, 'star', colors, 2, 6, 80, 0.1, 3, 7);
     this.triggerShake(3);
+  }
+
+  triggerMuzzleFlash(x: number, y: number, color: string = '#FFD166'): void {
+    this.spawnParticles(x, y, 8, 'muzzle',
+      [color, '#ffffff', '#ff8c00'],
+      0.4, 2.4, 18, 0.03, 4, 10);
+    this.spawnParticles(x, y, 6, 'smoke',
+      ['#9ca3af', '#6b7280'],
+      0.3, 1.6, 45, -0.02, 3, 8);
   }
 
   triggerShake(intensity: number): void {
@@ -308,7 +334,7 @@ interface Particle {
   decay: number;
   rotation: number;
   rotationSpeed: number;
-  type: 'explosion' | 'confetti' | 'spark' | 'smoke' | 'star';
+  type: 'explosion' | 'confetti' | 'spark' | 'smoke' | 'star' | 'muzzle';
   color: string;
   size: number;
 }
@@ -336,6 +362,10 @@ class VisualEffectsProxy {
   capitalCapture(x: number, y: number, _color?: string): void {
     this.get().triggerCaptureEffect(x, y);
     this.get().triggerShake(6);
+  }
+
+  muzzleFlash(x: number, y: number, color?: string): void {
+    this.get().triggerMuzzleFlash(x, y, color);
   }
 
   incomeEffect(x: number, y: number, _amount?: number): void {

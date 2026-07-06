@@ -58,6 +58,7 @@
     "hitPoints": 1,
     "canBlitz": false,
     "canBombard": true,
+    "attackRange": 2,
     "canStrategicBomb": false,
     "transportCapacity": 0,
     "requiredTransport": true,
@@ -190,6 +191,22 @@
     "transportCapacity": 0,
     "requiredTransport": false,
     "notes": "Wolfpack tactics. Convoy raider."
+  },
+  {
+    "id": "marines",
+    "name": "Marines",
+    "attack": 2,
+    "defense": 2,
+    "movement": 1,
+    "cost": 5,
+    "domain": "land",
+    "hitPoints": 1,
+    "canBlitz": false,
+    "canBombard": false,
+    "canStrategicBomb": false,
+    "transportCapacity": 0,
+    "requiredTransport": true,
+    "notes": "Expeditionary troops. Strongest on amphibious assaults and island landings."
   },
   {
     "id": "transport",

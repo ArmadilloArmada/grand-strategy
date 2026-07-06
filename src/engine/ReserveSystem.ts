@@ -15,6 +15,7 @@
 
 import { GameState } from './GameState';
 import { Territory } from '../data/Territory';
+import { hasSeaAccess, resolveTerritoryForNavalUnitPlacement, spawnUnitsOnTerritory } from './navalPlacement';
 
 export interface ReserveUnit {
   unitTypeId: string;
@@ -23,7 +24,7 @@ export interface ReserveUnit {
 
 export interface DeploymentZone {
   territory: Territory;
-  type: 'factory' | 'capital' | 'frontline' | 'rear';
+  type: 'factory' | 'capital' | 'frontline' | 'rear' | 'naval_base' | 'coastal_port';
   maxCapacity: number;
   currentDeployments: number;
   remainingCapacity: number;
@@ -116,27 +117,51 @@ export class ReserveSystem {
     const zones: DeploymentZone[] = [];
 
     for (const territory of this.state.territories.values()) {
-      if (territory.owner !== faction.id || !territory.isLand()) continue;
+      if (territory.owner !== faction.id) continue;
+
+      if (territory.type === 'sea') {
+        const touchesOwnedLand = territory.adjacentTo.some(adjId => {
+          const adj = this.state.territories.get(adjId);
+          return adj?.owner === faction.id && adj.isLand();
+        });
+        if (territory.owner !== faction.id && !touchesOwnedLand) continue;
+
+        const currentDeployments = this.pendingDeployments
+          .filter(d => d.territoryId === territory.id)
+          .reduce((sum, d) => sum + d.count, 0);
+        const maxCapacity = Math.max(2, Math.min(5, territory.production + 2));
+        zones.push({
+          territory,
+          type: 'naval_base',
+          maxCapacity,
+          currentDeployments,
+          remainingCapacity: Math.max(0, maxCapacity - currentDeployments),
+        });
+        continue;
+      }
+
+      if (!territory.isLand()) continue;
 
       let type: DeploymentZone['type'] = 'rear';
-      let maxCapacity = 1; // Base capacity for rear territories
+      let maxCapacity = 1;
 
-      // Check if this is a frontline territory (adjacent to enemy)
       const isFrontline = territory.adjacentTo.some(adjId => {
         const adj = this.state.territories.get(adjId);
         return adj && adj.owner && adj.owner !== faction.id && adj.isLand();
       });
 
-      // Determine zone type and capacity (reduced for balance)
       if (territory.hasFactory && !territory.isFactoryDisabled(this.state.turnNumber)) {
         type = 'factory';
-        maxCapacity = Math.min(territory.production, 3); // Factory capacity = production value (max 3)
+        maxCapacity = Math.min(territory.production, 3);
       } else if (territory.id === faction.capital) {
         type = 'capital';
-        maxCapacity = 2; // Capital has moderate capacity
+        maxCapacity = 2;
       } else if (isFrontline) {
         type = 'frontline';
-        maxCapacity = 1; // Frontline gets limited reinforcements
+        maxCapacity = 1;
+      } else if (territory.type === 'coastal' || hasSeaAccess(this.state, territory)) {
+        type = 'coastal_port';
+        maxCapacity = 2;
       }
 
       // Capital bonus: +2 slots if it's the capital with a factory
@@ -158,8 +183,8 @@ export class ReserveSystem {
       });
     }
 
-    // Sort: factories first, then capital, then frontline, then rear
-    const typeOrder = { factory: 0, capital: 1, frontline: 2, rear: 3 };
+    // Sort: naval bases & factories first, then coastal ports, capital, frontline, rear
+    const typeOrder = { naval_base: 0, factory: 1, coastal_port: 2, capital: 3, frontline: 4, rear: 5 };
     zones.sort((a, b) => {
       const orderDiff = typeOrder[a.type] - typeOrder[b.type];
       if (orderDiff !== 0) return orderDiff;
@@ -195,9 +220,35 @@ export class ReserveSystem {
       return { success: false, reason: 'Not enough units in reserve' };
     }
 
+    // Resolve naval units into valid sea zones (coastal ports redirect to adjacent sea).
+    let deployTerritoryId = territoryId;
+    const unitType = this.state.unitRegistry.get(unitTypeId);
+    const selectedTerritory = this.state.territories.get(territoryId);
+    if (unitType?.domain === 'sea' && selectedTerritory) {
+      const resolved = resolveTerritoryForNavalUnitPlacement(
+        this.state,
+        selectedTerritory,
+        unitTypeId,
+        faction.id,
+      );
+      if (!resolved) {
+        return { success: false, reason: 'No valid sea zone for naval deployment' };
+      }
+      deployTerritoryId = resolved.id;
+    }
+
+    const deployTerritory = this.state.territories.get(deployTerritoryId);
+    if (unitType?.domain === 'land' && deployTerritory?.type === 'sea') {
+      return { success: false, reason: 'Land units cannot deploy to sea zones' };
+    }
+    if (unitType?.domain === 'sea' && deployTerritory?.type === 'land') {
+      return { success: false, reason: 'Naval units cannot deploy to land tiles' };
+    }
+
     // Check deployment zone capacity
     const zones = this.getDeploymentZones();
-    const zone = zones.find(z => z.territory.id === territoryId);
+    const zone = zones.find(z => z.territory.id === deployTerritoryId)
+      ?? zones.find(z => z.territory.id === territoryId);
     
     if (!zone) {
       return { success: false, reason: 'Invalid deployment zone' };
@@ -209,13 +260,13 @@ export class ReserveSystem {
 
     // Add to pending deployments
     const existing = this.pendingDeployments.find(
-      d => d.unitTypeId === unitTypeId && d.territoryId === territoryId
+      d => d.unitTypeId === unitTypeId && d.territoryId === deployTerritoryId
     );
 
     if (existing) {
       existing.count += count;
     } else {
-      this.pendingDeployments.push({ unitTypeId, count, territoryId });
+      this.pendingDeployments.push({ unitTypeId, count, territoryId: deployTerritoryId });
     }
 
     return { success: true };
@@ -276,10 +327,20 @@ export class ReserveSystem {
       // Remove from reserve
       if (!this.removeFromReserve(faction.id, order.unitTypeId, order.count)) continue;
 
-      // Add to territory
-      territory.addUnits(order.unitTypeId, order.count);
+      const placed = spawnUnitsOnTerritory(
+        this.state,
+        faction.id,
+        order.territoryId,
+        order.unitTypeId,
+        order.count,
+      );
+      if (!placed.success) {
+        this.addToReserve(faction.id, order.unitTypeId, order.count);
+        continue;
+      }
+
       deployed += order.count;
-      territories.add(order.territoryId);
+      territories.add(placed.territoryId ?? order.territoryId);
     }
 
     // Clear pending deployments
@@ -305,51 +366,57 @@ export class ReserveSystem {
     const faction = this.state.getCurrentFaction();
     if (!faction || faction.id !== factionId) return { deployed: 0, territories: [] };
 
-    // Get zones sorted by priority
     const zones = this.getDeploymentZones();
-    
-    // Prioritize frontline factories, then other factories
-    zones.sort((a, b) => {
-      const aIsFrontlineFactory = a.type === 'factory' && this.isFrontline(a.territory);
-      const bIsFrontlineFactory = b.type === 'factory' && this.isFrontline(b.territory);
-      
-      if (aIsFrontlineFactory && !bIsFrontlineFactory) return -1;
-      if (!aIsFrontlineFactory && bIsFrontlineFactory) return 1;
-      
-      const typeOrder = { factory: 0, capital: 1, frontline: 2, rear: 3 };
-      return typeOrder[a.type] - typeOrder[b.type];
-    });
 
-    let deployed = 0;
-    const territories = new Set<string>();
-
-    // Deploy each unit type
     for (const reserve of [...reserves]) {
       let remaining = reserve.count;
+      const unitType = this.state.unitRegistry.get(reserve.unitTypeId);
+      const isNaval = unitType?.domain === 'sea';
+      const eligibleZones = zones.filter(z =>
+        isNaval ? (z.territory.type === 'sea' || z.territory.isLand()) : z.territory.isLand(),
+      );
+      const landTypeOrder: Record<DeploymentZone['type'], number> = {
+        factory: 0, coastal_port: 1, capital: 2, frontline: 3, rear: 4, naval_base: 99,
+      };
+      const navalTypeOrder: Record<DeploymentZone['type'], number> = {
+        naval_base: 0, coastal_port: 1, factory: 2, capital: 3, frontline: 4, rear: 5,
+      };
+      const typeOrder = isNaval ? navalTypeOrder : landTypeOrder;
 
-      for (const zone of zones) {
+      const sortedZones = [...eligibleZones].sort((a, b) => {
+        if (isNaval) {
+          const orderDiff = typeOrder[a.type] - typeOrder[b.type];
+          if (orderDiff !== 0) return orderDiff;
+        } else {
+          const aIsFrontlineFactory = a.type === 'factory' && this.isFrontline(a.territory);
+          const bIsFrontlineFactory = b.type === 'factory' && this.isFrontline(b.territory);
+          if (aIsFrontlineFactory && !bIsFrontlineFactory) return -1;
+          if (!aIsFrontlineFactory && bIsFrontlineFactory) return 1;
+          const orderDiff = typeOrder[a.type] - typeOrder[b.type];
+          if (orderDiff !== 0) return orderDiff;
+        }
+        return b.remainingCapacity - a.remainingCapacity;
+      });
+
+      for (const zone of sortedZones) {
         if (remaining === 0) break;
         if (zone.remainingCapacity === 0) continue;
 
         const toDeploy = Math.min(remaining, zone.remainingCapacity);
-        
         const result = this.queueDeployment(reserve.unitTypeId, zone.territory.id, toDeploy);
         if (result.success) {
           remaining -= toDeploy;
           zone.remainingCapacity -= toDeploy;
           zone.currentDeployments += toDeploy;
-          deployed += toDeploy;
-          territories.add(zone.territory.id);
         }
       }
     }
 
-    // Execute the deployments
-    if (deployed > 0) {
-      this.executeDeployments();
+    if (this.pendingDeployments.length === 0) {
+      return { deployed: 0, territories: [] };
     }
 
-    return { deployed, territories: Array.from(territories) };
+    return this.executeDeployments();
   }
 
   /**

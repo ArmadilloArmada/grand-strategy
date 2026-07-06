@@ -18,6 +18,8 @@ const recap: TurnRecapStats = {
   captures: 1,
   mobilizations: 3,
   unitsMobilized: 8,
+  unitsMoved: 5,
+  ipcsSpent: 18,
   income: 24,
   unitsLost: 4,
   enemyUnitsDestroyed: 6,
@@ -70,6 +72,8 @@ describe('TurnRecapPanel', () => {
     expect(card?.textContent).toContain('Turn 4 Recap');
     expect(card?.textContent).toContain('Atlantic Alliance');
     expect(card?.textContent).toContain('Combat exchange');
+    expect(card?.textContent).toContain('Units moved');
+    expect(card?.textContent).toContain('-18 IPC');
     expect(card?.textContent).toContain('+2');
     expect(card?.textContent).toContain('Western Front');
     expect(card?.textContent).toContain('Hold the Line');

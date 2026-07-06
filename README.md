@@ -173,6 +173,19 @@ Upload flow:
 npm test
 ```
 
+## Final Stabilization
+
+Before release candidate cut, run the focused ship checklist:
+
+- [`SHIP_READINESS_CHECKLIST.md`](SHIP_READINESS_CHECKLIST.md)
+
+Recommended order:
+
+1. automated checks (build/tests/typecheck)
+2. gameplay + active-faction regression smoke
+3. multiplayer turn-order smoke
+4. electron + steam packaging validation
+
 ## Performance Baseline
 
 See [`PERFORMANCE_BASELINE.md`](PERFORMANCE_BASELINE.md) for telemetry setup, collection protocol, and target thresholds (`renderFrameMs`, `aiPhaseMs`, `aiTurnMs`).

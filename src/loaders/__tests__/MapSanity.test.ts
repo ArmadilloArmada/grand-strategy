@@ -21,6 +21,8 @@ import gridSkirmishData from '../../../assets/maps/grid-skirmish.json';
 import gridMediterraneanData from '../../../assets/maps/grid-mediterranean.json';
 import gridArcticData from '../../../assets/maps/grid-arctic.json';
 import gridArchipelagoData from '../../../assets/maps/grid-archipelago.json';
+import gridWorldMapMega from '../../../assets/maps/grid-world-map-mega.json';
+import worldFactionsMega from '../../../assets/factions/world-factions-mega.json';
 import {
   AFRICA_FACTIONS,
   AMERICAS_FACTIONS,
@@ -46,6 +48,7 @@ const maps: Array<{ id: string; data: MapData; factions: FactionData[]; expectSe
   { id: 'grid-mediterranean', data: gridMediterraneanData as unknown as MapData, factions: MEDITERRANEAN_FACTIONS },
   { id: 'grid-arctic', data: gridArcticData as unknown as MapData, factions: ARCTIC_FACTIONS },
   { id: 'grid-archipelago', data: gridArchipelagoData as unknown as MapData, factions: ARCHIPELAGO_FACTIONS },
+  { id: 'grid-mega', data: gridWorldMapMega as unknown as MapData, factions: worldFactionsMega as FactionData[] },
 ];
 
 function loadMap(data: MapData, factions: FactionData[]): GameState {

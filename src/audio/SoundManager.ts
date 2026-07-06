@@ -29,9 +29,14 @@ type SoundType =
   | 'research'
   | 'achievement'
   | 'event'
-  | 'nuclear';
+  | 'nuclear'
+  | 'tactical_start'
+  | 'tactical_move'
+  | 'tactical_fire'
+  | 'tactical_victory'
+  | 'tactical_defeat';
 
-type MusicTrack = 'menu' | 'gameplay' | 'combat' | 'victory_theme' | 'defeat_theme';
+type MusicTrack = 'menu' | 'gameplay' | 'combat' | 'tactical_combat' | 'victory_theme' | 'defeat_theme';
 
 export class SoundManager {
   private audioContext: AudioContext | null = null;
@@ -158,6 +163,21 @@ export class SoundManager {
         break;
       case 'nuclear':
         this.playNuclear();
+        break;
+      case 'tactical_start':
+        this.playTacticalStart();
+        break;
+      case 'tactical_move':
+        this.playTacticalMove();
+        break;
+      case 'tactical_fire':
+        this.playTacticalFire();
+        break;
+      case 'tactical_victory':
+        this.playTacticalVictory();
+        break;
+      case 'tactical_defeat':
+        this.playTacticalDefeat();
         break;
     }
   }
@@ -511,6 +531,96 @@ export class SoundManager {
     osc.stop(ctx.currentTime + 0.3);
   }
 
+  private playTacticalStart(): void {
+    if (!this.audioContext) return;
+    const ctx = this.audioContext;
+    const volume = this.getVolume() * 0.35;
+    [220, 277, 330].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.07;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(volume, start + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.25);
+    });
+  }
+
+  private playTacticalMove(): void {
+    if (!this.audioContext) return;
+    const ctx = this.audioContext;
+    const volume = this.getVolume() * 0.18;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  }
+
+  private playTacticalFire(): void {
+    if (!this.audioContext) return;
+    const ctx = this.audioContext;
+    const volume = this.getVolume() * 0.28;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(420, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.16);
+  }
+
+  private playTacticalVictory(): void {
+    if (!this.audioContext) return;
+    const ctx = this.audioContext;
+    const volume = this.getVolume() * 0.3;
+    [392, 494, 587].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.08;
+      gain.gain.setValueAtTime(volume, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    });
+  }
+
+  private playTacticalDefeat(): void {
+    if (!this.audioContext) return;
+    const ctx = this.audioContext;
+    const volume = this.getVolume() * 0.28;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.35);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  }
+
   /**
    * Territory captured
    */
@@ -775,6 +885,9 @@ export class SoundManager {
       case 'combat':
         this.playCombatMusic();
         break;
+      case 'tactical_combat':
+        this.playTacticalCombatMusic();
+        break;
       case 'victory_theme':
         this.playVictoryTheme();
         break;
@@ -927,6 +1040,30 @@ export class SoundManager {
       
       beat++;
     }, 200);
+  }
+
+  /** Tactical grid music — tighter pulse, lower register */
+  private playTacticalCombatMusic(): void {
+    if (!this.audioContext || !this.musicGain) return;
+    const ctx = this.audioContext;
+    const pulseNotes = [98, 110, 123.47, 130.81];
+    let beat = 0;
+
+    this.musicInterval = window.setInterval(() => {
+      if (!this.isMusicPlaying || !this.musicGain) return;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = beat % 3 === 0 ? 'square' : 'triangle';
+      osc.frequency.value = pulseNotes[beat % pulseNotes.length];
+      gain.gain.setValueAtTime(this.getMusicVolume() * (beat % 3 === 0 ? 0.55 : 0.35), ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.16);
+      beat++;
+    }, 170);
   }
   
   /**

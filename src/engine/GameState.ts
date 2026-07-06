@@ -39,6 +39,7 @@ export interface SystemRegistry {
     getIncomeModifier?(factionId: string): number;
     recordCasualties?(factionId: string, count: number): void;
     recordVictory?(factionId: string, isCapital?: boolean, hasFactory?: boolean): void;
+    recordTacticalVictory?(factionId: string, cleanWin?: boolean): void;
   };
   espionageSystem?: {
     tick?(): void;
@@ -62,6 +63,7 @@ export interface SystemRegistry {
     serialize(): { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] };
     restore(data: { reserves: [string, { unitTypeId: string; count: number }[]][]; pending: { unitTypeId: string; count: number; territoryId: string }[] }): void;
   };
+  mobilizationSystem?: import('./MobilizationSystem').MobilizationSystem;
   weatherSystem?: {
     tick(): void;
     getWeatherModifiers(terrain: import('../data/Territory').TerrainType): import('./WeatherSystem').WeatherModifiers;
@@ -122,7 +124,8 @@ export type GameEventType =
   | 'espionage_result'
   | 'objective_reward'
   | 'tension_level_change'
-  | 'fortification_built';
+  | 'fortification_built'
+  | 'tactical_assault_start';
 
 export interface GameEvent {
   type: GameEventType;
@@ -139,6 +142,9 @@ export interface PendingMove {
   toTerritoryId: string;
   path: string[];
   viaTransport?: string; // sea zone ID of the transport being used, if any
+  /** Shore / land barrage — attackers stay on the source tile */
+  rangedStrike?: boolean;
+  coastalStrike?: boolean;
 }
 
 export interface PurchaseOrder {
@@ -165,7 +171,16 @@ export interface GameStateSnapshot {
   weather?: { condition: string; name: string; description: string; duration: number; expiresAtTurn: number };
 }
 
+export interface MapLayout {
+  width: number;
+  height: number;
+  wrapHorizontal: boolean;
+}
+
 export class GameState {
+  // Map topology (set when a map loads)
+  public mapLayout: MapLayout | null = null;
+
   // Core game data
   public territories: Map<string, Territory> = new Map();
   public unitRegistry: UnitRegistry = new UnitRegistry();

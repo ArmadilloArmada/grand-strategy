@@ -258,7 +258,7 @@ export function calculateAttackPriority(
 export function calculateUnitPriority(
   personality: AIPersonality,
   unitType: string,
-  _currentComposition: Map<string, number>
+  currentComposition: Map<string, number>
 ): number {
   let priority = 1.0;
   
@@ -271,11 +271,37 @@ export function calculateUnitPriority(
   }
   
   // Apply personality weights
-  if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'transport'].includes(unitType)) {
+  if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(unitType)) {
     priority *= personality.naval;
+
+    let navalTotal = 0;
+    let landTotal = 0;
+    for (const [id, count] of currentComposition) {
+      if (['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(id)) {
+        navalTotal += count;
+      } else if (id !== 'fighter' && id !== 'bomber') {
+        landTotal += count;
+      }
+    }
+    if (navalTotal >= 8) priority *= 0.45;
+    if (navalTotal >= 16) priority *= 0.35;
+    if (landTotal > 0 && navalTotal / landTotal > 0.35) priority *= 0.4;
   }
   if (['fighter', 'bomber'].includes(unitType)) {
     priority *= personality.air;
+
+    let airTotal = 0;
+    let landTotal = 0;
+    for (const [id, count] of currentComposition) {
+      if (id === 'fighter' || id === 'bomber') {
+        airTotal += count;
+      } else if (!['battleship', 'carrier', 'cruiser', 'destroyer', 'submarine', 'marines'].includes(id)) {
+        landTotal += count;
+      }
+    }
+    if (airTotal >= 6) priority *= 0.45;
+    if (airTotal >= 12) priority *= 0.35;
+    if (landTotal > 0 && airTotal / landTotal > 0.2) priority *= 0.4;
   }
   if (['infantry', 'artillery', 'anti_air'].includes(unitType)) {
     priority *= personality.defense;

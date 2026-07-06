@@ -42,8 +42,8 @@ export class FirstWarRoom {
           <strong>Suggested opening:</strong>
           <ol>
             <li>${this.escape(data.mobilizationAdvice)}</li>
-            <li>Select a border territory with ready units and inspect the highlighted attack targets.</li>
-            <li>Use the battle preview. Favor attacks marked favorable or overwhelming.</li>
+            <li>Select a border territory with ready units. Mixed stacks? Use <strong>All Unit Types</strong> to see every move and attack target.</li>
+            <li>Use the battle preview — check swing factors and favor favorable or overwhelming odds.</li>
           </ol>
         </div>
         <div class="fwr-next">

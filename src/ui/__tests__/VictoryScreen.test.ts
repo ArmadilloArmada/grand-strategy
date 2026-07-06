@@ -8,7 +8,7 @@ import { defaultConfig } from '../../engine/GameConfig';
 import { makeFactionData, makeTerritory } from '../../engine/__tests__/testHelpers';
 
 vi.mock('../../audio/SoundManager', () => ({
-  soundManager: { play: vi.fn() },
+  soundManager: { play: vi.fn(), playMusic: vi.fn() },
 }));
 
 function makeVictoryScreen(): { state: GameState; screen: VictoryScreen } {

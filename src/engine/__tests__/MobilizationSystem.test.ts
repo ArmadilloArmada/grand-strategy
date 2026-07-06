@@ -106,7 +106,7 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
     expect(opt.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
   });
 
-  it('coastal territory with sea access includes destroyer', () => {
+  it('coastal territory with sea access includes destroyer and marines', () => {
     const state = buildState();
     const sea = makeTerritory('sea1', null, { type: 'sea' as any, production: 0 });
     const coastal = makeTerritory('coast1', 'player', {
@@ -117,6 +117,7 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
       adjacentTo: ['sea1'],
     });
     state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'marines', cost: 5, domain: 'land' as any, attack: 2, defense: 2, requiredTransport: true }));
     state.territories.set('sea1', sea);
     state.territories.set('coast1', coastal);
 
@@ -124,6 +125,108 @@ describe('MobilizationSystem — getTerritoryMobilization types', () => {
     const opt = sys.getTerritoryMobilization(coastal);
     expect(opt.type).toBe('coastal');
     expect(opt.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(opt.units.some(u => u.unitTypeId === 'marines')).toBe(true);
+  });
+
+  it('coastal mobilization places naval units in adjacent sea', () => {
+    const state = buildState();
+    const sea = makeTerritory('sea1', null, {
+      type: 'sea' as any,
+      production: 0,
+      adjacentTo: ['coast1'],
+    });
+    const coastal = makeTerritory('coast1', 'player', {
+      type: 'coastal' as any,
+      production: 2,
+      hasFactory: false,
+      isCapital: false,
+      adjacentTo: ['sea1'],
+    });
+    state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'marines', cost: 5, domain: 'land' as any, attack: 2, defense: 2, requiredTransport: true }));
+    state.territories.set('sea1', sea);
+    state.territories.set('coast1', coastal);
+
+    const sys = new MobilizationSystem(state);
+    sys.mobilize('coast1');
+
+    expect(sea.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(coastal.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
+    expect(coastal.units.some(u => u.unitTypeId === 'destroyer')).toBe(false);
+    expect(sea.owner).toBe('player');
+  });
+
+  it('capital with sea access includes naval units and spawns them at sea', () => {
+    const state = buildState();
+    const sea = makeTerritory('sea1', null, {
+      type: 'sea' as any,
+      production: 0,
+      adjacentTo: ['cap'],
+    });
+    const cap = makeTerritory('cap', 'player', {
+      production: 3,
+      hasFactory: false,
+      isCapital: true,
+      adjacentTo: ['sea1'],
+    });
+    state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'marines', cost: 5, domain: 'land' as any, attack: 2, defense: 2, requiredTransport: true }));
+    state.unitRegistry.register(makeUnitData({ id: 'cruiser', cost: 14, domain: 'sea' as any }));
+    state.territories.set('sea1', sea);
+    state.territories.set('cap', cap);
+
+    const sys = new MobilizationSystem(state);
+    const opt = sys.getTerritoryMobilization(cap);
+    expect(opt.type).toBe('capital');
+    expect(opt.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(opt.units.some(u => u.unitTypeId === 'marines')).toBe(true);
+
+    const result = sys.mobilize('cap');
+    expect(result.success).toBe(true);
+    expect(sea.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(sea.owner).toBe('player');
+  });
+
+  it('factory with sea access includes naval units', () => {
+    const state = buildState();
+    const sea = makeTerritory('sea1', null, {
+      type: 'sea' as any,
+      production: 0,
+      adjacentTo: ['fact'],
+    });
+    const factory = makeTerritory('fact', 'player', {
+      production: 2,
+      hasFactory: true,
+      isCapital: false,
+      adjacentTo: ['sea1'],
+    });
+    state.unitRegistry.register(makeUnitData({ id: 'destroyer', cost: 10, domain: 'sea' as any }));
+    state.unitRegistry.register(makeUnitData({ id: 'marines', cost: 5, domain: 'land' as any, attack: 2, defense: 2, requiredTransport: true }));
+    state.territories.set('sea1', sea);
+    state.territories.set('fact', factory);
+
+    const sys = new MobilizationSystem(state);
+    const opt = sys.getTerritoryMobilization(factory);
+    expect(opt.type).toBe('factory');
+    expect(opt.units.some(u => u.unitTypeId === 'destroyer')).toBe(true);
+    expect(opt.units.some(u => u.unitTypeId === 'marines')).toBe(true);
+  });
+
+  it('does not swap faction unique unit on factory mobilization', () => {
+    const state = buildState();
+    state.unitRegistry.register(makeUnitData({
+      id: 'marine',
+      cost: 5,
+      domain: 'land',
+      factionId: 'player',
+    }));
+    const factory = makeTerritory('fact', 'player', { production: 2, hasFactory: true });
+    state.territories.set('fact', factory);
+
+    const sys = new MobilizationSystem(state);
+    const opt = sys.getTerritoryMobilization(factory);
+    expect(opt.units.some(u => u.unitTypeId === 'marine')).toBe(false);
+    expect(opt.units.some(u => u.unitTypeId === 'infantry')).toBe(true);
   });
 
   it('canMobilize is false when faction lacks IPCs', () => {

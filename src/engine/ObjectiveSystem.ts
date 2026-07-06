@@ -7,6 +7,7 @@
  */
 
 import { GameState } from './GameState';
+import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export type ObjectiveRewardType = 'ipc' | 'research' | 'units';
 
@@ -172,8 +173,8 @@ export class ObjectiveSystem {
     if (capital?.owner === factionId) {
       const obj: Objective = {
         id: `obj_${++this.idCounter}`,
-        title: 'Secure the Capital',
-        description: `Hold ${capital.name} for the first 3 turns.`,
+        title: 'Survive the Opening',
+        description: `Keep ${capital.name} safe for 3 turns. This is your anchor objective.`,
         reward: { type: 'ipc', amount: 20 },
         deadline: this.state.turnNumber + 4,
         factionId,
@@ -205,8 +206,8 @@ export class ObjectiveSystem {
     if (enemyBorder) {
       const obj: Objective = {
         id: `obj_${++this.idCounter}`,
-        title: 'Opening Offensive',
-        description: `Capture ${enemyBorder.name} before turn ${this.state.turnNumber + 5}.`,
+        title: 'First Strike Target',
+        description: `Capture ${enemyBorder.name} before turn ${this.state.turnNumber + 5}. This gives your first campaign a clear attack lane.`,
         reward: { type: 'ipc', amount: 25 },
         deadline: this.state.turnNumber + 5,
         factionId,
@@ -285,6 +286,10 @@ export class ObjectiveSystem {
       return pickCapture('Hemisphere Pressure', 'Control the approach by taking',
         adjacentEnemy.filter(t => t.production >= 3 || t.hasFactory), 20);
     }
+    if (this.mapId.includes('mega') || this.mapId.includes('global')) {
+      return pickCapture('Seize a Production Hub', 'Open the global campaign by taking',
+        adjacentEnemy.filter(t => t.hasFactory || t.production >= 4), 24);
+    }
     if (this.mapId.includes('arctic')) {
       return pickHold('Hold the Ice Road', 'Protect the northern route at',
         ownedLand.filter(t => !t.isCapital && (t.production >= 2 || t.hasFactory)), 18);
@@ -319,9 +324,16 @@ export class ObjectiveSystem {
     if (obj.reward.type === 'ipc') {
       faction.addIPCs(obj.reward.amount);
     } else if (obj.reward.type === 'units' && obj.reward.unitTypeId) {
-      // Spawn units at capital
       const capital = this.state.territories.get(faction.capital);
-      if (capital) capital.addUnits(obj.reward.unitTypeId, obj.reward.amount);
+      if (capital) {
+        spawnUnitsOnTerritory(
+          this.state,
+          obj.factionId,
+          capital.id,
+          obj.reward.unitTypeId,
+          obj.reward.amount,
+        );
+      }
     }
     // 'research' reward is informational — TechnologyManager can pick it up via event
     this.state.emit('objective_reward', { factionId: obj.factionId, reward: obj.reward });

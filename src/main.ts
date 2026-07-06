@@ -4,6 +4,7 @@
  */
 
 import { GameState } from './engine/GameState';
+import { mergePersistedGameConfig } from './engine/GameConfig';
 import { TurnManager } from './engine/TurnManager';
 import { AIController } from './engine/AIController';
 import { MapRenderer } from './renderer/MapRenderer';
@@ -16,7 +17,8 @@ import { soundManager } from './audio/SoundManager';
 // New feature imports
 import { achievementManager } from './engine/AchievementManager';
 import { statisticsManager } from './engine/StatisticsManager';
-import { campaignManager, CampaignMission } from './engine/CampaignManager';
+import { campaignManager, CampaignMission, CAMPAIGNS } from './engine/CampaignManager';
+import { renderCampaignObjectivesPanel } from './ui/hud/CampaignObjectivesPanel';
 import { tutorialManager } from './engine/TutorialManager';
 import { replayManager } from './engine/ReplayManager';
 import { steamManager } from './engine/SteamManager';
@@ -31,15 +33,19 @@ import { getAITaunt } from './engine/AITaunts';
 import { factionAbilityManager } from './engine/FactionAbilities';
 import { DebugPanel } from './ui/DebugPanel';
 import { ReplayUI } from './ui/ReplayUI';
+import { battleLog } from './ui/BattleLog';
+import { visualEffects } from './ui/VisualEffects';
 import { cloudSaveManager } from './engine/CloudSaveManager';
 import { WeatherSystem } from './engine/WeatherSystem';
 import { FortificationSystem } from './engine/FortificationSystem';
 import { dragManager } from './ui/DragManager';
-import { normalizeCapitalsToWin, normalizeHumanFactions } from './engine/SetupValidation';
+import { normalizeCapitalsToWinForMatch, resolveMatchSetup, applyMatchSetupToState } from './engine/SetupValidation';
+import { sanitizeUnitPlacement } from './engine/navalPlacement';
 import { selectTrait, ALL_TRAITS } from './engine/CommanderProgression';
 import type { Commander, CommanderTraitId } from './data/Territory';
 import type { UnitTypeData } from './data/Unit';
 import { bootstrapGame } from './app/bootstrap';
+import { attachE2EBrowserApi } from './e2e/browserApi';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -51,14 +57,15 @@ import wwiiUnitsData from '../assets/units/wwii-units.json';
 import coldwarUnitsData from '../assets/units/coldwar-units.json';
 import modernUnitsData from '../assets/units/modern-units.json';
 import factionsData from '../assets/factions/world-factions.json';
+import worldFactionsMegaData from '../assets/factions/world-factions-mega.json';
 
 // Unit era registry
 type UnitEraEntry = { name: string; description: string; data: UnitTypeData[] };
 const UNIT_ERAS: Record<string, UnitEraEntry> = {
-  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Limited mobility.', data: wwiUnitsData as unknown as UnitTypeData[] },
-  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Balanced gameplay.', data: wwiiUnitsData as unknown as UnitTypeData[] },
-  'coldwar': { name: 'Cold War (1970)', description: 'Faster units. Jet age warfare.', data: coldwarUnitsData as unknown as UnitTypeData[] },
-  'modern': { name: 'Modern (2020)', description: 'High-tech, fast, and expensive.', data: modernUnitsData as unknown as UnitTypeData[] },
+  'wwi': { name: 'World War I (1914)', description: 'Slow trench warfare. Most units move 1 tile.', data: wwiUnitsData as unknown as UnitTypeData[] },
+  'wwii': { name: 'World War II (1942)', description: 'Classic combined arms. Standard mobility.', data: wwiiUnitsData as unknown as UnitTypeData[] },
+  'coldwar': { name: 'Cold War (1970)', description: 'Jet age. Armor and fleets move 3 tiles.', data: coldwarUnitsData as unknown as UnitTypeData[] },
+  'modern': { name: 'Modern (2020)', description: 'High-tech warfare. Fastest units on land, sea, and air.', data: modernUnitsData as unknown as UnitTypeData[] },
 };
 import _gridMapData from '../assets/maps/grid-world-map.json';
 import _tutorialMapData from '../assets/maps/tutorial-map.json';
@@ -71,6 +78,7 @@ import _gridSkirmishData from '../assets/maps/grid-skirmish.json';
 import _gridMediterraneanData from '../assets/maps/grid-mediterranean.json';
 import _gridArcticData from '../assets/maps/grid-arctic.json';
 import _gridArchipelagoData from '../assets/maps/grid-archipelago.json';
+import _gridWorldMapMega from '../assets/maps/grid-world-map-mega.json';
 import { registerMap, getMapEntry, getMapById } from './data/mapRegistry';
 import { EUROPE_FACTIONS, PACIFIC_FACTIONS, AMERICAS_FACTIONS, AFRICA_FACTIONS, EASTERN_FRONT_FACTIONS, SKIRMISH_FACTIONS, MEDITERRANEAN_FACTIONS, ARCTIC_FACTIONS, ARCHIPELAGO_FACTIONS, TUTORIAL_FACTIONS } from './data/mapFactions';
 import type { MapData } from './loaders/MapLoader';
@@ -85,6 +93,7 @@ const gridSkirmishData = _gridSkirmishData as unknown as MapData;
 const gridMediterraneanData = _gridMediterraneanData as unknown as MapData;
 const gridArcticData = _gridArcticData as unknown as MapData;
 const gridArchipelagoData = _gridArchipelagoData as unknown as MapData;
+const gridWorldMapMega = _gridWorldMapMega as unknown as MapData;
 
 /**
  * Main Game class - orchestrates all systems
@@ -143,6 +152,13 @@ class Game {
   async init(): Promise<void> {
     // Register available maps — themed maps supply their own faction definitions
     registerMap('grid', 'World at War (Grid)', gridMapData, undefined, factionsData as import('./data/Faction').FactionData[]);
+    registerMap(
+      'grid-mega',
+      'World at War — Fine Grid (Grid)',
+      gridWorldMapMega,
+      'Same geography as the default world map, split into 25×25 tiles (768 territories).',
+      worldFactionsMegaData as import('./data/Faction').FactionData[],
+    );
     registerMap('tutorial', 'Tutorial', tutorialMapData, undefined, TUTORIAL_FACTIONS);
     registerMap('grid-europe',        'European Theater (Grid)',   gridEuropeData,       undefined, EUROPE_FACTIONS);
     registerMap('grid-pacific',       'Pacific Ring (Grid)',       gridPacificData,      undefined, PACIFIC_FACTIONS);
@@ -164,6 +180,7 @@ class Game {
     // Initialize renderer and HUD
     this.renderer = new MapRenderer(this.state, 'game-canvas');
     this.hud = new HUD(this.state, this.turnManager, this.renderer);
+    this.saveManager.setGameConfigProvider(() => this.hud.gameConfig);
     this.hud.setAISpeedCallback((multiplier) => this.aiController.setSpeed(multiplier));
     // DebugPanel is dev-only; never let it block the main menu from wiring up.
     try {
@@ -186,7 +203,7 @@ class Game {
 
     // Stamp the build version into the main-menu version label
     const versionEl = document.getElementById('main-menu-version');
-    if (versionEl) versionEl.textContent = `v${__APP_VERSION__} · Press H for help`;
+    if (versionEl) versionEl.textContent = `War Room Edition v${__APP_VERSION__} - Autosaves each phase`;
 
     // Setup UI event listeners
     this.setupMenuListeners();
@@ -284,6 +301,12 @@ class Game {
           ter?.isCapital ?? false,
           ter?.hasFactory ?? false,
         );
+        if ((combat as { resolvedTactically?: boolean }).resolvedTactically) {
+          this.state.systems.moraleSystem?.recordTacticalVictory?.(
+            combat.attackingFactionId,
+            (combat as { tacticalCleanWin?: boolean }).tacticalCleanWin ?? false,
+          );
+        }
       }
     });
     this.state.on('units_produced', (e: any) => {
@@ -303,6 +326,11 @@ class Game {
         fromId: d.from,
         toId: d.to,
       });
+      const destination = this.state.territories.get(d.to);
+      if (destination) {
+        const screen = this.renderer.worldToScreen(destination.center[0], destination.center[1]);
+        visualEffects.floatText(screen.x, screen.y - 12, `+${d.count} moved`, faction?.color ?? '#fbbf24', 16);
+      }
     });
     this.state.on('tech_researched', (e: any) => {
       const d = e.data as { factionId: string; techId: string };
@@ -362,27 +390,162 @@ class Game {
 
     console.log('✓ Game initialized!');
 
+    attachE2EBrowserApi({
+      startE2ETutorialMatch: () => this.startE2ETutorialMatch(),
+      readE2ESnapshot: () => this.hud.readE2ESnapshot(),
+      runE2EUnitAction: (fromId, toId, allTypes) => this.hud.runE2EUnitAction(fromId, toId, allTypes),
+      runE2EConfirmAttack: () => this.hud.runE2EConfirmAttack(),
+      runE2EEndTurn: () => this.hud.runE2EEndTurn(),
+      dismissE2EOverlays: () => this.hud.dismissE2EOverlays(),
+      e2eBoostTerritory: (territoryId, unitTypeId, count) => this.hud.e2eBoostTerritory(territoryId, unitTypeId, count),
+      startE2ECampaignMission: (campaignId, missionId) => this.startE2ECampaignMission(campaignId, missionId),
+      runE2EQuickSave: () => this.runE2EQuickSave(),
+      runE2EQuickLoad: () => this.runE2EQuickLoad(),
+    });
+
     // Set up drag for panels visible on the main menu screen
     dragManager.setup();
   }
 
-  /**
-   * Quick start a new game with preset settings
-   */
   quickStart(turnStyle: 'classic' | 'quick'): void {
-    // Set up default config
+    const isQuick = turnStyle === 'quick';
     this.hud.gameConfig = {
       ...this.hud.gameConfig,
       mode: 'vs-ai',
       humanFactions: ['atlantic_alliance'],
       turnStyle: turnStyle,
       victoryType: 'capitals',
-      turnLimit: 50,
+      capitalsToWin: isQuick ? 2 : 3,
+      turnLimit: isQuick ? 25 : 50,
       fogOfWar: true,
       autoSave: true,
+      simpleMode: isQuick,
+      guidedOnboarding: isQuick,
+      aiDifficulty: isQuick ? 'easy' : 'medium',
+      aiPersonality: 'default',
     };
 
     this.startNewGame();
+    if (isQuick) {
+      this.showSimpleCampaignBriefing();
+    }
+  }
+
+  private showSimpleCampaignBriefing(): void {
+    document.getElementById('scenario-briefing-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'scenario-briefing-overlay';
+    overlay.className = 'scenario-briefing-overlay';
+    overlay.innerHTML = `
+      <div class="scenario-briefing-card">
+        <div class="scenario-briefing-kicker">Simple Campaign</div>
+        <h2>Your First Command</h2>
+        <p class="scenario-briefing-subtitle">One command phase per turn — mobilize, move, attack, then End Turn. The Co-Pilot will guide each step.</p>
+        <div class="scenario-briefing-goals">
+          <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
+          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack.</strong></div>
+          <div class="scenario-briefing-goal"><span>3</span><strong>Capture 2 enemy capitals before turn 25 to win.</strong></div>
+        </div>
+        <div class="scenario-briefing-doctrine">Easy AI · Favorable economy · Co-Pilot coaching enabled</div>
+        <div class="scenario-briefing-actions">
+          <button class="primary" id="btn-start-command">Begin Turn 1</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('btn-start-command')?.addEventListener('click', () => overlay.remove());
+  }
+
+  private startScenario(scenario: string): void {
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mode: 'vs-ai',
+      humanFactions: ['atlantic_alliance'],
+      turnStyle: 'quick',
+      victoryType: scenario === 'factory-rush' ? 'economic' : 'capitals',
+      economicTarget: scenario === 'factory-rush' ? 180 : this.hud.gameConfig.economicTarget,
+      capitalsToWin: scenario === 'first-war' ? 2 : 3,
+      turnLimit: scenario === 'hold-capital' ? 12 : 20,
+      fogOfWar: true,
+      autoSave: true,
+      simpleMode: true,
+      guidedOnboarding: true,
+      aiDifficulty: scenario === 'first-war' ? 'medium' : 'easy',
+      aiPersonality: scenario === 'hold-capital' ? 'defensive' : scenario === 'factory-rush' ? 'economic' : 'aggressive',
+    };
+    this.startNewGame();
+    this.showScenarioBriefing(scenario);
+    const labels: Record<string, string> = {
+      'hold-capital': 'Hold the Capital: survive and reinforce Washington D.C.',
+      'factory-rush': 'Factory Rush: build your economy and outproduce the AI.',
+      'first-war': 'First War: follow the co-pilot into an early attack.',
+    };
+    this.hud.showToast(labels[scenario] ?? 'Scenario started', 'success');
+  }
+
+  private showScenarioBriefing(scenario: string): void {
+    document.getElementById('scenario-briefing-overlay')?.remove();
+
+    const briefings: Record<string, { title: string; subtitle: string; goals: string[]; doctrine: string }> = {
+      'hold-capital': {
+        title: 'Hold the Capital',
+        subtitle: 'Protect Washington D.C. long enough to turn the front line.',
+        goals: ['Build defenders first.', 'Use the Threats overlay to spot danger.', 'End the turn when the co-pilot has no urgent warning.'],
+        doctrine: 'Defensive AI: reinforces strongholds and punishes exposed capitals.',
+      },
+      'factory-rush': {
+        title: 'Factory Rush',
+        subtitle: 'Win by turning production into unstoppable pressure.',
+        goals: ['Use Buy & Auto-Deploy in factory territories.', 'Protect production hubs.', 'Bank income when the front is stable.'],
+        doctrine: 'Economic AI: expands factories and tries to outproduce you.',
+      },
+      'first-war': {
+        title: 'First War',
+        subtitle: 'Learn the clean loop: build, move, fight, review.',
+        goals: ['Follow Do This Next.', 'Attack only when the preview looks favorable.', 'Watch moved units become ready next turn.'],
+        doctrine: 'Aggressive AI: looks for early attacks and weak borders.',
+      },
+    };
+
+    const briefing = briefings[scenario] ?? {
+      title: 'Scenario',
+      subtitle: 'A guided operation is ready.',
+      goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End turns when your plan is complete.'],
+      doctrine: `AI doctrine: ${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
+    };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'scenario-briefing-overlay';
+    overlay.className = 'scenario-briefing-overlay';
+    overlay.innerHTML = `
+      <div class="scenario-briefing-card">
+        <div class="scenario-briefing-kicker">Operation Briefing</div>
+        <h2>${briefing.title}</h2>
+        <p class="scenario-briefing-subtitle">${briefing.subtitle}</p>
+        <div class="scenario-briefing-goals">
+          ${briefing.goals.map((goal, index) => `
+            <div class="scenario-briefing-goal">
+              <span>${index + 1}</span>
+              <strong>${goal}</strong>
+            </div>
+          `).join('')}
+        </div>
+        <div class="scenario-briefing-doctrine">${briefing.doctrine}</div>
+        <div class="scenario-briefing-actions">
+          <button class="primary" id="btn-start-command">Start Command</button>
+          <button id="btn-briefing-copilot">Show Co-Pilot</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    document.getElementById('btn-start-command')?.addEventListener('click', close);
+    document.getElementById('btn-briefing-copilot')?.addEventListener('click', () => {
+      close();
+      document.querySelector<HTMLElement>('.strategic-advisor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   }
 
   /**
@@ -405,34 +568,34 @@ class Game {
       map: mapToLoad,
     });
 
-    // Set faction AI control based on game config (from HUD setup modal)
-    const factions = this.state.factionRegistry.getInTurnOrder();
-    const humanFactions = normalizeHumanFactions(this.hud.gameConfig.humanFactions, mapFactions);
-    this.hud.gameConfig.humanFactions = humanFactions;
-    this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWin(this.hud.gameConfig.capitalsToWin, mapFactions);
-
-    // Resolve the active set for this game session.
-    // - If the New Game modal supplied an explicit list, honor it.
-    // - Otherwise (legacy / scripted starts) fall back to "every map faction is active".
-    const configuredActive = this.hud.gameConfig.activeFactionIds;
-    const activeIds = new Set<string>(
-      configuredActive && configuredActive.length > 0
-        ? configuredActive
-        : factions.map(f => f.id)
+    // Resolve match participants and apply to loaded map data.
+    const matchSetup = resolveMatchSetup({
+      mode: this.hud.gameConfig.mode ?? 'vs-ai',
+      humanFactionIds: this.hud.gameConfig.humanFactions,
+      availableFactions: mapFactions,
+      pickedOpponentIds: this.hud.gameConfig.aiOpponents,
+      opponentCountRaw: this.hud.gameConfig.aiOpponentCount === 0
+        ? 'all'
+        : String(this.hud.gameConfig.aiOpponentCount ?? 'all'),
+    });
+    this.hud.gameConfig.humanFactions = matchSetup.humanFactionIds;
+    this.hud.gameConfig.aiOpponents = matchSetup.aiOpponentIds;
+    this.hud.gameConfig.aiOpponentCount = matchSetup.aiOpponentCount;
+    this.hud.gameConfig.activeFactionIds = matchSetup.activeFactionIds;
+    this.hud.gameConfig.capitalsToWin = normalizeCapitalsToWinForMatch(
+      this.hud.gameConfig.capitalsToWin,
+      matchSetup.activeFactionIds,
+      matchSetup.humanFactionIds,
+      mapFactions,
     );
-    // Humans are always active even if missing from the list (defensive).
-    for (const id of humanFactions) activeIds.add(id);
-    this.hud.gameConfig.activeFactionIds = Array.from(activeIds);
+    applyMatchSetupToState(this.state, matchSetup);
+    sanitizeUnitPlacement(this.state);
 
-    for (const faction of factions) {
-      // Check if this faction should be human controlled
-      faction.controlledBy = humanFactions.includes(faction.id) ? 'human' : 'ai';
-      faction.isActive = activeIds.has(faction.id);
-    }
+    this.hud.syncRendererFromConfig();
 
     // Apply current difficulty and personality
-    this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
-    this.aiController.setPersonality(settings.getSetting('aiPersonality') ?? 'default');
+    this.aiController.setDifficulty(this.hud.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty'));
+    this.aiController.setPersonality(this.hud.gameConfig.aiPersonality ?? settings.getSetting('aiPersonality') ?? 'default');
 
     // Set turn style from config
     this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
@@ -491,8 +654,8 @@ class Game {
 
     this.hud.updateTurnInfo();
 
-    // Assign starting commanders to each faction's capital territory
-    for (const faction of this.state.factionRegistry.getAll()) {
+    // Assign starting commanders to each active faction's capital territory
+    for (const faction of this.state.factionRegistry.getActive()) {
       const commander = getStartingCommander(faction.id);
       if (!commander) continue;
       // Find this faction's capital territory
@@ -515,6 +678,7 @@ class Game {
     (window as any).__gameState = this.state;
 
     this.isGameStarted = true;
+    soundManager.playMusic('gameplay');
 
     // Clean up any previous per-game listeners before adding new ones
     for (const unsub of this.unsubCampaignListeners) unsub();
@@ -532,8 +696,14 @@ class Game {
             const defenderLosses = (combat.defenders as Array<{ casualties: number }>)
               ?.reduce((sum: number, d: { casualties: number }) => sum + (d.casualties ?? 0), 0) ?? 0;
             if (defenderLosses > 0) campaignManager.trackUnitsDestroyed(defenderLosses);
-            if (combat.captured) campaignManager.trackCapture(combat.territoryId);
+            if (combat.winner === 'attacker') {
+              campaignManager.trackCapture(combat.territoryId);
+            }
+            if ((combat as { resolvedTactically?: boolean }).resolvedTactically && combat.winner === 'attacker') {
+              campaignManager.trackTacticalVictory(1);
+            }
           }
+          this.checkCampaignMissionProgress();
         }),
         this.state.on('territory_mobilized', (e) => {
           if (!this.activeCampaignId) return;
@@ -542,7 +712,11 @@ class Game {
           if (humanFactions.includes(data?.factionId) && data?.count) {
             campaignManager.trackUnitsProduced(data.count as number);
           }
-        })
+          this.checkCampaignMissionProgress();
+        }),
+        this.state.on('units_moved', () => {
+          this.checkCampaignMissionProgress();
+        }),
       );
     }
 
@@ -562,6 +736,7 @@ class Game {
     }
 
     if (this.saveManager.loadAutoSave()) {
+      this.applyLoadedMatchSettings();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
@@ -588,8 +763,18 @@ class Game {
     }
   }
 
+  private applyLoadedMatchSettings(): void {
+    const saved = this.saveManager.consumeLastLoadedConfig();
+    if (!saved) return;
+    this.hud.gameConfig = mergePersistedGameConfig(this.hud.gameConfig, saved);
+    this.turnManager.setTurnStyle(this.hud.gameConfig.turnStyle);
+    this.aiController.setDifficulty(this.hud.gameConfig.aiDifficulty ?? settings.getSetting('aiDifficulty'));
+    this.aiController.setPersonality(this.hud.gameConfig.aiPersonality ?? settings.getSetting('aiPersonality') ?? 'default');
+  }
+
   private quickLoadWithFeedback(): void {
     if (this.saveManager.quickLoad()) {
+      this.applyLoadedMatchSettings();
       this.hud.updateTurnInfo();
       this.isGameStarted = true;
       this.hideMainMenu();
@@ -607,6 +792,7 @@ class Game {
     steamManager.clearRichPresence();
     const modal = document.getElementById('main-menu-modal');
     if (modal) modal.classList.remove('hidden');
+    this.setMainMenuTab('new');
 
     // Hide HUD elements that have no meaning without an active game
     document.getElementById('turn-info')?.classList.add('hidden');
@@ -617,7 +803,9 @@ class Game {
     // Update continue button state
     const continueBtn = document.getElementById('btn-continue-game') as HTMLButtonElement;
     if (continueBtn) {
-      continueBtn.disabled = !this.saveManager.hasAutoSave();
+      const hasAutoSave = this.saveManager.hasAutoSave();
+      continueBtn.disabled = !hasAutoSave;
+      continueBtn.title = hasAutoSave ? 'Loads the latest autosave from the Resume tab.' : 'No autosave found yet.';
     }
   }
 
@@ -638,6 +826,18 @@ class Game {
     requestAnimationFrame(() => dragManager.setup());
   }
 
+  private setMainMenuTab(tabName: 'new' | 'resume'): void {
+    document.querySelectorAll<HTMLElement>('[data-menu-tab]').forEach(tab => {
+      const isActive = tab.dataset.menuTab === tabName;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+    });
+
+    document.querySelectorAll<HTMLElement>('[data-menu-panel]').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.menuPanel === tabName);
+    });
+  }
+
   /**
    * Show save confirmation modal when leaving a game
    */
@@ -653,7 +853,7 @@ class Game {
       <div class="modal-content" style="text-align: center; max-width: 400px;">
         <h2>💾 Save Current Game?</h2>
         <p style="margin: 1rem 0; color: #aaa;">
-          You have a game in progress. Would you like to save before starting a new game?
+          You have a game in progress. Starting fresh will not load your autosave; it stays available from the Resume tab until another autosave replaces it.
         </p>
         <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
           <button id="btn-save-and-continue" class="primary" style="padding: 0.8rem;">
@@ -803,8 +1003,11 @@ class Game {
               mapId: mission.mapId,
               mode: 'vs-ai',
               humanFactions: [missionFaction],
-              turnStyle: 'classic',
+              turnStyle: 'quick',
+              simpleMode: true,
+              guidedOnboarding: mission.difficulty === 'easy',
               victoryType: 'capitals',
+              capitalsToWin: 99,
               turnLimit: 50,
               fogOfWar: true,
               autoSave: true,
@@ -1125,6 +1328,7 @@ class Game {
         e.stopPropagation();
         const slotId = parseInt((btn as HTMLElement).dataset.slot || '1');
         if (this.saveManager.loadFromSlot(slotId)) {
+          this.applyLoadedMatchSettings();
           this.hud.updateTurnInfo();
           this.isGameStarted = true;
           this.hideSaveLoadModal();
@@ -1207,6 +1411,7 @@ class Game {
     (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked = s.midGameObjectives ?? true;
     (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked = s.aiTaunts ?? true;
     (document.getElementById('setting-battle-animations') as HTMLInputElement).checked = s.battleAnimations ?? true;
+    (document.getElementById('setting-tactical-battles') as HTMLInputElement).checked = s.tacticalBattles ?? true;
     (document.getElementById('setting-commander-progression') as HTMLInputElement).checked = s.commanderProgression ?? true;
     (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
     (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
@@ -1256,6 +1461,7 @@ class Game {
       midGameObjectives: (document.getElementById('setting-mid-objectives') as HTMLInputElement).checked,
       aiTaunts: (document.getElementById('setting-ai-taunts') as HTMLInputElement).checked,
       battleAnimations: (document.getElementById('setting-battle-animations') as HTMLInputElement).checked,
+      tacticalBattles: (document.getElementById('setting-tactical-battles') as HTMLInputElement).checked,
       commanderProgression: (document.getElementById('setting-commander-progression') as HTMLInputElement).checked,
       dynamicWeather: (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked,
       fortifications: (document.getElementById('setting-fortifications') as HTMLInputElement).checked,
@@ -1295,6 +1501,13 @@ class Game {
       }
     };
 
+    document.querySelectorAll<HTMLElement>('[data-menu-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.menuTab === 'resume' ? 'resume' : 'new';
+        this.setMainMenuTab(target);
+      });
+    });
+
     // Theme toggle button in HUD
     document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
       const current = settings.getSetting('theme') ?? 'dark';
@@ -1311,6 +1524,13 @@ class Game {
     // Quick Start - Simple Mode
     document.getElementById('btn-quick-simple')?.addEventListener('click', () => {
       runMenuAction(() => this.confirmLeaveGame(() => this.quickStart('quick')));
+    });
+
+    document.querySelectorAll<HTMLElement>('.scenario-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const scenario = button.dataset.scenario ?? 'first-war';
+        runMenuAction(() => this.confirmLeaveGame(() => this.startScenario(scenario)));
+      });
     });
 
     // Custom Game Setup
@@ -1563,6 +1783,10 @@ class Game {
       this.saveSettings();
     });
 
+    document.getElementById('btn-close-settings')?.addEventListener('click', () => {
+      this.hideSettings();
+    });
+
     document.getElementById('btn-reset-settings')?.addEventListener('click', () => {
       this.showConfirm('Reset Settings?', 'All settings will return to their defaults.', () => {
         settings.reset();
@@ -1616,14 +1840,26 @@ class Game {
         return;
       }
 
-      // Escape - clear selection, or close modal, or open/close menu
+      // Escape - close open modal, or clear selection / toggle menu
       if (e.key === 'Escape') {
+        const mainMenu = document.getElementById('main-menu-modal');
+        const gameMenu = document.getElementById('game-menu-modal');
+        const anyModal = document.querySelector<HTMLElement>('.modal:not(.hidden)');
+        if (anyModal && anyModal !== mainMenu && anyModal !== gameMenu) {
+          const closeBtn = anyModal.querySelector<HTMLElement>(
+            '[id^="btn-close"], [id^="btn-cancel"], #btn-skip-tutorial',
+          );
+          if (closeBtn && !(closeBtn as HTMLButtonElement).disabled) {
+            closeBtn.click();
+          } else {
+            anyModal.classList.add('hidden');
+          }
+          e.preventDefault();
+          return;
+        }
+
         if (this.isGameStarted) {
-          const gameMenu = document.getElementById('game-menu-modal');
-          const anyModal = document.querySelector('.modal:not(.hidden)');
-          if (anyModal && anyModal !== gameMenu) {
-            (anyModal as HTMLElement).classList.add('hidden');
-          } else if (this.state.selectedTerritoryId) {
+          if (this.state.selectedTerritoryId) {
             this.state.selectTerritory(null);
             this.renderer.render();
             this.hud.updateSelectionInfo();
@@ -1656,9 +1892,10 @@ class Game {
         }
       }
 
-      // B - Open build menu (during purchase phase)
+      // B - Open build menu (during build phases)
       if (e.key === 'b' && this.isGameStarted) {
-        if (this.state.currentPhase === 'purchase') {
+        const phase = this.state.currentPhase as string;
+        if (['purchase', 'production', 'build', 'play'].includes(phase)) {
           e.preventDefault();
           document.getElementById('btn-build')?.click();
         }
@@ -1672,10 +1909,10 @@ class Game {
         }
       }
 
-      // A - Attack (during combat phase)
+      // A - Resolve combat (during combat phase)
       if (e.key === 'a' && this.isGameStarted) {
         if (this.state.currentPhase === 'combat') {
-          document.getElementById('btn-attack')?.click();
+          this.hud.resolveCombat();
         }
       }
 
@@ -1728,7 +1965,9 @@ class Game {
     const turnStyle = this.hud.gameConfig.turnStyle;
     
     if (!faction) return;
-    
+
+    sanitizeUnitPlacement(this.state);
+
     // Clean up expired event effects
     this.eventsSystem.cleanupExpiredEffects();
     
@@ -1770,6 +2009,7 @@ class Game {
       this.hud.updatePhaseInfo();
       this.renderer.render();
       this.updateCampaignObjectivesPanel();
+      this.checkCampaignMissionProgress();
       return; // STOP - wait for human input
     }
     
@@ -1786,15 +2026,23 @@ class Game {
     }
     
     // Show AI indicator
-    this.hud.showToast(`${faction.name} is playing...`, 'info');
+    this.hud.showToast(`${faction.name} is playing (${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
     
     // Wait so player can see
     await new Promise(resolve => setTimeout(resolve, settings.getAIDelay()));
     
+    const aiBefore = this.captureAISummary(faction.id);
+
     // Execute AI's full turn (all phases)
     await this.aiController.executeTurn();
     this.renderer.render();
     this.hud.renderMinimap();
+    const aiSummary = this.describeAITurn(faction.id, aiBefore);
+    if (aiSummary) {
+      battleLog.addAI(this.state.turnNumber, faction.name, faction.color, aiSummary, 'Turn recap');
+      this.hud.showToast(`${faction.name}: ${aiSummary}`, 'info');
+      this.focusMostRelevantAITerritory(faction.id);
+    }
     
     // Spectator mode - pause to let player review AI moves
     if (turnStyle === 'spectator') {
@@ -1803,6 +2051,56 @@ class Game {
     
     // Small delay before next faction
     await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
+  private captureAISummary(factionId: string): { territories: number; units: number; ipcs: number; capitals: number } {
+    const faction = this.state.factionRegistry.get(factionId);
+    const territories = Array.from(this.state.territories.values()).filter(t => t.owner === factionId);
+    return {
+      territories: territories.length,
+      units: territories.reduce((sum, territory) => sum + territory.getTotalUnitCount(), 0),
+      ipcs: faction?.ipcs ?? 0,
+      capitals: territories.filter(t => t.isCapital).length,
+    };
+  }
+
+  private focusMostRelevantAITerritory(factionId: string): void {
+    const candidate = Array.from(this.state.territories.values())
+      .filter(t => t.owner === factionId)
+      .sort((a, b) => {
+        const aScore = (a.isCapital ? 10 : 0) + (a.hasFactory ? 8 : 0) + a.production + a.getTotalUnitCount();
+        const bScore = (b.isCapital ? 10 : 0) + (b.hasFactory ? 8 : 0) + b.production + b.getTotalUnitCount();
+        return bScore - aScore;
+      })[0];
+    if (!candidate) return;
+    this.renderer.centerOnTerritory(candidate.id);
+    this.renderer.setAIPulseTerritory(candidate.id);
+  }
+
+  private describeAITurn(factionId: string, before: { territories: number; units: number; ipcs: number; capitals: number }): string {
+    const after = this.captureAISummary(factionId);
+    const territoryDelta = after.territories - before.territories;
+    const unitDelta = after.units - before.units;
+    const ipcDelta = after.ipcs - before.ipcs;
+    const parts: string[] = [];
+    if (territoryDelta > 0) parts.push(`captured ${territoryDelta} territor${territoryDelta === 1 ? 'y' : 'ies'}`);
+    if (territoryDelta < 0) parts.push(`lost ${Math.abs(territoryDelta)} territor${territoryDelta === -1 ? 'y' : 'ies'}`);
+    if (unitDelta > 0) parts.push(`added ${unitDelta} units`);
+    if (unitDelta < 0) parts.push(`lost ${Math.abs(unitDelta)} units`);
+    if (ipcDelta > 0) parts.push(`banked +${ipcDelta} IPC`);
+    if (ipcDelta < 0) parts.push(`spent ${Math.abs(ipcDelta)} IPC`);
+    if (after.capitals > before.capitals) parts.unshift('captured a capital');
+    return parts.length > 0 ? parts.slice(0, 3).join(', ') : 'held position and reorganized';
+  }
+
+  private describeAIDoctrine(personality?: string): string {
+    switch (personality) {
+      case 'aggressive': return 'aggressive';
+      case 'defensive': return 'defensive';
+      case 'economic': return 'economic';
+      case 'balanced': return 'balanced';
+      default: return 'standard';
+    }
   }
 
   /**
@@ -1935,6 +2233,9 @@ class Game {
   private flashSaveIndicator(): void {
     const el = document.getElementById('save-indicator');
     if (!el) return;
+    const savedAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    el.textContent = `Saved ${savedAt}`;
+    el.setAttribute('title', `Last saved at ${savedAt}`);
     el.classList.remove('hidden', 'visible');
     void el.offsetWidth; // reflow to restart transition
     el.classList.add('visible');
@@ -2074,19 +2375,8 @@ class Game {
    * Refresh the campaign mission objectives sidebar panel.
    * Shown only when an active campaign mission is in progress.
    */
-  private updateCampaignObjectivesPanel(): void {
-    const panel = document.getElementById('campaign-objectives-panel');
-    const listEl = document.getElementById('campaign-objectives-list');
-    const nameEl = document.getElementById('campaign-mission-name');
-    if (!panel || !listEl || !nameEl) return;
-
-    if (!this.activeCampaignId || !this.activeMission) {
-      panel.classList.add('hidden');
-      return;
-    }
-
-    const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
-    const gameState = {
+  private buildCampaignGameState() {
+    return {
       turnNumber: this.state.turnNumber,
       territoriesOwnedBy: (fId: string) =>
         Array.from(this.state.territories.values())
@@ -2095,20 +2385,139 @@ class Game {
       totalUnitsKilled: 0,
       totalUnitsProduced: 0,
     };
+  }
 
+  private checkCampaignMissionProgress(): void {
+    if (!this.activeCampaignId || !this.activeMission) return;
+
+    const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
+    if (!humanFactionId) return;
+
+    this.updateCampaignObjectivesPanel();
+
+    if (!campaignManager.areMissionObjectivesMet(
+      this.activeMission,
+      this.buildCampaignGameState(),
+      humanFactionId,
+    )) {
+      return;
+    }
+
+    if (this.lastGameWinnerFaction === humanFactionId) return;
+
+    soundManager.play('achievement');
+    this.lastGameWinnerFaction = humanFactionId;
+    this.state.emit('victory', { winner: humanFactionId, factionId: humanFactionId });
+  }
+
+  private updateCampaignObjectivesPanel(): void {
+    if (!this.activeCampaignId || !this.activeMission) {
+      renderCampaignObjectivesPanel(null, []);
+      return;
+    }
+
+    const humanFactionId = this.hud.gameConfig.humanFactions?.[0] ?? '';
+    const gameState = this.buildCampaignGameState();
     const results = campaignManager.checkObjectives(this.activeMission, gameState, humanFactionId);
+    renderCampaignObjectivesPanel(this.activeMission, results);
+  }
 
-    nameEl.textContent = this.activeMission.name;
-    listEl.innerHTML = results.map(r => {
-      const icon = r.met ? '✅' : '⬜';
-      return `<div style="display:flex;gap:6px;align-items:flex-start;">
-        <span style="flex-shrink:0;">${icon}</span>
-        <span style="${r.met ? 'color:#4ade80;' : ''}">${r.objective.description} <span style="color:#5b9bd5;">(${r.progress})</span></span>
-      </div>`;
-    }).join('');
+  private runE2EQuickSave(): boolean {
+    if (!this.isGameStarted) return false;
+    return this.saveManager.quickSave();
+  }
 
-    panel.classList.remove('hidden');
-    document.getElementById('objectives-panel')?.classList.add('hidden');
+  private runE2EQuickLoad(): boolean {
+    if (!this.saveManager.quickLoad()) return false;
+    this.applyLoadedMatchSettings();
+    this.hud.updateTurnInfo();
+    this.isGameStarted = true;
+    this.hideMainMenu();
+    this.scheduleFitMapToCommandLayout();
+    return true;
+  }
+
+  /**
+   * Deterministic campaign mission for Playwright.
+   */
+  startE2ECampaignMission(campaignId: string, missionId: string): void {
+    const campaign = CAMPAIGNS.find(c => c.id === campaignId);
+    const mission = campaign?.missions.find(m => m.id === missionId);
+    if (!campaign || !mission) return;
+
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+
+    this.activeCampaignId = campaignId;
+    this.activeMission = mission;
+    this.lastGameWinnerFaction = null;
+    campaignManager.activeCampaignId = campaignId;
+    campaignManager.activeMissionId = mission.id;
+    campaignManager.resetCounters();
+    campaignManager.startCampaign(campaignId);
+
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: mission.mapId,
+      mode: 'vs-ai',
+      humanFactions: [mission.faction],
+      aiOpponents: ['eastern_bloc'],
+      aiOpponentCount: 1,
+      turnStyle: 'quick',
+      simpleMode: true,
+      guidedOnboarding: false,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: 'capitals',
+      capitalsToWin: 99,
+      turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
+  }
+
+  /**
+   * Deterministic tutorial match for Playwright — tutorial map, quick turns, no coaching noise.
+   */
+  startE2ETutorialMatch(): void {
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: 'tutorial',
+      mode: 'vs-ai',
+      humanFactions: ['atlantic_alliance'],
+      aiOpponents: ['eastern_bloc'],
+      aiOpponentCount: 1,
+      turnStyle: 'quick',
+      simpleMode: true,
+      guidedOnboarding: false,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: 'capitals',
+      capitalsToWin: 1,
+      turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
   }
 
   /**

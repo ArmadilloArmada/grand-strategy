@@ -30,6 +30,7 @@ export interface GameSettings {
   midGameObjectives: boolean;     // Random mid-game bonus objectives
   aiTaunts: boolean;              // AI personality flavor text in toasts
   battleAnimations: boolean;      // Pre-combat clash animation
+  tacticalBattles: boolean;       // Optional mini-map tactical battles before dice combat
   commanderProgression: boolean;  // Commander XP leveling and trait unlocks
   dynamicWeather: boolean;        // Seasonal weather events that affect combat
   fortifications: boolean;        // Buildable earthworks and bunkers that boost defense
@@ -58,6 +59,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   midGameObjectives: true,
   aiTaunts: true,
   battleAnimations: true,
+  tacticalBattles: true,
   commanderProgression: true,
   dynamicWeather: true,
   fortifications: true,

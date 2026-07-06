@@ -15,6 +15,8 @@ export interface UnitTypeData {
   hitPoints: number;   // Usually 1, but battleships have 2
   canBlitz: boolean;   // Can move through empty enemy territory
   canBombard: boolean; // Naval bombardment ability
+  /** Tiles away a unit can strike without entering the target (1 = melee only). */
+  attackRange?: number;
   canStrategicBomb: boolean; // Can bomb factories
   transportCapacity: number; // How many land units it can carry (0 = can't transport)
   requiredTransport: boolean; // Needs transport to move over sea
@@ -33,6 +35,7 @@ export class UnitType {
   public readonly hitPoints: number;
   public readonly canBlitz: boolean;
   public readonly canBombard: boolean;
+  public readonly attackRange: number;
   public readonly canStrategicBomb: boolean;
   public readonly transportCapacity: number;
   public readonly requiredTransport: boolean;
@@ -49,6 +52,7 @@ export class UnitType {
     this.hitPoints = data.hitPoints;
     this.canBlitz = data.canBlitz;
     this.canBombard = data.canBombard;
+    this.attackRange = data.attackRange ?? (data.canBombard && data.domain === 'land' ? 2 : 1);
     this.canStrategicBomb = data.canStrategicBomb;
     this.transportCapacity = data.transportCapacity;
     this.requiredTransport = data.requiredTransport;
@@ -63,7 +67,7 @@ export class UnitType {
       case 'land':
         return territoryType === 'land' || territoryType === 'coastal';
       case 'sea':
-        return territoryType === 'sea' || territoryType === 'coastal';
+        return territoryType === 'sea';
       case 'air':
         return true; // Air units can go anywhere
     }

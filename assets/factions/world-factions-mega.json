@@ -1,0 +1,96 @@
+[
+  {
+    "id": "atlantic_alliance",
+    "name": "Atlantic Alliance",
+    "color": "#4a90d9",
+    "colorLight": "#7eb3eb",
+    "pattern": "solid",
+    "capital": "washington__1_1",
+    "startingIPCs": 38,
+    "turnOrder": 1,
+    "isPlayable": true,
+    "allies": [],
+    "playstyle": "Industrial Powerhouse",
+    "description": "Strong economy and production. Excels at building and sustaining large armies.",
+    "bonuses": {
+      "ipcPerFactory": 1,
+      "navalAttackBonus": 1,
+      "researchSpeedBonus": 0.25,
+      "incomeMultiplierBonus": 0.1
+    },
+    "specialAbility": {
+      "name": "Arsenal of Democracy",
+      "description": "Factories produce +1 unit per turn. +1 IPC per factory owned.",
+      "passive": true
+    }
+  },
+  {
+    "id": "eastern_coalition",
+    "name": "Eastern Coalition",
+    "color": "#e85d75",
+    "colorLight": "#f08090",
+    "pattern": "diagonal",
+    "capital": "moscow__1_1",
+    "startingIPCs": 45,
+    "turnOrder": 2,
+    "isPlayable": true,
+    "allies": [],
+    "playstyle": "Defensive Juggernaut",
+    "description": "Masters of defense. Infantry hold the line while armor counterattacks.",
+    "bonuses": {
+      "infantryDefenseBonus": 1,
+      "counterIntelBonus": 0.3
+    },
+    "specialAbility": {
+      "name": "Deep Battle Doctrine",
+      "description": "Infantry defend at +1. Defenders in home territory get +1 to all rolls.",
+      "passive": true
+    }
+  },
+  {
+    "id": "pacific_union",
+    "name": "Pacific Union",
+    "color": "#00a896",
+    "colorLight": "#2dd4bf",
+    "pattern": "horizontal",
+    "capital": "tokyo__1_1",
+    "startingIPCs": 40,
+    "turnOrder": 3,
+    "isPlayable": true,
+    "allies": [],
+    "playstyle": "Rapid Expansion",
+    "description": "Swift and mobile forces. Strike fast, capture quickly, consolidate.",
+    "bonuses": {
+      "movementBonus": 1,
+      "navalAttackBonus": 1
+    },
+    "specialAbility": {
+      "name": "Lightning War",
+      "description": "All land units get +1 movement. Tanks can blitz through 2 territories.",
+      "passive": true
+    }
+  },
+  {
+    "id": "southern_federation",
+    "name": "Southern Federation",
+    "color": "#f5a623",
+    "colorLight": "#ffc857",
+    "pattern": "dots",
+    "capital": "india__1_1",
+    "startingIPCs": 40,
+    "turnOrder": 4,
+    "isPlayable": true,
+    "allies": [],
+    "playstyle": "Guerrilla Warfare",
+    "description": "Resourceful and adaptable. Cheaper units and terrain advantages.",
+    "bonuses": {
+      "unitCostDiscount": 1,
+      "incomeMultiplierBonus": 0.05
+    },
+    "specialAbility": {
+      "name": "People's Army",
+      "description": "All units cost 1 less IPC. Defending in owned territory: first casualty is ignored.",
+      "passive": true
+    }
+  }
+]

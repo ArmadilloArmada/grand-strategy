@@ -6,6 +6,7 @@
 import { GameState } from '../engine/GameState';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { soundManager } from '../audio/SoundManager';
+import type { SpawnedUnit } from '../engine/MobilizationSystem';
 
 export interface UndoCallbacks {
   showToast: (message: string, type: 'info' | 'success') => void;
@@ -15,7 +16,7 @@ export interface UndoCallbacks {
   updateFactionPanel: () => void;
   updateActionButtons: () => void;
   /** Reverse a mobilize: remove spawned units, refund IPCs, unmark territory. */
-  undoMobilize: (territoryId: string, cost: number, units: { unitTypeId: string; count: number }[]) => void;
+  undoMobilize: (territoryId: string, cost: number, units: SpawnedUnit[]) => void;
 }
 
 interface MoveRecord {
@@ -132,7 +133,7 @@ export class UndoController {
       const { territoryId, cost, units } = lastAction.data as {
         territoryId: string;
         cost: number;
-        units: { unitTypeId: string; count: number }[];
+        units: SpawnedUnit[];
       };
       this.callbacks.undoMobilize(territoryId, cost, units);
       this.callbacks.showToast('Mobilization undone', 'info');

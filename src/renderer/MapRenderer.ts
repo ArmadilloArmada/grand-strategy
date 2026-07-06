@@ -5,6 +5,7 @@
 
 import { GameState } from '../engine/GameState';
 import { Territory } from '../data/Territory';
+import type { UnitEra } from '../engine/GameConfig';
 
 export interface RenderOptions {
   showGrid: boolean;
@@ -28,6 +29,26 @@ interface PerfRoot {
   [metric: string]: PerfBucket;
 }
 
+export type UnitDropKind = 'move' | 'attack' | 'invalid';
+
+export interface UnitDragController {
+  canDragFrom(territoryId: string): boolean;
+  onDragStart(fromTerritoryId: string): void;
+  onDragHover(toTerritoryId: string | null): void;
+  onDragDrop(fromTerritoryId: string, toTerritoryId: string): void;
+  onDragCancel(): void;
+  getDropKind(fromTerritoryId: string, toTerritoryId: string): UnitDropKind;
+}
+
+interface ActiveUnitDrag {
+  fromId: string;
+  startScreenX: number;
+  startScreenY: number;
+  currentScreenX: number;
+  currentScreenY: number;
+  committed: boolean;
+}
+
 export class MapRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -45,10 +66,20 @@ export class MapRenderer {
   private lastMouseX: number = 0;
   private lastMouseY: number = 0;
   private hoveredTerritoryId: string | null = null;
+  private unitDragController: UnitDragController | null = null;
+  private unitDrag: ActiveUnitDrag | null = null;
+  private dragHoverTerritoryId: string | null = null;
+  private dragHoverKind: UnitDropKind = 'invalid';
+  private activeCommandUnitTypeId: string | null = null;
+  private activeCommandUnitIcon: string = '';
+  private activeCommandDomain: 'land' | 'sea' | 'air' | null = null;
+  private static readonly UNIT_DRAG_THRESHOLD = 8;
 
   // Valid move highlights
   private validMoveTargets: Set<string> = new Set();
   private attackTargets: Set<string> = new Set();
+  private coastalStrikeTargets: Set<string> = new Set();
+  private unitEra: UnitEra = 'wwii';
 
   // Mobilization highlights (build phase)
   private mobilizableTargets: Set<string> = new Set();
@@ -90,6 +121,11 @@ export class MapRenderer {
     highlightValidMoves: true,
   };
   private perfEnabled: boolean = false;
+
+  /** Skip expensive terrain/wave effects on very large maps (e.g. fine grid). */
+  private isLargeMap(): boolean {
+    return this.state.territories.size >= 400;
+  }
 
   // Military map / wargame color palette
   private readonly COLORS = {
@@ -220,6 +256,7 @@ export class MapRenderer {
     // Keep loop alive while a territory is selected or mobilizable targets are pulsing
     if (this.state.selectedTerritoryId !== null) anyActive = true;
     if (this.mobilizableTargets.size > 0) anyActive = true;
+    if (this.unitDrag?.committed) anyActive = true;
     // Use drawFrame() directly — the animation loop already owns the RAF cadence
     this.renderPending = false;
     const start = performance.now();
@@ -301,12 +338,15 @@ export class MapRenderer {
 
   /** Immediate synchronous draw — used internally and by the capture animation loop. */
   private drawFrame(): void {
-    if (this.state.territories.size === 0) return;
+    if (this.state.territories.size === 0) {
+      this.fillCanvasBackdrop();
+      return;
+    }
 
-    // Rebuild static layer when dirty or when camera moved since last build
-    const cameraChanged = this.scale !== this.staticLastScale
-      || this.offsetX !== this.staticLastOffsetX
+    const scaleChanged = this.scale !== this.staticLastScale;
+    const panChanged = this.offsetX !== this.staticLastOffsetX
       || this.offsetY !== this.staticLastOffsetY;
+    const cameraChanged = scaleChanged || panChanged;
     if (this.staticDirty || cameraChanged) {
       this.rebuildStaticLayer();
     }
@@ -315,6 +355,8 @@ export class MapRenderer {
     this.ctx.clearRect(0, 0, this.width, this.height);
     if (this.staticCanvas) {
       this.ctx.drawImage(this.staticCanvas, 0, 0);
+    } else {
+      this.fillCanvasBackdrop();
     }
 
     // Draw dynamic layer: interaction highlights, animations, map overlays
@@ -324,12 +366,18 @@ export class MapRenderer {
 
     this.drawDynamicTerritoryOverlays();
     this.drawSelectionGlow();
+    this.drawActiveCommandBadge();
+    this.drawUnitDragOverlay();
 
     if (this.overlayMode === 'economic') {
       this.drawEconomicOverlay();
     } else if (this.overlayMode === 'range' && (this.validMoveTargets.size > 0 || this.attackTargets.size > 0)) {
       this.drawOverlayLayer(this.validMoveTargets, 'rgba(34, 197, 94, 0.25)');
-      this.drawOverlayLayer(this.attackTargets, 'rgba(239, 68, 68, 0.3)');
+      this.drawOverlayLayer(this.coastalStrikeTargets, 'rgba(251, 146, 60, 0.35)');
+      this.drawOverlayLayer(
+        new Set([...this.attackTargets].filter(id => !this.coastalStrikeTargets.has(id))),
+        'rgba(239, 68, 68, 0.3)',
+      );
     } else if (this.overlayMode === 'threat' && this.threatTerritoryIds.size > 0) {
       this.drawOverlayLayer(this.threatTerritoryIds, 'rgba(239, 68, 68, 0.35)');
     }
@@ -390,14 +438,17 @@ export class MapRenderer {
   /**
    * Draw aged parchment / military map background
    */
-  private drawBackground(): void {
-    // Parchment base — diagonal gradient for aged-paper warmth
+  private fillCanvasBackdrop(): void {
     const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height);
     gradient.addColorStop(0, '#243a5e');
     gradient.addColorStop(0.55, '#1e3252');
     gradient.addColorStop(1, '#14243d');
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, this.width, this.height);
+  }
+
+  private drawBackground(): void {
+    this.fillCanvasBackdrop();
 
     this.ctx.save();
     this.ctx.strokeStyle = 'rgba(180, 210, 255, 0.08)';
@@ -426,10 +477,11 @@ export class MapRenderer {
    * Draw sea zones
    */
   private drawSeaZones(): void {
+    const simplified = this.isLargeMap();
     for (const territory of this.state.territories.values()) {
       if (!territory.isSea()) continue;
       this.drawTerritory(territory, true);
-      this.drawSeaWaves(territory.polygon);
+      if (!simplified) this.drawSeaWaves(territory.polygon);
     }
   }
 
@@ -515,7 +567,7 @@ export class MapRenderer {
     this.ctx.globalAlpha = 1;
 
     // Terrain texture overlay — clipped to polygon, drawn before capture animation
-    if (!isSea) {
+    if (!isSea && !this.isLargeMap()) {
       this.drawTerrainTexture(polygon, territory.terrain ?? 'plains');
     }
 
@@ -558,7 +610,7 @@ export class MapRenderer {
     }
 
     // Inner vignette: radial gradient darkens territory edges for genuine depth
-    {
+    if (!this.isLargeMap()) {
       let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
       for (const [px, py] of polygon) {
         if (px < bMinX) bMinX = px; if (py < bMinY) bMinY = py;
@@ -657,14 +709,66 @@ export class MapRenderer {
     this.ctx.shadowBlur = 0;
   }
 
+  /** Badge showing which unit type is armed for orders on the selected territory. */
+  private drawActiveCommandBadge(): void {
+    const id = this.state.selectedTerritoryId;
+    if (!id || !this.activeCommandUnitTypeId) return;
+    const territory = this.state.territories.get(id);
+    if (!territory) return;
+    const [cx, cy] = territory.center;
+    const label = this.activeCommandUnitIcon || '●';
+    this.ctx.save();
+    this.ctx.font = '16px sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    this.ctx.beginPath();
+    this.ctx.arc(cx + 14, cy - 14, 11, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = 'rgba(72, 220, 120, 0.9)';
+    this.ctx.lineWidth = 2;
+    this.ctx.stroke();
+    this.ctx.fillStyle = '#fff';
+    this.ctx.fillText(label, cx + 14, cy - 14);
+    this.ctx.restore();
+  }
+
+  /**
+   * Resolve which faction color to use for unit counters on this territory.
+   * Sea zones often have no owner even when a fleet is present.
+   */
+  private resolveTerritoryDisplayFactionId(territory: import('../data/Territory').Territory): string | null {
+    if (territory.owner) return territory.owner;
+
+    if (territory.type === 'sea' && territory.getTotalUnitCount() > 0) {
+      for (const adjId of territory.adjacentTo) {
+        const adj = this.state.territories.get(adjId);
+        if (adj?.owner && adj.isLand()) return adj.owner;
+      }
+    }
+
+    return null;
+  }
+
+  private getTerritoryDisplayUnits(territory: import('../data/Territory').Territory) {
+    return territory.units.filter(pu => {
+      const ut = this.state.unitRegistry.get(pu.unitTypeId);
+      if (!ut) return false;
+      if (ut.domain === 'sea' && territory.type !== 'sea') return false;
+      return true;
+    });
+  }
+
   /**
    * Draw unit tokens as square NATO-style wargame counters.
    * The entire counter is clipped to the territory polygon so it
    * can never bleed into a neighbouring tile.
    */
   private drawUnitTokens(): void {
+    const simplified = this.isLargeMap();
     for (const territory of this.state.territories.values()) {
-      const unitCount = territory.getTotalUnitCount();
+      const displayUnits = this.getTerritoryDisplayUnits(territory);
+      const unitCount = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
       if (unitCount === 0) continue;
 
       const isVisible = this.options.fogOfWarCallback
@@ -673,7 +777,28 @@ export class MapRenderer {
       if (!isVisible) continue;
 
       const [cx, cy] = territory.center;
-      const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+      if (simplified) {
+        const displayFactionId = this.resolveTerritoryDisplayFactionId(territory);
+        const faction = displayFactionId ? this.state.factionRegistry.get(displayFactionId) : null;
+        const color = faction?.color ?? '#666666';
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        this.ctx.fillStyle = color;
+        this.ctx.fill();
+        this.ctx.strokeStyle = this.COLORS.borderDark;
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
+        if (unitCount > 1) {
+          this.ctx.fillStyle = '#fff';
+          this.ctx.font = 'bold 8px monospace';
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText(String(unitCount), cx, cy);
+        }
+        continue;
+      }
+      const displayFactionId = this.resolveTerritoryDisplayFactionId(territory);
+      const faction = displayFactionId ? this.state.factionRegistry.get(displayFactionId) : null;
       const factionColor = faction?.color ?? '#666666';
 
       // Counter size: 55% of the territory's bounding box, capped at 36×26
@@ -715,14 +840,19 @@ export class MapRenderer {
       this.ctx.lineWidth = 1;
       this.ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
 
-      // NATO unit symbol + count
-      const primaryUnit = territory.units.reduce((max, pu) => pu.count > max.count ? pu : max, territory.units[0]);
+      // Role sprite + count — on sea zones prefer showing a ship icon over mixed stacks
+      const primaryUnit = territory.type === 'sea'
+        ? (displayUnits.find(pu => {
+            const ut = this.state.unitRegistry.get(pu.unitTypeId);
+            return ut?.domain === 'sea';
+          }) ?? displayUnits[0])
+        : displayUnits.reduce((max, pu) => pu.count > max.count ? pu : max, displayUnits[0]);
       const primaryType = primaryUnit ? this.state.unitRegistry.get(primaryUnit.unitTypeId) : null;
 
       if (primaryType && w >= 18 && h >= 14) {
-        // Symbol in upper ~55% of counter, count in lower strip
+        // Sprite in upper ~62% of counter, count in lower strip
         const symCy = y + h * 0.40;
-        this.drawNATOSymbol(cx, symCy, w * 0.54, h * 0.38, primaryType.domain ?? 'land', primaryUnit.unitTypeId);
+        this.drawUnitSprite(cx, symCy, w * 0.64, h * 0.46, primaryType.domain ?? 'land', primaryUnit.unitTypeId, factionColor);
         const countSize = Math.max(7, Math.min(10, h * 0.36));
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${countSize}px "Courier New", monospace`;
@@ -758,16 +888,17 @@ export class MapRenderer {
       const unitCount = territory.getTotalUnitCount();
       const markerY = unitCount > 0 ? cy - 24 : cy;
 
-      // Capital: drawn 5-pointed star
+      // Capital: command flag token
       if (territory.isCapital) {
-        const sx = unitCount > 0 ? cx - 14 : cx - 10;
-        this.drawStar(sx, markerY, 8, '#f5c842', '#2a1808');
+        const sx = unitCount > 0 ? cx - 16 : cx - 10;
+        const faction = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
+        this.drawCapitalSprite(sx, markerY, faction?.color ?? '#f5c842');
       }
 
-      // Factory: small drawn industry symbol (rectangle + chimney)
+      // Factory: industrial token
       if (territory.hasFactory) {
-        const fx = unitCount > 0 ? cx + 10 : cx + 8;
-        this.drawFactorySymbol(fx, markerY, '#888888', '#2a1808');
+        const fx = unitCount > 0 ? cx + 12 : cx + 8;
+        this.drawFactorySprite(fx, markerY, territory.owner ? '#9ca3af' : '#7a7468');
       }
 
       // Fortification badge: small tower symbol based on level
@@ -840,70 +971,321 @@ export class MapRenderer {
     this.ctx.restore();
   }
 
-  /** Draw a NATO wargame counter symbol inside the unit token upper zone. */
-  private drawNATOSymbol(cx: number, cy: number, w: number, h: number, domain: string, unitTypeId: string): void {
+  /** Draw a tiny role sprite inside the unit token upper zone. */
+  private drawUnitSprite(cx: number, cy: number, w: number, h: number, domain: string, unitTypeId: string, factionColor: string): void {
+    const id = unitTypeId.toLowerCase();
+    if (domain === 'air') {
+      this.drawAircraftSprite(cx, cy, w, h, id, factionColor);
+    } else if (domain === 'sea') {
+      this.drawShipSprite(cx, cy, w, h, id, factionColor, this.unitEra);
+    } else if (id.includes('armor') || id.includes('tank') || id.includes('panzer') || id.includes('mech')) {
+      this.drawTankSprite(cx, cy, w, h, factionColor);
+    } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
+      this.drawArtillerySprite(cx, cy, w, h, factionColor);
+    } else if (id.includes('anti_air') || id.includes('antiair') || id.includes('_aa') || id.includes('flak')) {
+      this.drawAASprite(cx, cy, w, h, factionColor);
+    } else {
+      this.drawInfantrySprite(cx, cy, w, h, factionColor);
+    }
+  }
+
+  private drawInfantrySprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
     const ctx = this.ctx;
+    const r = Math.max(1.6, Math.min(w, h) * 0.18);
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 1;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    const hw = w * 0.5;
-    const hh = h * 0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillStyle = this.lightenColor(factionColor, 34);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx - w * 0.17, cy - h * 0.18, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.15, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.16, cy + h * 0.20);
+    ctx.moveTo(cx - w * 0.02, cy - h * 0.10);
+    ctx.lineTo(cx + w * 0.34, cy - h * 0.32);
+    ctx.moveTo(cx + w * 0.18, cy - h * 0.22);
+    ctx.lineTo(cx + w * 0.42, cy - h * 0.36);
+    ctx.stroke();
+    ctx.restore();
+  }
 
-    if (domain === 'air') {
+  private drawTankSprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 26);
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = 1.1;
+    this.roundRect(cx - w * 0.42, cy - h * 0.16, w * 0.72, h * 0.34, h * 0.12);
+    ctx.fill();
+    ctx.stroke();
+    this.roundRect(cx - w * 0.18, cy - h * 0.30, w * 0.32, h * 0.24, h * 0.08);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + w * 0.10, cy - h * 0.20);
+    ctx.lineTo(cx + w * 0.44, cy - h * 0.34);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    for (let i = 0; i < 3; i++) {
       ctx.beginPath();
-      ctx.moveTo(cx, cy - hh);
-      ctx.lineTo(cx + hw, cy + hh);
-      ctx.lineTo(cx - hw, cy + hh);
-      ctx.closePath();
-      ctx.globalAlpha = 0.75;
-      ctx.stroke();
-    } else if (domain === 'sea') {
-      ctx.globalAlpha = 0.75;
-      ctx.beginPath();
-      ctx.arc(cx, cy + hh * 0.25, hw * 0.85, Math.PI, 0, false);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + hh * 0.25);
-      ctx.lineTo(cx, cy - hh);
-      ctx.stroke();
-    } else {
-      const id = unitTypeId.toLowerCase();
-      ctx.globalAlpha = 0.75;
-      if (id.includes('armor') || id.includes('tank') || id.includes('panzer')) {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, hw * 0.82, hh * 0.5, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (id.includes('artillery') || id.includes('cannon') || id.includes('howitzer')) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, Math.min(hw, hh) * 0.72, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fill();
-      } else if (id.includes('anti_air') || id.includes('antiair') || id.includes('_aa') || id.includes('flak')) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - hh);
-        ctx.lineTo(cx, cy + hh * 0.45);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(cx - hw * 0.52, cy - hh * 0.28);
-        ctx.lineTo(cx, cy - hh);
-        ctx.lineTo(cx + hw * 0.52, cy - hh * 0.28);
-        ctx.stroke();
-      } else {
-        // Infantry default: X cross
-        ctx.beginPath();
-        ctx.moveTo(cx - hw, cy - hh);
-        ctx.lineTo(cx + hw, cy + hh);
-        ctx.moveTo(cx + hw, cy - hh);
-        ctx.lineTo(cx - hw, cy + hh);
-        ctx.stroke();
-      }
+      ctx.arc(cx - w * 0.28 + i * w * 0.22, cy + h * 0.10, Math.max(1, h * 0.08), 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
+  }
+
+  private drawArtillerySprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = this.lightenColor(factionColor, 30);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.34, cy + h * 0.20);
+    ctx.lineTo(cx + w * 0.34, cy - h * 0.24);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx - w * 0.22, cy + h * 0.22, Math.max(1.5, h * 0.16), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + w * 0.12, cy + h * 0.08, Math.max(1, h * 0.10), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawAASprite(cx: number, cy: number, w: number, h: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = this.lightenColor(factionColor, 30);
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + h * 0.30);
+    ctx.lineTo(cx, cy - h * 0.34);
+    ctx.moveTo(cx - w * 0.30, cy - h * 0.05);
+    ctx.lineTo(cx, cy - h * 0.34);
+    ctx.lineTo(cx + w * 0.30, cy - h * 0.05);
+    ctx.moveTo(cx - w * 0.22, cy + h * 0.30);
+    ctx.lineTo(cx + w * 0.22, cy + h * 0.30);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private roundRect(x: number, y: number, w: number, h: number, r: number): void {
+    const ctx = this.ctx;
+    const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  private drawAircraftSprite(cx: number, cy: number, w: number, h: number, unitTypeId: string, factionColor: string): void {
+    const ctx = this.ctx;
+    const bomber = unitTypeId.includes('bomber') || unitTypeId.includes('heavy');
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 34);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + w * 0.44, cy);
+    ctx.lineTo(cx - w * 0.12, cy - h * 0.16);
+    ctx.lineTo(cx - w * 0.40, cy - h * (bomber ? 0.34 : 0.24));
+    ctx.lineTo(cx - w * 0.28, cy);
+    ctx.lineTo(cx - w * 0.40, cy + h * (bomber ? 0.34 : 0.24));
+    ctx.lineTo(cx - w * 0.12, cy + h * 0.16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (bomber) {
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.05, cy - h * 0.14);
+      ctx.lineTo(cx + w * 0.10, cy + h * 0.14);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawShipSprite(
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    unitTypeId: string,
+    factionColor: string,
+    era: UnitEra = 'wwii',
+  ): void {
+    const ctx = this.ctx;
+    const submarine = unitTypeId.includes('sub');
+    const carrier = unitTypeId.includes('carrier');
+    const transport = unitTypeId.includes('transport');
+    const battleship = unitTypeId.includes('battle');
+    const cruiser = unitTypeId.includes('cruiser');
+    const destroyer = unitTypeId.includes('destroy');
+    ctx.save();
+    ctx.fillStyle = this.lightenColor(factionColor, 28);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+
+    if (submarine) {
+      this.drawSubmarineSprite(cx, cy, w, h, era);
+    } else if (carrier) {
+      this.drawCarrierSprite(cx, cy, w, h, era);
+    } else if (transport) {
+      this.drawTransportSprite(cx, cy, w, h, era);
+    } else if (battleship) {
+      this.drawBattleshipSprite(cx, cy, w, h, era);
+    } else if (cruiser) {
+      this.drawCruiserSprite(cx, cy, w, h, era);
+    } else if (destroyer) {
+      this.drawDestroyerSprite(cx, cy, w, h, era);
+    } else {
+      this.drawDestroyerSprite(cx, cy, w, h, era);
+    }
+    ctx.restore();
+  }
+
+  private drawBattleshipSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const long = era === 'wwi' || era === 'wwii';
+    const bow = long ? w * 0.48 : w * 0.40;
+    const stern = long ? w * 0.46 : w * 0.36;
+    ctx.beginPath();
+    ctx.moveTo(cx - stern, cy - h * 0.02);
+    ctx.lineTo(cx + bow * 0.72, cy - h * 0.06);
+    ctx.lineTo(cx + bow, cy + h * 0.02);
+    ctx.lineTo(cx + bow * 0.55, cy + h * 0.28);
+    ctx.lineTo(cx - stern * 0.82, cy + h * 0.26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const turretCount = era === 'wwi' ? 2 : era === 'modern' ? 1 : 3;
+    for (let i = 0; i < turretCount; i++) {
+      const tx = cx - stern * 0.35 + i * (stern + bow) * 0.22;
+      ctx.fillRect(tx - w * 0.05, cy - h * 0.24, w * 0.10, h * 0.10);
+      ctx.strokeRect(tx - w * 0.05, cy - h * 0.24, w * 0.10, h * 0.10);
+    }
+    if (era === 'wwi') {
+      ctx.fillRect(cx - w * 0.06, cy - h * 0.34, w * 0.05, h * 0.12);
+      ctx.fillRect(cx + w * 0.02, cy - h * 0.36, w * 0.05, h * 0.14);
+    }
+  }
+
+  private drawDestroyerSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const slim = era === 'modern' || era === 'coldwar';
+    const bow = slim ? w * 0.34 : w * 0.40;
+    const stern = slim ? w * 0.30 : w * 0.36;
+    ctx.beginPath();
+    if (era === 'modern') {
+      ctx.moveTo(cx - stern, cy + h * 0.08);
+      ctx.lineTo(cx + bow * 0.55, cy - h * 0.10);
+      ctx.lineTo(cx + bow, cy + h * 0.04);
+      ctx.lineTo(cx - stern * 0.7, cy + h * 0.22);
+    } else {
+      ctx.moveTo(cx - stern, cy - h * 0.04);
+      ctx.lineTo(cx + bow * 0.72, cy - h * 0.06);
+      ctx.lineTo(cx + bow, cy + h * 0.04);
+      ctx.lineTo(cx - stern * 0.75, cy + h * 0.24);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (era === 'wwi') {
+      ctx.beginPath();
+      ctx.moveTo(cx + bow * 0.35, cy - h * 0.12);
+      ctx.lineTo(cx + bow * 0.55, cy - h * 0.28);
+      ctx.stroke();
+    } else if (era === 'coldwar' || era === 'modern') {
+      ctx.strokeRect(cx - w * 0.04, cy - h * 0.22, w * 0.14, h * 0.08);
+    }
+  }
+
+  private drawCruiserSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.38, cy - h * 0.03);
+    ctx.lineTo(cx + w * 0.30, cy - h * 0.05);
+    ctx.lineTo(cx + w * 0.36, cy + h * 0.05);
+    ctx.lineTo(cx - w * 0.30, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillRect(cx - w * 0.08, cy - h * 0.22, w * 0.08, h * 0.08);
+    if (era === 'coldwar' || era === 'modern') {
+      ctx.beginPath();
+      ctx.moveTo(cx + w * 0.08, cy - h * 0.10);
+      ctx.lineTo(cx + w * 0.24, cy - h * 0.24);
+      ctx.stroke();
+    }
+  }
+
+  private drawCarrierSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const deckW = era === 'modern' ? w * 0.50 : era === 'coldwar' ? w * 0.46 : w * 0.38;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.40, cy + h * 0.04);
+    ctx.lineTo(cx + w * 0.28, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.34, cy + h * 0.22);
+    ctx.lineTo(cx - w * 0.34, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.28, deckW, h * 0.16);
+    if (era === 'modern') {
+      ctx.beginPath();
+      ctx.moveTo(cx + deckW * 0.15, cy - h * 0.28);
+      ctx.lineTo(cx + deckW * 0.28, cy - h * 0.42);
+      ctx.stroke();
+    }
+  }
+
+  private drawTransportSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.34, cy - h * 0.02);
+    ctx.lineTo(cx + w * 0.26, cy - h * 0.04);
+    ctx.lineTo(cx + w * 0.20, cy + h * 0.24);
+    ctx.lineTo(cx - w * 0.30, cy + h * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const deckW = era === 'modern' ? w * 0.30 : w * 0.24;
+    ctx.strokeRect(cx - deckW * 0.5, cy - h * 0.20, deckW, h * 0.10);
+  }
+
+  private drawSubmarineSprite(cx: number, cy: number, w: number, h: number, era: UnitEra): void {
+    const ctx = this.ctx;
+    const elongated = era === 'coldwar' || era === 'modern';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + h * 0.04, w * (elongated ? 0.46 : 0.40), h * (elongated ? 0.22 : 0.24), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (era === 'wwi' || era === 'wwii') {
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.04, cy - h * 0.18);
+      ctx.lineTo(cx - w * 0.04, cy - h * 0.36);
+      ctx.lineTo(cx + w * 0.08, cy - h * 0.36);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(cx + w * 0.06, cy - h * 0.10);
+      ctx.lineTo(cx + w * 0.10, cy - h * 0.18);
+      ctx.stroke();
+    }
   }
 
   /** Draw subtle terrain texture clipped to polygon. */
@@ -1018,30 +1400,112 @@ export class MapRenderer {
     this.ctx.restore();
   }
 
-  /** Draw a small factory/industry symbol at (cx, cy). */
-  private drawFactorySymbol(cx: number, cy: number, fill: string, stroke: string): void {
-    this.ctx.save();
-    this.ctx.fillStyle = fill;
-    this.ctx.strokeStyle = stroke;
-    this.ctx.lineWidth = 0.8;
-    // Main building body
-    this.ctx.fillRect(cx - 5, cy - 3, 10, 7);
-    this.ctx.strokeRect(cx - 5, cy - 3, 10, 7);
-    // Chimney
-    this.ctx.fillRect(cx - 2, cy - 7, 3, 5);
-    this.ctx.strokeRect(cx - 2, cy - 7, 3, 5);
-    this.ctx.restore();
+  private drawCapitalSprite(cx: number, cy: number, factionColor: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#1f2937';
+    ctx.strokeStyle = '#f5c842';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5, cy + 5);
+    ctx.lineTo(cx - 3.5, cy - 6);
+    ctx.stroke();
+
+    ctx.fillStyle = this.lightenColor(factionColor, 28);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx - 2.5, cy - 6);
+    ctx.lineTo(cx + 6, cy - 4);
+    ctx.lineTo(cx + 4, cy + 1);
+    ctx.lineTo(cx - 2.5, cy - 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    this.drawStar(cx - 4.8, cy + 3.2, 3.5, '#f5c842', '#2a1808');
+    ctx.restore();
+  }
+
+  private drawFactorySprite(cx: number, cy: number, fill: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#111827';
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1;
+    this.roundRect(cx - 10, cy - 8, 20, 16, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = '#273142';
+    ctx.lineWidth = 0.8;
+    ctx.fillRect(cx - 7, cy - 1, 14, 7);
+    ctx.strokeRect(cx - 7, cy - 1, 14, 7);
+    ctx.fillRect(cx - 5, cy - 6, 3, 6);
+    ctx.strokeRect(cx - 5, cy - 6, 3, 6);
+    ctx.fillRect(cx + 1, cy - 8, 3, 8);
+    ctx.strokeRect(cx + 1, cy - 8, 3, 8);
+
+    ctx.fillStyle = 'rgba(229,231,235,0.85)';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(cx - 5 + i * 4, cy + 1.5, 2, 2);
+    }
+    ctx.restore();
   }
 
   /**
    * Draw per-interaction and per-animation overlays on top of the static layer.
    * Called every frame during the animation loop — must be cheap.
    */
+  /** Territories that need per-frame overlay work (avoids O(n) scan on mega maps). */
+  private getOverlayTerritoryIds(): Set<string> | null {
+    if (!this.isLargeMap()) return null;
+
+    const ids = new Set<string>();
+    if (this.state.selectedTerritoryId) ids.add(this.state.selectedTerritoryId);
+    if (this.hoveredTerritoryId) ids.add(this.hoveredTerritoryId);
+    for (const id of this.validMoveTargets) ids.add(id);
+    for (const id of this.attackTargets) ids.add(id);
+    for (const id of this.coastalStrikeTargets) ids.add(id);
+    for (const id of this.mobilizableTargets) ids.add(id);
+    for (const id of this.mobilizedTargets) ids.add(id);
+    for (const id of this.captureAnimations.keys()) ids.add(id);
+    for (const id of this.aiPulseTerritories.keys()) ids.add(id);
+
+    if (this.options.highlightValidMoves && this.validMoveTargets.size > 0) {
+      for (const id of this.validMoveTargets) {
+        this.state.territories.get(id)?.adjacentTo.forEach(adj => ids.add(adj));
+      }
+      if (this.state.selectedTerritoryId) {
+        this.state.territories.get(this.state.selectedTerritoryId)?.adjacentTo.forEach(adj => ids.add(adj));
+      }
+    }
+    return ids;
+  }
+
   private drawDynamicTerritoryOverlays(): void {
     const selectedId = this.state.selectedTerritoryId;
     const currentFaction = this.state.getCurrentFaction();
+    const overlayIds = this.getOverlayTerritoryIds();
+    const territories = overlayIds
+      ? [...overlayIds].map(id => this.state.territories.get(id)).filter((t): t is Territory => !!t)
+      : [...this.state.territories.values()];
 
-    for (const territory of this.state.territories.values()) {
+    for (const territory of territories) {
       const polygon = territory.polygon;
       if (polygon.length < 3) continue;
       const isSea = territory.isSea();
@@ -1051,18 +1515,35 @@ export class MapRenderer {
 
       const isSelected = territory.id === selectedId;
       const isHovered = territory.id === this.hoveredTerritoryId;
+      const isDragHover = territory.id === this.dragHoverTerritoryId;
 
       if (this.options.highlightSelected && isSelected) {
         overlayColor = 'rgba(255,255,255,0.18)';
+      } else if (isDragHover) {
+        overlayColor = this.dragHoverKind === 'attack'
+          ? 'rgba(255,68,68,0.62)'
+          : this.dragHoverKind === 'move'
+            ? 'rgba(68,255,68,0.55)'
+            : 'rgba(255,255,255,0.12)';
       } else if (isHovered) {
         overlayColor = 'rgba(255,255,255,0.10)';
       }
 
       if (!isSea && this.options.highlightValidMoves) {
-        if (this.attackTargets.has(territory.id)) {
+        if (this.coastalStrikeTargets.has(territory.id)) {
+          overlayColor = 'rgba(251, 146, 60, 0.52)';
+        } else if (this.attackTargets.has(territory.id)) {
           overlayColor = 'rgba(255,68,68,0.50)';
         } else if (this.validMoveTargets.has(territory.id)) {
-          overlayColor = 'rgba(68,255,68,0.40)';
+          overlayColor = this.getDomainMoveOverlayColor(this.activeCommandDomain, false);
+        }
+      } else if (isSea && this.options.highlightValidMoves) {
+        if (this.coastalStrikeTargets.has(territory.id)) {
+          overlayColor = 'rgba(251, 146, 60, 0.62)';
+        } else if (this.attackTargets.has(territory.id)) {
+          overlayColor = 'rgba(255,96,96,0.58)';
+        } else if (this.validMoveTargets.has(territory.id)) {
+          overlayColor = this.getDomainMoveOverlayColor(this.activeCommandDomain, true);
         }
       }
 
@@ -1079,6 +1560,7 @@ export class MapRenderer {
       // ZOC tint for non-move, non-attack land territories when move-highlights active
       if (!isSea && this.options.highlightValidMoves && currentFaction
           && !this.attackTargets.has(territory.id)
+          && !this.coastalStrikeTargets.has(territory.id)
           && !this.validMoveTargets.has(territory.id)) {
         const inZOC = territory.adjacentTo.some(adjId => {
           const adj = this.state.territories.get(adjId);
@@ -1243,21 +1725,58 @@ export class MapRenderer {
     return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
   }
 
+  setUnitDragController(controller: UnitDragController | null): void {
+    this.unitDragController = controller;
+  }
+
+  clearUnitDrag(): void {
+    this.unitDrag = null;
+    this.dragHoverTerritoryId = null;
+    this.dragHoverKind = 'invalid';
+    this.render();
+  }
+
   /**
    * Set valid move targets for highlighting
    */
-  setValidMoveTargets(moves: string[], attacks: string[]): void {
+  setValidMoveTargets(moves: string[], attacks: string[], coastalStrikes: string[] = []): void {
     this.validMoveTargets = new Set(moves);
     this.attackTargets = new Set(attacks);
+    this.coastalStrikeTargets = new Set(coastalStrikes);
+    this.render();
+  }
+
+  /** Sync naval/land unit art to the selected game era. */
+  setUnitEra(era: UnitEra): void {
+    this.unitEra = era;
+    this.markStaticDirty();
     this.render();
   }
 
   /**
    * Clear valid move highlights
    */
+  setActiveCommandStack(
+    unitTypeId: string | null,
+    icon = '',
+    domain: 'land' | 'sea' | 'air' | null = null,
+  ): void {
+    this.activeCommandUnitTypeId = unitTypeId;
+    this.activeCommandUnitIcon = icon;
+    this.activeCommandDomain = domain;
+    this.render();
+  }
+
+  private getDomainMoveOverlayColor(domain: 'land' | 'sea' | 'air' | null, onSea: boolean): string {
+    if (domain === 'air') return onSea ? 'rgba(167,139,250,0.58)' : 'rgba(167,139,250,0.46)';
+    if (domain === 'sea') return onSea ? 'rgba(56,189,248,0.58)' : 'rgba(34,211,238,0.42)';
+    return onSea ? 'rgba(56,189,248,0.52)' : 'rgba(68,255,68,0.40)';
+  }
+
   clearValidMoveTargets(): void {
     this.validMoveTargets.clear();
     this.attackTargets.clear();
+    this.coastalStrikeTargets.clear();
     this.render();
   }
 
@@ -1378,19 +1897,47 @@ export class MapRenderer {
 
   // Event handlers
   private onMouseDown(e: MouseEvent): void {
-    if (e.button === 0) {
-      this.isDragging = true;
-      this.didDrag = false;
+    if (e.button !== 0) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    const territory = this.getTerritoryAtPoint(world.x, world.y);
+
+    if (territory && this.unitDragController?.canDragFrom(territory.id)) {
+      this.unitDrag = {
+        fromId: territory.id,
+        startScreenX: e.clientX,
+        startScreenY: e.clientY,
+        currentScreenX: e.clientX,
+        currentScreenY: e.clientY,
+        committed: false,
+      };
       this.lastMouseX = e.clientX;
       this.lastMouseY = e.clientY;
+      this.didDrag = false;
       this.canvas.style.cursor = 'grabbing';
+      return;
     }
+
+    if (territory) {
+      // Territory clicks are handled by onClick (select / attack) — don't pan the map.
+      this.didDrag = false;
+      return;
+    }
+
+    this.isDragging = true;
+    this.didDrag = false;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
+    this.canvas.style.cursor = 'grabbing';
   }
 
   private onMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    if (this.unitDrag) return;
 
     if (this.isDragging) return;
 
@@ -1400,13 +1947,59 @@ export class MapRenderer {
 
     if (newHoveredId !== this.hoveredTerritoryId) {
       this.hoveredTerritoryId = newHoveredId;
-      this.canvas.style.cursor = newHoveredId ? 'pointer' : 'grab';
+      const canDrag = newHoveredId && this.unitDragController?.canDragFrom(newHoveredId);
+      this.canvas.style.cursor = canDrag ? 'grab' : newHoveredId ? 'pointer' : 'grab';
       this.territoryHoverCallback?.(newHoveredId, e.clientX, e.clientY);
       this.render();
     }
   }
 
   private onWindowMouseMove(e: MouseEvent): void {
+    if (this.unitDrag) {
+      this.unitDrag.currentScreenX = e.clientX;
+      this.unitDrag.currentScreenY = e.clientY;
+
+      const dx = e.clientX - this.unitDrag.startScreenX;
+      const dy = e.clientY - this.unitDrag.startScreenY;
+      if (!this.unitDrag.committed) {
+        const panDx = e.clientX - this.lastMouseX;
+        const panDy = e.clientY - this.lastMouseY;
+        if (panDx !== 0 || panDy !== 0) {
+          this.didDrag = true;
+          this.offsetX += panDx;
+          this.offsetY += panDy;
+          this.lastMouseX = e.clientX;
+          this.lastMouseY = e.clientY;
+          this.render();
+        }
+        if (Math.hypot(dx, dy) >= MapRenderer.UNIT_DRAG_THRESHOLD) {
+          this.unitDrag.committed = true;
+          this.unitDragController?.onDragStart(this.unitDrag.fromId);
+          this.startContinuousRender();
+        } else {
+          return;
+        }
+      }
+
+      if (this.unitDrag.committed) {
+        this.didDrag = true;
+        const rect = this.canvas.getBoundingClientRect();
+        const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+        const hoverTerritory = this.getTerritoryAtPoint(world.x, world.y);
+        const hoverId = hoverTerritory?.id ?? null;
+        const kind = hoverId && hoverId !== this.unitDrag.fromId
+          ? this.unitDragController?.getDropKind(this.unitDrag.fromId, hoverId) ?? 'invalid'
+          : 'invalid';
+        if (hoverId !== this.dragHoverTerritoryId || kind !== this.dragHoverKind) {
+          this.dragHoverTerritoryId = hoverId;
+          this.dragHoverKind = kind;
+          this.unitDragController?.onDragHover(hoverId);
+        }
+        this.render();
+      }
+      return;
+    }
+
     if (!this.isDragging) return;
 
     const dx = e.clientX - this.lastMouseX;
@@ -1421,9 +2014,86 @@ export class MapRenderer {
     this.render();
   }
 
-  private onMouseUp(_e: MouseEvent): void {
+  private onMouseUp(e: MouseEvent): void {
+    if (this.unitDrag) {
+      const drag = this.unitDrag;
+      const rect = this.canvas.getBoundingClientRect();
+      const world = this.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      const target = this.getTerritoryAtPoint(world.x, world.y);
+
+      if (drag.committed && target && target.id !== drag.fromId) {
+        const kind = this.unitDragController?.getDropKind(drag.fromId, target.id) ?? 'invalid';
+        if (kind !== 'invalid') {
+          this.unitDragController?.onDragDrop(drag.fromId, target.id);
+        } else {
+          this.unitDragController?.onDragCancel();
+        }
+      } else if (!drag.committed && target) {
+        this.state.selectTerritory(target.id);
+        this.render();
+      } else if (drag.committed) {
+        this.unitDragController?.onDragCancel();
+      }
+
+      this.unitDrag = null;
+      this.dragHoverTerritoryId = null;
+      this.dragHoverKind = 'invalid';
+      this.isDragging = false;
+      this.canvas.style.cursor = this.hoveredTerritoryId ? 'grab' : 'grab';
+      this.render();
+      return;
+    }
+
     this.isDragging = false;
-    this.canvas.style.cursor = this.hoveredTerritoryId ? 'pointer' : 'grab';
+    this.canvas.style.cursor = this.hoveredTerritoryId ? 'grab' : 'grab';
+  }
+
+  private drawUnitDragOverlay(): void {
+    if (!this.unitDrag?.committed) return;
+
+    const from = this.state.territories.get(this.unitDrag.fromId);
+    if (!from) return;
+
+    const fromScreen = this.worldToScreen(from.center[0], from.center[1]);
+    const rect = this.canvas.getBoundingClientRect();
+    const startX = fromScreen.x;
+    const startY = fromScreen.y;
+
+    let endX = this.unitDrag.currentScreenX - rect.left;
+    let endY = this.unitDrag.currentScreenY - rect.top;
+    if (this.dragHoverTerritoryId && this.dragHoverKind !== 'invalid') {
+      const hover = this.state.territories.get(this.dragHoverTerritoryId);
+      if (hover) {
+        const hoverScreen = this.worldToScreen(hover.center[0], hover.center[1]);
+        const dist = Math.hypot(hoverScreen.x - startX, hoverScreen.y - startY);
+        if (dist < rect.width * 0.55) {
+          endX = hoverScreen.x;
+          endY = hoverScreen.y;
+        }
+      }
+    }
+
+    const stroke = this.dragHoverKind === 'attack'
+      ? 'rgba(255, 80, 80, 0.9)'
+      : this.dragHoverKind === 'move'
+        ? 'rgba(72, 220, 120, 0.9)'
+        : 'rgba(240, 224, 168, 0.75)';
+
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.strokeStyle = stroke;
+    this.ctx.lineWidth = 3;
+    this.ctx.setLineDash([8, 6]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(startX, startY);
+    this.ctx.lineTo(endX, endY);
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = stroke;
+    this.ctx.beginPath();
+    this.ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
   }
 
   private onWheel(e: WheelEvent): void {

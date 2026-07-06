@@ -9,6 +9,7 @@ import {
   shouldPauseAfterAction,
   isOneActionPerTurn,
   isMoveOrAttackOnly,
+  isMoveForMoveStyle,
   getPhaseTip,
 } from '../TurnStyleManager';
 
@@ -20,9 +21,9 @@ describe('getPhasesForStyle', () => {
     ]);
   });
 
-  it('quick returns 3-phase array', () => {
+  it('quick returns 2-phase array', () => {
     const phases = getPhasesForStyle('quick');
-    expect(phases).toEqual(['build', 'move', 'end']);
+    expect(phases).toEqual(['play', 'end']);
   });
 
   it('civilization returns 4-phase array with orders/resolve', () => {
@@ -34,6 +35,11 @@ describe('getPhasesForStyle', () => {
   it('chess returns single "action" phase', () => {
     const phases = getPhasesForStyle('chess');
     expect(phases).toEqual(['action']);
+  });
+
+  it('move_for_move returns single freeform play phase', () => {
+    const phases = getPhasesForStyle('move_for_move');
+    expect(phases).toEqual(['play']);
   });
 
   it('spectator uses classic phases', () => {
@@ -131,9 +137,16 @@ describe('isMoveOrAttackOnly', () => {
   });
 });
 
+describe('isMoveForMoveStyle', () => {
+  it('returns true only for move_for_move', () => {
+    expect(isMoveForMoveStyle('move_for_move')).toBe(true);
+    expect(isMoveForMoveStyle('quick')).toBe(false);
+  });
+});
+
 describe('getPhaseTip', () => {
-  it('returns a non-empty string for quick/build', () => {
-    const tip = getPhaseTip('build', 'quick');
+  it('returns a non-empty string for quick/play', () => {
+    const tip = getPhaseTip('play', 'quick');
     expect(tip).toBeTruthy();
   });
 

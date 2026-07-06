@@ -168,6 +168,18 @@ describe('CampaignManager — checkObjectives', () => {
     expect(destroyResult!.met).toBe(true);
   });
 
+  it('defend objective: met when target territory is held', () => {
+    const cm = makeManager();
+    const mission = CAMPAIGNS[0].missions[0];
+    const state = makeGameState({
+      territoriesOwnedBy: () => [{ id: 'contested_territory', name: 'Contested' }],
+    });
+    const results = cm.checkObjectives(mission, state, 'player');
+    const defendResult = results.find(r => r.objective.id === 'obj3');
+    expect(defendResult!.met).toBe(true);
+    expect(defendResult!.progress).toBe('✓ Held');
+  });
+
   it('produce objective: met when produced count >= target', () => {
     const cm = makeManager();
     cm.trackUnitsProduced(3);
@@ -290,5 +302,37 @@ describe('CampaignManager — resetCampaign / resetAll', () => {
     cm.resetAll();
     expect(cm.getProgress('tutorial_campaign')).toBeUndefined();
     expect(cm.getProgress('europe_campaign')).toBeUndefined();
+  });
+});
+
+describe('CampaignManager — theater campaign', () => {
+  it('includes the Theater Operations campaign with three linked missions', () => {
+    const theater = CAMPAIGNS.find(c => c.id === 'theater_campaign');
+    expect(theater).toBeDefined();
+    expect(theater!.missions).toHaveLength(3);
+    expect(theater!.missions[0]!.mapId).toBe('grid-mediterranean');
+    expect(theater!.missions[1]!.unlockCondition).toBe('theater_1');
+    expect(theater!.missions[2]!.unlockCondition).toBe('theater_2');
+  });
+
+  it('starts at Control the Narrows', () => {
+    const cm = makeManager();
+    const mission = cm.startCampaign('theater_campaign');
+    expect(mission?.id).toBe('theater_1');
+  });
+});
+
+describe('CampaignManager — areMissionObjectivesMet', () => {
+  it('returns true only when every primary objective is met', () => {
+    const cm = makeManager();
+    const mission = CAMPAIGNS.find(c => c.id === 'tutorial_campaign')!.missions[0]!;
+    const state = makeGameState({
+      territoriesOwnedBy: () => [{ id: 'contested_territory', name: 'Contested' }],
+    });
+
+    cm.trackUnitsDestroyed(1);
+
+    expect(cm.areMissionObjectivesMet(mission, state, 'atlantic_alliance')).toBe(true);
+    expect(cm.areMissionObjectivesMet(mission, makeGameState(), 'atlantic_alliance')).toBe(false);
   });
 });
