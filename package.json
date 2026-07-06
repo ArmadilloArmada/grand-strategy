@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "A turn-based grand strategy wargame of global conquest",
   "author": "ArmadilloArmada",
+  "homepage": "https://github.com/ArmadilloArmada/grand-strategy#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArmadilloArmada/grand-strategy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ArmadilloArmada/grand-strategy/issues"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
@@ -14,12 +22,16 @@
     "test": "vitest",
     "electron": "node electron/launch.cjs",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --win nsis zip && node scripts/generate-release-checksums.cjs",
+    "dist:zip": "npm run build && electron-builder --win zip && node scripts/generate-release-checksums.cjs",
+    "dist:portable": "npm run build && electron-builder --win portable && node scripts/generate-release-checksums.cjs",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder -mwl",
     "dist:steam": "npm run build && electron-builder --win --config electron-builder-steam.json",
     "pack:steam": "npm run build && electron-builder --win --dir --config electron-builder-steam.json",
+    "release:preflight": "node scripts/release-preflight.cjs",
+    "release:checksums": "node scripts/generate-release-checksums.cjs",
     "steam:preflight": "node scripts/steam-preflight.cjs",
     "steam:sync-appid": "node scripts/steam-sync-appid.cjs"
   },
@@ -44,63 +56,5 @@
   "dependencies": {
     "steamworks.js": "^0.4.0",
     "ws": "^8.16.0"
-  },
-  "build": {
-    "appId": "com.grandstrategy.game",
-    "productName": "Grand Strategy",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "assets/**/*"
-    ],
-    "asar": true,
-    "asarUnpack": [
-      "**/*.node"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.ico",
-      "signAndEditExecutable": false
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "assets/icon.icns",
-      "category": "public.app-category.strategy-games"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "icon": "assets/icon.png",
-      "category": "Game"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "license": "LICENSE"
-    },
-    "forceCodeSigning": false
   }
 }

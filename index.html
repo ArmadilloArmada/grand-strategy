@@ -9,6 +9,10 @@
   <script>
     if (window.location.protocol === 'file:') {
       window.addEventListener('DOMContentLoaded', function () {
+        // Packaged Electron builds also use file:// but load bundled dist assets.
+        if (window.electronAPI) return;
+        if (!document.querySelector('script[type="module"][src="/src/main.ts"]')) return;
+
         var warning = document.createElement('div');
         warning.className = 'direct-open-warning';
         warning.style.cssText = 'position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:100000;width:min(680px,calc(100vw - 2rem));padding:0.85rem 1rem;border:2px solid #fbbf24;border-radius:8px;background:#111827;color:#f8fafc;box-shadow:0 12px 32px rgba(0,0,0,0.45);font-family:system-ui,sans-serif;';

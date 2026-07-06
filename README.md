@@ -69,8 +69,12 @@ npm run dev:electron
 # Web build
 npm run build
 
-# Desktop, Windows installer and portable app
+# Desktop, Windows installer + ZIP (recommended for distribution)
 npm run dist
+
+# Optional: ZIP-only or legacy portable (more likely to trigger browser warnings)
+npm run dist:zip
+npm run dist:portable
 
 # macOS
 npm run dist:mac
@@ -82,7 +86,18 @@ npm run dist:linux
 npm run dist:all
 ```
 
-Built files go to the `release/` directory.
+Built files go to the `release/` directory (`SHA256SUMS.txt` and `VERIFY_DOWNLOAD.md` included).
+
+### Trusted Windows downloads
+
+1. Prefer **GitHub Releases** on this repo over emailing `.exe` files directly.
+2. Use **`Grand Strategy Setup <version>.exe`** (installer) or the **win-x64 ZIP** from GitHub Releases.
+3. Verify downloads with `SHA256SUMS.txt` / `VERIFY_DOWNLOAD.md`.
+4. Add `CSC_LINK` + `CSC_KEY_PASSWORD` secrets and run the **Release** workflow for signed builds (removes most SmartScreen/Chrome warnings).
+
+```bash
+npm run release:preflight
+```
 
 ### Optional Strict Map Topology Mode
 
