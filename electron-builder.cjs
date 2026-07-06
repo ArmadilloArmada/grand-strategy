@@ -26,11 +26,6 @@ module.exports = {
   electronLanguages: ['en-US'],
   compression: 'maximum',
   forceCodeSigning: hasSigningCert,
-  publish: {
-    provider: 'github',
-    owner: 'ArmadilloArmada',
-    repo: 'grand-strategy',
-  },
   win: {
     target: [
       { target: 'nsis', arch: ['x64'] },
