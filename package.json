@@ -27,7 +27,7 @@
     "test:e2e:install": "playwright install chromium",
     "electron": "node electron/launch.cjs",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win nsis zip && node scripts/generate-release-checksums.cjs",
+    "dist": "npm run build && electron-builder --win nsis zip -p never && node scripts/generate-release-checksums.cjs",
     "dist:zip": "npm run build && electron-builder --win zip && node scripts/generate-release-checksums.cjs",
     "dist:portable": "npm run build && electron-builder --win portable && node scripts/generate-release-checksums.cjs",
     "dist:mac": "npm run build && electron-builder --mac",
