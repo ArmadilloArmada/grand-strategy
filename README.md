@@ -5,9 +5,12 @@ A modern turn-based grand strategy wargame inspired by TripleA, built with TypeS
 ## Features
 
 - **Turn-based combat** with dice mechanics, critical hits, veteran bonuses, and combined arms
+- **Tactical battles** — optional grid-based command mode for contested fights (fewer losses, morale bonuses)
+- **Simple Command phase** — mobilize, move, and attack in one turn (Quick/Simple mode)
 - **4 playable factions**: Atlantic Alliance, Pacific Union, Middle Eastern Coalition, Eurasian Dominion, each with unique abilities
 - **5 unit eras**: WWI, WWII, Cold War, Modern, and Full, with 9+ unit types per era
-- **6 turn styles**: Classic, Quick, Spectator, Action-by-Action, Civilization, and Chess modes
+- **Naval combat** with coastal strikes, amphibious fire, and cross-domain rules
+- **Turn styles**: Classic, Quick/Simple Command, Move-for-Move, and more
 - **Technology tree** with 20+ researchable technologies
 - **Diplomacy system**: war declarations, non-aggression pacts, alliances, and trade deals
 - **Espionage**: intel gathering, factory sabotage, and tech theft
@@ -17,6 +20,7 @@ A modern turn-based grand strategy wargame inspired by TripleA, built with TypeS
 - **AI opponents** with 5 personality types and multiple difficulty levels
 - **Hot Seat mode** for local turn-based play on one machine
 - **Campaign mode** with Tutorial, European Liberation, Pacific Storm, and World at War campaigns
+- **Mega world map** (768 territories) plus regional skirmish maps
 - **Achievements** system with unlock conditions
 - **Replay system** to record and replay games
 - **Map editor** for creating custom scenarios
@@ -87,6 +91,23 @@ npm run dist:all
 ```
 
 Built files go to the `release/` directory (`SHA256SUMS.txt` and `VERIFY_DOWNLOAD.md` included).
+
+### Download (latest release)
+
+**Windows installer:** [Grand Strategy v0.1.1 Setup](https://github.com/ArmadilloArmada/grand-strategy/releases/latest)
+
+**All assets:** [GitHub Releases](https://github.com/ArmadilloArmada/grand-strategy/releases/latest)
+
+### Publish a new release (CI)
+
+```bash
+npm run release:preflight   # local gate: tests, maps, dist, checksums
+git tag v0.1.2
+git push origin main
+git push origin v0.1.2      # triggers Release workflow → GitHub Releases
+```
+
+Or run **Actions → Release** manually with a tag name. Enable **signed build** if `CSC_LINK` secrets are configured.
 
 ### Trusted Windows downloads
 

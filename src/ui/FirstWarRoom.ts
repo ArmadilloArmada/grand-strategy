@@ -32,7 +32,7 @@ export class FirstWarRoom {
       <div class="first-war-room-card">
         <div class="fwr-kicker">First War Room</div>
         <h2>${this.escape(data.factionName)}</h2>
-        <p>Your opening job is simple: protect your capital, turn IPCs into board presence, and take one profitable fight instead of three messy ones.</p>
+        <p>Your opening job is simple: protect your capital, turn IPCs into board presence, and take one profitable fight instead of three messy ones. Each turn is one <strong>Command phase</strong>: mobilize, move, attack, then End Turn.</p>
         <div class="fwr-grid">
           <div><span>Anchor</span><strong>${this.escape(data.capitalName)}</strong></div>
           <div><span>Watch</span><strong>${this.escape(data.threatName)}</strong></div>
@@ -44,6 +44,7 @@ export class FirstWarRoom {
             <li>${this.escape(data.mobilizationAdvice)}</li>
             <li>Select a border territory with ready units. Mixed stacks? Use <strong>All Unit Types</strong> to see every move and attack target.</li>
             <li>Use the battle preview — check swing factors and favor favorable or overwhelming odds.</li>
+            <li>On contested fights, try <strong>Play Tactical</strong> (or press T) to command units on a grid and reduce losses.</li>
           </ol>
         </div>
         <div class="fwr-next">

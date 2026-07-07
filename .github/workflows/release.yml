@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.1.0)'
+        description: 'Release tag (e.g. v0.1.2)'
         required: true
-        default: 'v0.1.0'
+        default: 'v0.1.2'
       signed_build:
-        description: 'Sign Windows/macOS builds (requires CSC_LINK secrets)'
+        description: 'Sign Windows builds (requires CSC_LINK secrets)'
         required: false
         default: false
         type: boolean
@@ -42,6 +42,9 @@ jobs:
 
       - name: Build Windows release
         run: npm run dist
+        env:
+          CSC_LINK: ${{ github.event_name == 'workflow_dispatch' && inputs.signed_build && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && inputs.signed_build && secrets.CSC_KEY_PASSWORD || '' }}
 
       - name: Upload Windows release assets
         uses: actions/upload-artifact@v4
@@ -83,6 +86,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.value }}
           name: Grand Strategy ${{ steps.tag.outputs.value }}
+          body_path: dist-assets/VERIFY_DOWNLOAD.md
           generate_release_notes: true
           files: |
             dist-assets/*

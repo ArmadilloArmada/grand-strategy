@@ -444,7 +444,7 @@ class Game {
         <p class="scenario-briefing-subtitle">One command phase per turn — mobilize, move, attack, then End Turn. The Co-Pilot will guide each step.</p>
         <div class="scenario-briefing-goals">
           <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
-          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack.</strong></div>
+          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack — use Play Tactical (T) on contested fights.</strong></div>
           <div class="scenario-briefing-goal"><span>3</span><strong>Capture 2 enemy capitals before turn 25 to win.</strong></div>
         </div>
         <div class="scenario-briefing-doctrine">Easy AI · Favorable economy · Co-Pilot coaching enabled</div>

@@ -77,6 +77,33 @@ test.describe('Tutorial smoke', () => {
     expect(snap.isHumanTurn).toBe(true);
   });
 
+  test('opens tactical battle from attack preview', async ({ page }) => {
+    await setupFastE2E(page, { tacticalBattles: true });
+    await page.goto('/?e2e=1');
+    await startTutorialMatch(page);
+
+    await e2eMove(page, 'player_capital', 'contested_territory', true);
+    await e2eEndTurn(page);
+    await waitForHumanTurn(page, 2);
+    await dismissE2EOverlays(page);
+
+    await page.evaluate(() => {
+      (window as unknown as {
+        __gsE2E: { e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void };
+      }).__gsE2E.e2eBoostTerritory('contested_territory', 'tank', 8);
+    });
+
+    const attackKind = await e2eMove(page, 'contested_territory', 'enemy_capital', true);
+    expect(attackKind).toBe('attack');
+
+    const tacticalBtn = page.locator('#btn-play-tactical');
+    await expect(tacticalBtn).toBeVisible({ timeout: 10_000 });
+    await tacticalBtn.click();
+
+    await expect(page.locator('#tactical-battle-modal')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#tactical-battle-canvas')).toBeVisible();
+  });
+
   test('resolves combat on the tutorial map', async ({ page }) => {
     await page.goto('/?e2e=1');
     await startTutorialMatch(page);

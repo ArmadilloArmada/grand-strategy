@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test';
 import type { E2ESnapshot } from '../src/e2e/browserApi';
 
-export async function setupFastE2E(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+export async function setupFastE2E(page: Page, options?: { tacticalBattles?: boolean }): Promise<void> {
+  await page.addInitScript((opts) => {
     const key = 'grand-strategy-settings';
     let settings: Record<string, unknown> = {};
     try {
@@ -13,7 +13,7 @@ export async function setupFastE2E(page: Page): Promise<void> {
     localStorage.setItem(key, JSON.stringify({
       ...settings,
       gameSpeed: 'fast',
-      tacticalBattles: false,
+      tacticalBattles: opts?.tacticalBattles ?? false,
       battleAnimations: false,
       battleNarratives: false,
       confirmEndTurn: false,
@@ -22,7 +22,7 @@ export async function setupFastE2E(page: Page): Promise<void> {
     }));
     // Keep strategic events from interrupting smoke tests.
     Math.random = () => 0.99;
-  });
+  }, { tacticalBattles: options?.tacticalBattles ?? false });
 }
 
 export async function startTutorialMatch(page: Page): Promise<void> {

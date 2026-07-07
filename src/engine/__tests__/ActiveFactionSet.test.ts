@@ -57,6 +57,43 @@ describe('GameState save/load preserves Faction.isActive', () => {
   });
 });
 
+describe('Diplomacy and espionage target lists respect the active set', () => {
+  it('lists only active factions as diplomacy targets', () => {
+    const state = buildState();
+    state.factionRegistry.get('pacific_union')!.isActive = false;
+    state.factionRegistry.get('southern_federation')!.isActive = false;
+
+    const currentId = 'atlantic_alliance';
+    const diplomacyTargets = state.factionRegistry
+      .getActive()
+      .filter(f => f.id !== currentId)
+      .map(f => f.id);
+
+    expect(diplomacyTargets).toEqual(['eastern_coalition']);
+  });
+
+  it('lists only active at-war factions as espionage targets', () => {
+    const state = buildState();
+    state.factionRegistry.get('pacific_union')!.isActive = false;
+    state.factionRegistry.get('southern_federation')!.isActive = false;
+    state.diplomacyManager.forceWar('atlantic_alliance', 'eastern_coalition');
+    state.diplomacyManager.forceWar('atlantic_alliance', 'pacific_union');
+
+    const factionId = 'atlantic_alliance';
+    const espionageTargets = state.factionRegistry
+      .getActive()
+      .filter(
+        f =>
+          f.id !== factionId &&
+          state.diplomacyManager.getRelation(factionId, f.id) === 'war',
+      )
+      .map(f => f.id);
+
+    expect(espionageTargets).toEqual(['eastern_coalition']);
+    expect(espionageTargets).not.toContain('pacific_union');
+  });
+});
+
 describe('Turn order rendering uses the active set (HUD parity smoke test)', () => {
   it('only renders dots for active, undefeated factions', () => {
     const state = buildState();

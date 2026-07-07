@@ -31,6 +31,7 @@ module.exports = {
       { target: 'nsis', arch: ['x64'] },
       { target: 'zip', arch: ['x64'] },
     ],
+    artifactName: '${productName}-${version}-win-x64.${ext}',
     icon: 'assets/icon.ico',
     publisherName: 'ArmadilloArmada',
     legalTrademarks: 'Grand Strategy',
