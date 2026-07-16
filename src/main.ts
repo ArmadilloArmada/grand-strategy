@@ -5,7 +5,7 @@
 
 import { GameState } from './engine/GameState';
 import { rng } from './engine/rng';
-import { escapeHtml } from './ui/htmlEscape';
+import { buildSaveSlotsHtml } from './ui/saveSlotsView';
 import {
   summarizeFactionForAI,
   describeAITurnDelta,
@@ -1283,40 +1283,12 @@ class Game {
     if (!container) return;
 
     const slots = this.saveManager.getSlots();
-    let html = '';
-
-    for (const slot of slots) {
-      const isEmpty = slot.isEmpty;
-      const factionName = slot.currentFaction 
-        ? this.state.factionRegistry.get(slot.currentFaction)?.name || slot.currentFaction
-        : '';
-
-      html += `
-        <div class="save-slot ${isEmpty ? 'empty' : ''}" data-slot="${slot.id}">
-          <div class="save-slot-info">
-            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : escapeHtml(slot.name)}</div>
-            <div class="save-slot-details">
-              ${isEmpty 
-                ? 'No save data' 
-                : `Turn ${slot.turnNumber} • ${factionName} • ${this.saveManager.formatTimestamp(slot.timestamp)}`
-              }
-            </div>
-          </div>
-          <div class="save-slot-actions">
-            ${this.saveLoadMode === 'save' 
-              ? `<button class="btn-slot-save primary" data-slot="${slot.id}">Save</button>`
-              : isEmpty 
-                ? '' 
-                : `<button class="btn-slot-load primary" data-slot="${slot.id}">Load</button>`
-            }
-            ${!isEmpty ? `<button class="btn-slot-rename" data-slot="${slot.id}">Rename</button>` : ''}
-            ${!isEmpty ? `<button class="btn-slot-delete danger" data-slot="${slot.id}">🗑️</button>` : ''}
-          </div>
-        </div>
-      `;
-    }
-
-    container.innerHTML = html;
+    container.innerHTML = buildSaveSlotsHtml(
+      slots,
+      this.saveLoadMode,
+      (factionId) => this.state.factionRegistry.get(factionId)?.name || factionId,
+      (timestamp) => this.saveManager.formatTimestamp(timestamp),
+    );
 
     // Add event listeners
     container.querySelectorAll('.btn-slot-save').forEach(btn => {
