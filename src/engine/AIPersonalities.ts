@@ -3,6 +3,8 @@
  * Makes AI opponents more varied and interesting
  */
 
+import { rng } from './rng';
+
 export interface AIPersonality {
   id: string;
   name: string;
@@ -224,7 +226,7 @@ export function getPersonality(id: string): AIPersonality {
  * Get random personality
  */
 export function getRandomPersonality(): AIPersonality {
-  return AI_PERSONALITIES[Math.floor(Math.random() * AI_PERSONALITIES.length)];
+  return AI_PERSONALITIES[Math.floor(rng.next() * AI_PERSONALITIES.length)];
 }
 
 /**

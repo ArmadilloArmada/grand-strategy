@@ -2,6 +2,8 @@
  * Faction - Represents a playable faction/nation
  */
 
+import { colorblindEntryForTurnOrder } from './colorblindPalette';
+
 export interface FactionBonus {
   ipcPerFactory?: number;         // Extra IPCs per factory (e.g. +1)
   infantryDefenseBonus?: number;  // +N to infantry defense rolls
@@ -32,8 +34,12 @@ export interface FactionData {
 export class Faction {
   public readonly id: string;
   public readonly name: string;
-  public readonly color: string;
-  public readonly colorLight: string;
+  /** Current display color (may be overridden by the colorblind palette). */
+  public color: string;
+  public colorLight: string;
+  /** Original colors from faction data, used to restore when colorblind mode is off. */
+  public readonly baseColor: string;
+  public readonly baseColorLight: string;
   public readonly capital: string;
   public readonly startingIPCs: number;
   public readonly turnOrder: number;
@@ -64,6 +70,8 @@ export class Faction {
     this.name = data.name;
     this.color = data.color;
     this.colorLight = data.colorLight;
+    this.baseColor = data.color;
+    this.baseColorLight = data.colorLight;
     this.capital = data.capital;
     this.startingIPCs = data.startingIPCs;
     this.ipcs = data.startingIPCs;
@@ -128,8 +136,9 @@ export class Faction {
     return {
       id: this.id,
       name: this.name,
-      color: this.color,
-      colorLight: this.colorLight,
+      // Persist the original colors so saves are independent of the active palette.
+      color: this.baseColor,
+      colorLight: this.baseColorLight,
       capital: this.capital,
       startingIPCs: this.startingIPCs,
       turnOrder: this.turnOrder,
@@ -153,6 +162,7 @@ export class Faction {
  */
 export class FactionRegistry {
   private factions: Map<string, Faction> = new Map();
+  private colorblind = false;
 
   /**
    * Register a new faction
@@ -160,7 +170,34 @@ export class FactionRegistry {
   register(data: FactionData): Faction {
     const faction = new Faction(data);
     this.factions.set(data.id, faction);
+    this.applyPalette(faction);
     return faction;
+  }
+
+  /**
+   * Enable/disable the colorblind-safe palette. Re-applies colors to every
+   * already-registered faction so the change takes effect immediately.
+   */
+  setColorblindMode(enabled: boolean): void {
+    this.colorblind = enabled;
+    for (const faction of this.factions.values()) {
+      this.applyPalette(faction);
+    }
+  }
+
+  isColorblindMode(): boolean {
+    return this.colorblind;
+  }
+
+  private applyPalette(faction: Faction): void {
+    if (this.colorblind) {
+      const entry = colorblindEntryForTurnOrder(faction.turnOrder);
+      faction.color = entry.color;
+      faction.colorLight = entry.colorLight;
+    } else {
+      faction.color = faction.baseColor;
+      faction.colorLight = faction.baseColorLight;
+    }
   }
 
   /**

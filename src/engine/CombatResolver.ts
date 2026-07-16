@@ -3,6 +3,7 @@
  */
 
 import { GameState } from "./GameState";
+import { rng } from "./rng";
 import { PlacedUnit } from "../data/Territory";
 import { UnitType } from "../data/Unit";
 import { SupplySystem } from "./SupplySystem";
@@ -607,7 +608,7 @@ export class CombatResolver {
 
     for (const cu of subs) {
       const activeCount = cu.count - cu.casualties;
-      let attackValue = cu.unitType.attack + 1; // surprise strike bonus
+      const attackValue = cu.unitType.attack + 1; // surprise strike bonus
       for (let i = 0; i < activeCount; i++) {
         const roll = this.rollDie(diceSides);
         const isHit = roll <= attackValue;
@@ -921,7 +922,7 @@ export class CombatResolver {
    * Roll a single die
    */
   private rollDie(sides: number): number {
-    return Math.floor(Math.random() * sides) + 1;
+    return Math.floor(rng.next() * sides) + 1;
   }
 
   /**

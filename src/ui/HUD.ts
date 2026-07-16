@@ -3661,6 +3661,17 @@ export class HUD {
   }
 
   /**
+   * Repaint the main map and minimap. Used when a display-only change (e.g. the
+   * colorblind palette toggle) needs to be reflected without mutating state.
+   * Invalidates the renderer's static cache so faction color changes show.
+   */
+  repaintMap(): void {
+    this.renderer.markStaticDirty();
+    this.renderer.render();
+    this.renderMinimap();
+  }
+
+  /**
    * Update turn order display
    */
   updateTurnOrder(): void {
@@ -4002,6 +4013,7 @@ export class HUD {
     const simpleMode = (document.getElementById('simple-mode') as HTMLInputElement)?.checked ?? true;
     const aiDifficulty = ((document.getElementById('setup-ai-difficulty') as HTMLSelectElement)?.value || settings.getSetting('aiDifficulty')) as 'easy' | 'medium' | 'hard';
     const aiPersonality = (document.getElementById('setup-ai-personality') as HTMLSelectElement)?.value || settings.getSetting('aiPersonality') || 'default';
+    const seed = (document.getElementById('game-seed') as HTMLInputElement)?.value?.trim() || undefined;
 
     const setupFactions = this.getSetupFactionsForMap(mapId);
     const playableSetupFactions = setupFactions.filter(f => f.isPlayable);
@@ -4062,6 +4074,7 @@ export class HUD {
       aiOpponentCount: matchSetup.aiOpponentCount,
       activeFactionIds: matchSetup.activeFactionIds,
       turnStyle: turnStyle as TurnStyle,
+      seed,
       victoryType: victoryType as VictoryType,
       capitalsToWin: normalizeCapitalsToWinForMatch(
         capitalsToWin,

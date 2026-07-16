@@ -108,7 +108,14 @@ export interface GameConfig {
 
   // Turn style
   turnStyle: TurnStyle;
-  
+
+  /**
+   * Optional RNG seed. When set (non-empty), the game is fully deterministic:
+   * the same seed reproduces identical combat, AI decisions, and events. When
+   * empty/undefined the game uses non-deterministic randomness (Math.random).
+   */
+  seed?: string;
+
   // Victory conditions
   victoryType: VictoryType;
   capitalsToWin: number;      // For capitals victory
@@ -143,6 +150,7 @@ export type PersistedGameConfig = Pick<GameConfig,
   | 'aiPersonality'
   | 'activeFactionIds'
   | 'turnStyle'
+  | 'seed'
   | 'victoryType'
   | 'capitalsToWin'
   | 'territoriesPercent'
@@ -166,6 +174,7 @@ export function serializeGameConfig(config: GameConfig): PersistedGameConfig {
     aiPersonality: config.aiPersonality,
     activeFactionIds: config.activeFactionIds ? [...config.activeFactionIds] : undefined,
     turnStyle: config.turnStyle,
+    seed: config.seed,
     victoryType: config.victoryType,
     capitalsToWin: config.capitalsToWin,
     territoriesPercent: config.territoriesPercent,
