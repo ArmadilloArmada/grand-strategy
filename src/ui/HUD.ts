@@ -4013,6 +4013,7 @@ export class HUD {
     const simpleMode = (document.getElementById('simple-mode') as HTMLInputElement)?.checked ?? true;
     const aiDifficulty = ((document.getElementById('setup-ai-difficulty') as HTMLSelectElement)?.value || settings.getSetting('aiDifficulty')) as 'easy' | 'medium' | 'hard';
     const aiPersonality = (document.getElementById('setup-ai-personality') as HTMLSelectElement)?.value || settings.getSetting('aiPersonality') || 'default';
+    const seed = (document.getElementById('game-seed') as HTMLInputElement)?.value?.trim() || undefined;
 
     const setupFactions = this.getSetupFactionsForMap(mapId);
     const playableSetupFactions = setupFactions.filter(f => f.isPlayable);
@@ -4073,6 +4074,7 @@ export class HUD {
       aiOpponentCount: matchSetup.aiOpponentCount,
       activeFactionIds: matchSetup.activeFactionIds,
       turnStyle: turnStyle as TurnStyle,
+      seed,
       victoryType: victoryType as VictoryType,
       capitalsToWin: normalizeCapitalsToWinForMatch(
         capitalsToWin,

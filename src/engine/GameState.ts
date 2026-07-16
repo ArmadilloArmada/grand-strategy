@@ -9,6 +9,7 @@ import { Faction, FactionRegistry, FactionData } from '../data/Faction';
 import { GameRules, GamePhase } from '../data/GameRules';
 import { DiplomacyManager } from './DiplomacyManager';
 import { SupplySystem } from './SupplySystem';
+import { rng } from './rng';
 
 /**
  * Registry of optional subsystems wired onto GameState after construction.
@@ -169,6 +170,8 @@ export interface GameStateSnapshot {
     islandHoppingTurns: [string, number][];
   };
   weather?: { condition: string; name: string; description: string; duration: number; expiresAtTurn: number };
+  /** Seeded-RNG state so loading a save resumes the exact random sequence (null when unseeded). */
+  rngState?: number | null;
 }
 
 export interface MapLayout {
@@ -428,6 +431,7 @@ export class GameState {
         islandHoppingTurns: [...this.systems.abilityState.islandHoppingTurns.entries()],
       } : undefined,
       weather: this.systems.weatherSystem?.serialize() as any,
+      rngState: rng.getState(),
     };
   }
 
@@ -438,6 +442,12 @@ export class GameState {
     this.turnNumber = snapshot.turnNumber;
     this.currentFactionId = snapshot.currentFactionId;
     this.currentPhase = snapshot.currentPhase;
+
+    // Restore RNG so the loaded game continues the same deterministic sequence.
+    // Older saves omit rngState; leaving it undefined keeps the current RNG mode.
+    if (snapshot.rngState !== undefined) {
+      rng.setState(snapshot.rngState);
+    }
 
     // Restore territories
     this.territories.clear();

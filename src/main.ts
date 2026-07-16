@@ -4,6 +4,7 @@
  */
 
 import { GameState } from './engine/GameState';
+import { rng } from './engine/rng';
 import { mergePersistedGameConfig } from './engine/GameConfig';
 import { TurnManager } from './engine/TurnManager';
 import { AIController } from './engine/AIController';
@@ -556,6 +557,10 @@ class Game {
    */
   startNewGame(): void {
     this.hud.resetVictoryState();
+    // Seed the RNG for reproducible games when a seed is provided; otherwise use
+    // non-deterministic randomness (rng falls back to Math.random when unseeded).
+    const configuredSeed = this.hud.gameConfig.seed?.trim();
+    rng.seed(configuredSeed ? configuredSeed : null);
     const mapId = this.hud.gameConfig.mapId ?? 'grid';
     const mapEntry = getMapEntry(mapId);
     const mapToLoad = mapEntry?.data ?? gridMapData;
