@@ -4,6 +4,7 @@
  */
 
 import { GameState } from "./GameState";
+import { rng } from "./rng";
 import { TurnManager } from "./TurnManager";
 import { MovementValidator } from "./MovementValidator";
 import { resolveMovePhaseContext } from './movePhaseContext';
@@ -382,7 +383,7 @@ export class AIController {
       acceptChance -= Math.min(0.65, grudge / 140);
       acceptChance = Math.max(0.05, Math.min(0.9, acceptChance));
 
-      if (Math.random() < acceptChance) {
+      if (rng.next() < acceptChance) {
         diplo.acceptProposal(proposal.fromId, proposal.toId, proposal.type);
       } else {
         diplo.declineProposal(proposal.fromId, proposal.toId, proposal.type);
@@ -392,7 +393,7 @@ export class AIController {
     const others = this.state.factionRegistry.getActive().filter(f => f.id !== faction.id);
 
     // When losing badly, seek a non-aggression pact with the strongest enemy
-    if ((isLosing || borderThreat > 35) && Math.random() < 0.25 + Math.min(0.25, borderThreat / 200)) {
+    if ((isLosing || borderThreat > 35) && rng.next() < 0.25 + Math.min(0.25, borderThreat / 200)) {
       const strongest = others
         .filter(f => diplo.getRelation(faction.id, f.id) === 'war')
         .filter(f => this.getGrudgeSeverity(faction.id, f.id) < 70)
@@ -403,7 +404,7 @@ export class AIController {
     }
 
     // Economic AI proposes trade deals to pact/alliance partners
-    if (this.personality.economy > 0.6 && Math.random() < this.personality.economy * 0.25) {
+    if (this.personality.economy > 0.6 && rng.next() < this.personality.economy * 0.25) {
       const tradeTarget = others.find(f => {
         const rel = diplo.getRelation(faction.id, f.id);
         return (rel === 'pact' || rel === 'alliance') && !diplo.getTradeDealInfo(faction.id, f.id);
@@ -415,7 +416,7 @@ export class AIController {
     }
 
     // Defensive/patient AI upgrades pacts to alliances
-    if (this.personality.aggression < 0.4 && this.personality.defense > 0.6 && Math.random() < 0.15) {
+    if (this.personality.aggression < 0.4 && this.personality.defense > 0.6 && rng.next() < 0.15) {
       const allyTarget = others.find(f =>
         diplo.getRelation(faction.id, f.id) === 'pact' && !diplo.hasAlliance(faction.id, f.id) &&
         this.getGrudgeSeverity(faction.id, f.id) < 30 && f.betrayalCooldown === 0
@@ -427,14 +428,14 @@ export class AIController {
     for (const proposal of diplo.getPendingProposals(faction.id)) {
       if (proposal.type === 'alliance') {
         const grudge = this.getGrudgeSeverity(faction.id, proposal.fromId);
-        if (grudge > 30 && Math.random() < 0.8) {
+        if (grudge > 30 && rng.next() < 0.8) {
           diplo.declineProposal(proposal.fromId, faction.id, 'alliance');
         }
       }
     }
 
     // Aggressive AI may betray a weak ally when winning decisively
-    if (this.personality.aggression > 0.8 && faction.betrayalCooldown === 0 && Math.random() < 0.08) {
+    if (this.personality.aggression > 0.8 && faction.betrayalCooldown === 0 && rng.next() < 0.08) {
       const myTerritoryCount = this.state.getTerritoriesOwnedBy(faction.id).length;
       const weakestAlly = others
         .filter(f => diplo.hasAlliance(faction.id, f.id))
@@ -466,7 +467,7 @@ export class AIController {
     if (faction.ipcs < 5) return;
 
     const actionChance = 0.20 + this.personality.aggression * 0.35 + this.personality.economy * 0.15;
-    if (Math.random() > actionChance) return;
+    if (rng.next() > actionChance) return;
 
     const enemies = this.state.factionRegistry.getActive().filter(f =>
       f.id !== faction.id && !f.isDefeated && faction.isEnemyOf(f.id)
@@ -510,7 +511,7 @@ export class AIController {
 
     // Weighted random selection
     const totalWeight = candidates.reduce((s, c) => s + c.weight, 0);
-    let roll = Math.random() * totalWeight;
+    let roll = rng.next() * totalWeight;
     const pick = candidates.find(c => { roll -= c.weight; return roll <= 0; }) ?? candidates[0];
 
     espionage.executeOperation(faction.id, target.id, pick.type);
@@ -529,7 +530,7 @@ export class AIController {
       ? 0.70                                        // desperate — almost always fires
       : 0.15 + this.personality.aggression * 0.50; // aggressive AI fires opportunistically
 
-    if (Math.random() > fireChance) return;
+    if (rng.next() > fireChance) return;
 
     // Pick the most valuable enemy target: capital > factory-rich > most units
     const candidates = Array.from(this.state.territories.values()).filter(
@@ -982,7 +983,7 @@ export class AIController {
     }
 
     // Behavior: surprise_attacks — occasionally commit to a non-adjacent target
-    if (this.hasBehavior('surprise_attacks') && Math.random() < 0.35) {
+    if (this.hasBehavior('surprise_attacks') && rng.next() < 0.35) {
       this.addSurpriseAttack(plans, evaluations, faction);
     }
 
@@ -1737,7 +1738,7 @@ export class AIController {
   }
 
   private applyRandomFocusModifiers(): void {
-    const roll = Math.random();
+    const roll = rng.next();
     if (roll < 0.2) {
       this.personality.aggression = 0.9; this.personality.defense = 0.1;
     } else if (roll < 0.4) {
@@ -1798,7 +1799,7 @@ export class AIController {
       t.owner && faction.isEnemyOf(t.owner) && !plans.some(p => p.targetId === t.id)
     );
     if (candidates.length === 0) return;
-    const randomTarget = candidates[Math.floor(Math.random() * candidates.length)];
+    const randomTarget = candidates[Math.floor(rng.next() * candidates.length)];
     const eval_ = evaluations.get(randomTarget.id);
     if (!eval_) return;
 

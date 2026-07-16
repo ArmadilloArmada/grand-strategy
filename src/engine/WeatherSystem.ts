@@ -9,6 +9,7 @@
  */
 
 import { GameState } from './GameState';
+import { rng } from './rng';
 import { TerrainType } from '../data/Territory';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -136,7 +137,7 @@ export class WeatherSystem {
   tick(): void {
     // If current event has expired, or random chance triggers a change, pick new weather
     const expired = this.state.turnNumber > this.currentEvent.expiresAtTurn;
-    const randomChange = Math.random() < WEATHER_CHANGE_CHANCE;
+    const randomChange = rng.next() < WEATHER_CHANGE_CHANCE;
 
     if (expired || randomChange) {
       const previous = this.currentEvent.condition;
@@ -250,11 +251,11 @@ export class WeatherSystem {
     const eligible = WEATHER_TEMPLATES.filter(t => t.seasons.includes(season));
     const totalWeight = eligible.reduce((s, t) => s + t.weight, 0);
 
-    let rng = Math.random() * totalWeight;
+    let roll = rng.next() * totalWeight;
     let chosen = eligible[eligible.length - 1];
     for (const t of eligible) {
-      rng -= t.weight;
-      if (rng <= 0) { chosen = t; break; }
+      roll -= t.weight;
+      if (roll <= 0) { chosen = t; break; }
     }
 
     return this.makeEventFromTemplate(chosen);
@@ -262,7 +263,7 @@ export class WeatherSystem {
 
   private makeEventFromTemplate(template: WeatherTemplate): WeatherEvent {
     const duration = template.minDuration +
-      Math.floor(Math.random() * (template.maxDuration - template.minDuration + 1));
+      Math.floor(rng.next() * (template.maxDuration - template.minDuration + 1));
     return {
       condition: template.condition,
       name: template.name,

@@ -9,6 +9,7 @@
  */
 
 import { Commander, CommanderTrait, CommanderTraitId } from '../data/Territory';
+import { rng } from './rng';
 import { CombatState } from './CombatResolver';
 
 // ── Trait pool ────────────────────────────────────────────────────────────────
@@ -117,7 +118,7 @@ export function awardBattleXP(
 
   // Check for death before leveling
   let commanderDied = false;
-  if (!won && Math.random() < COMMANDER_DEATH_CHANCE_ON_LOSS) {
+  if (!won && rng.next() < COMMANDER_DEATH_CHANCE_ON_LOSS) {
     commanderDied = true;
     return { previousLevel: prev, newLevel: prev, leveledUp: false, traitChoices: [], commanderDied: true };
   }

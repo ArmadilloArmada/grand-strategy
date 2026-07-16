@@ -2,6 +2,8 @@
  * BattleNarrator - Generates flavour text after each battle
  */
 
+import { rng } from './rng';
+
 export interface NarrativeParams {
   territoryName: string;
   attackerFactionName: string;
@@ -68,7 +70,7 @@ const WINTER: string[] = [
 ];
 
 function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(rng.next() * arr.length)];
 }
 
 function fill(template: string, p: NarrativeParams): string {
@@ -86,14 +88,14 @@ export function generateBattleNarrative(p: NarrativeParams): string {
 
   if (p.winner === 'attacker') {
     if (p.isCapital) return fill(pick(CAPITAL_WIN), p);
-    if (p.isWinter && Math.random() < 0.4) return fill(pick(WINTER), p);
+    if (p.isWinter && rng.next() < 0.4) return fill(pick(WINTER), p);
     if (isPyrrhic && totalCasualties > 4) return fill(pick(PYRRHIC), p);
-    if (p.attackerCommander && Math.random() < 0.5) return fill(pick(ATTACKER_WIN_COMMANDER), p);
+    if (p.attackerCommander && rng.next() < 0.5) return fill(pick(ATTACKER_WIN_COMMANDER), p);
     return fill(pick(ATTACKER_WIN), p);
   }
 
   if (p.winner === 'defender') {
-    if (p.defenderCommander && Math.random() < 0.5) return fill(pick(DEFENDER_WIN_COMMANDER), p);
+    if (p.defenderCommander && rng.next() < 0.5) return fill(pick(DEFENDER_WIN_COMMANDER), p);
     return fill(pick(DEFENDER_WIN), p);
   }
 

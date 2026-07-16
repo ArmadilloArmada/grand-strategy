@@ -7,6 +7,7 @@
  */
 
 import { GameState } from './GameState';
+import { rng } from './rng';
 import { spawnUnitsOnTerritory } from './navalPlacement';
 
 export type ObjectiveRewardType = 'ipc' | 'research' | 'units';
@@ -70,7 +71,7 @@ export class ObjectiveSystem {
     this.ensureOpeningObjectives(factionId);
 
     const active = this.objectives.filter(o => o.factionId === factionId && !o.completed && !o.failed);
-    if (active.length < MAX_ACTIVE && Math.random() < CHANCE_PER_TURN) {
+    if (active.length < MAX_ACTIVE && rng.next() < CHANCE_PER_TURN) {
       const obj = this.generateObjective(factionId);
       if (obj) {
         if (active.length >= MAX_ACTIVE) {
@@ -349,7 +350,7 @@ export class ObjectiveSystem {
 
     const turn = this.state.turnNumber;
     const id = `obj_${++this.idCounter}`;
-    const deadline = turn + 4 + Math.floor(Math.random() * 3); // 4–6 turns
+    const deadline = turn + 4 + Math.floor(rng.next() * 3); // 4–6 turns
 
     const templates: Array<() => Objective | null> = [
       // Hold a random friendly territory
@@ -357,8 +358,8 @@ export class ObjectiveSystem {
         const owned = Array.from(this.state.territories.values())
           .filter(t => t.owner === factionId && !t.isCapital && t.isLand());
         if (owned.length === 0) return null;
-        const t = owned[Math.floor(Math.random() * owned.length)];
-        const holdTurns = 2 + Math.floor(Math.random() * 2);
+        const t = owned[Math.floor(rng.next() * owned.length)];
+        const holdTurns = 2 + Math.floor(rng.next() * 2);
         return {
           id, factionId, completed: false, failed: false, progress: 0,
           title: 'Hold the Line',
@@ -376,7 +377,7 @@ export class ObjectiveSystem {
           return f && faction.isEnemyOf(f.id);
         });
         if (adjacent.length === 0) return null;
-        const t = adjacent[Math.floor(Math.random() * adjacent.length)];
+        const t = adjacent[Math.floor(rng.next() * adjacent.length)];
         return {
           id, factionId, completed: false, failed: false, progress: 0,
           title: 'Offensive Push',
@@ -388,7 +389,7 @@ export class ObjectiveSystem {
       },
       // Destroy enemy units
       () => {
-        const count = 5 + Math.floor(Math.random() * 6) * 5; // 5,10,15,20,25,30
+        const count = 5 + Math.floor(rng.next() * 6) * 5; // 5,10,15,20,25,30
         return {
           id, factionId, completed: false, failed: false, progress: 0,
           title: 'Attrit the Enemy',
@@ -400,7 +401,7 @@ export class ObjectiveSystem {
       },
       // Earn income
       () => {
-        const target = 20 + Math.floor(Math.random() * 4) * 10; // 20,30,40,50
+        const target = 20 + Math.floor(rng.next() * 4) * 10; // 20,30,40,50
         return {
           id, factionId, completed: false, failed: false, progress: 0,
           title: 'War Economy',
@@ -412,7 +413,7 @@ export class ObjectiveSystem {
       },
       // Survive turns with capital held
       () => {
-        const turns = 3 + Math.floor(Math.random() * 3); // 3–5 turns
+        const turns = 3 + Math.floor(rng.next() * 3); // 3–5 turns
         return {
           id, factionId, completed: false, failed: false, progress: 0,
           title: 'Hold the Homefront',
@@ -425,7 +426,7 @@ export class ObjectiveSystem {
     ];
 
     // Shuffle and pick first valid
-    const shuffled = templates.sort(() => Math.random() - 0.5);
+    const shuffled = templates.sort(() => rng.next() - 0.5);
     for (const fn of shuffled) {
       const result = fn();
       if (result) return result;

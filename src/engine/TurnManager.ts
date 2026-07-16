@@ -3,6 +3,7 @@
  */
 
 import { GameState } from "./GameState";
+import { rng } from "./rng";
 import { GamePhase } from "../data/GameRules";
 import { Faction } from "../data/Faction";
 import { TurnStyle } from "./GameConfig";
@@ -164,7 +165,7 @@ export class TurnManager {
           territory.originalOwner !== null &&
           territory.owner !== territory.originalOwner &&
           territory.isLand() &&
-          Math.random() < 0.08
+          rng.next() < 0.08
         ) {
           territory.addUnits('partisan', 1);
         }

@@ -2,6 +2,8 @@
  * AITaunts - Faction-specific flavor text for AI actions
  */
 
+import { rng } from './rng';
+
 type TauntContext = 'attack' | 'defend_win' | 'victory' | 'diplomacy_propose' | 'diplomacy_decline' | 'low_on_ipcs' | 'nuclear_threat';
 
 const TAUNTS: Record<string, Record<TauntContext, string[]>> = {
@@ -169,7 +171,7 @@ const GENERIC: Record<TauntContext, string[]> = {
 };
 
 function pick(arr: string[]): string {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(rng.next() * arr.length)];
 }
 
 export function getAITaunt(factionId: string, context: TauntContext): string {
