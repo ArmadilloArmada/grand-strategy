@@ -43,7 +43,7 @@ import { FactionAbilityManager, factionAbilityManager, FACTION_ABILITIES, applyF
 import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
-import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
+import { getTopThreats, getOpportunityTargets } from './advisorTargets';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
 import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
 import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
@@ -1788,7 +1788,7 @@ export class HUD {
     if (!faction) return;
 
     const recap = this.ensureTurnRecap(faction.id);
-    const topThreat = this.getTopThreats(faction.id)[0];
+    const topThreat = getTopThreats(this.state, faction.id)[0];
     const nextObjective = this.objectiveSystem.getActive(faction.id)[0];
 
     this.turnRecapPanel.showTurn({
@@ -5015,53 +5015,6 @@ export class HUD {
     this.gameConfig.totalIPCsEarned.set(factionId, current + amount);
   }
 
-  private getTopThreats(factionId: string): TerritoryThreat[] {
-    const faction = this.state.factionRegistry.get(factionId);
-    if (!faction) return [];
-
-    return Array.from(this.state.territories.values())
-      .filter(t => t.owner === factionId && t.isLand())
-      .map(t => calculateTerritoryThreat(this.state, t, faction))
-      .filter(t => t.threatLevel > 0)
-      .sort((a, b) => b.defenseGap - a.defenseGap || b.threatLevel - a.threatLevel)
-      .slice(0, 3);
-  }
-
-  private getOpportunityTargets(factionId: string): Array<{ territoryId: string; score: number; reason: string }> {
-    const faction = this.state.factionRegistry.get(factionId);
-    if (!faction) return [];
-
-    const opportunities = new Map<string, { territoryId: string; score: number; reason: string }>();
-    for (const owned of this.state.territories.values()) {
-      if (owned.owner !== factionId || !owned.isLand()) continue;
-      const availableAttack = owned.units.reduce((sum, unit) => {
-        const type = this.state.unitRegistry.get(unit.unitTypeId);
-        return sum + (type?.attack ?? 0) * owned.getAvailableUnitCount(unit.unitTypeId);
-      }, 0);
-      if (availableAttack <= 0) continue;
-
-      for (const adjacentId of owned.adjacentTo) {
-        const target = this.state.territories.get(adjacentId);
-        if (!target?.owner || !faction.isEnemyOf(target.owner) || target.isSea()) continue;
-        const defense = target.units.reduce((sum, unit) => {
-          const type = this.state.unitRegistry.get(unit.unitTypeId);
-          return sum + (type?.defense ?? 0) * unit.count;
-        }, 0);
-        const strategicValue = target.production + (target.isCapital ? 8 : 0) + (target.hasFactory ? 5 : 0);
-        const score = availableAttack - defense + strategicValue;
-        const existing = opportunities.get(target.id);
-        if (!existing || score > existing.score) {
-          const reason = target.isCapital ? 'enemy capital' : target.hasFactory ? 'factory target' : `+${target.production} IPC`;
-          opportunities.set(target.id, { territoryId: target.id, score, reason });
-        }
-      }
-    }
-
-    return Array.from(opportunities.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-  }
-
   private getMobilizationAdvice(): string {
     const navalHint = this.getNavalMobilizationAdvice();
     if (navalHint) return navalHint;
@@ -5089,8 +5042,8 @@ export class HUD {
     const best = this.mobilizationSystem.getMobilizationOptions()
       .filter(o => o.canMobilize)
       .sort((a, b) => {
-        const aThreat = this.getTopThreats(a.territory.owner ?? '')[0]?.territoryId === a.territory.id ? 5 : 0;
-        const bThreat = this.getTopThreats(b.territory.owner ?? '')[0]?.territoryId === b.territory.id ? 5 : 0;
+        const aThreat = getTopThreats(this.state, a.territory.owner ?? '')[0]?.territoryId === a.territory.id ? 5 : 0;
+        const bThreat = getTopThreats(this.state, b.territory.owner ?? '')[0]?.territoryId === b.territory.id ? 5 : 0;
         const aValue = aThreat + (a.territory.isCapital ? 10 : 0) + (a.territory.hasFactory ? 7 : 0) + a.territory.production + a.units.reduce((s, u) => s + u.count, 0);
         const bValue = bThreat + (b.territory.isCapital ? 10 : 0) + (b.territory.hasFactory ? 7 : 0) + b.territory.production + b.units.reduce((s, u) => s + u.count, 0);
         return bValue - aValue || a.cost - b.cost;
@@ -5329,8 +5282,8 @@ export class HUD {
       return;
     }
 
-    const topThreat = this.getTopThreats(faction.id)[0];
-    const topOpportunity = this.getOpportunityTargets(faction.id)[0];
+    const topThreat = getTopThreats(this.state, faction.id)[0];
+    const topOpportunity = getOpportunityTargets(this.state, faction.id)[0];
     const activeObjective = this.objectiveSystem.getActive(faction.id)[0];
     const income = this.state.calculateIncome(faction.id);
     const coach = this.getTurnCoach(faction);
@@ -5374,8 +5327,8 @@ export class HUD {
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction || faction.controlledBy !== 'human') return;
 
-    const threats = this.getTopThreats(factionId);
-    const opportunities = this.getOpportunityTargets(factionId);
+    const threats = getTopThreats(this.state, factionId);
+    const opportunities = getOpportunityTargets(this.state, factionId);
     const capital = this.state.territories.get(faction.capital);
     const firstThreat = threats[0] ? this.state.territories.get(threats[0].territoryId)?.name : null;
     const firstTarget = opportunities[0] ? this.state.territories.get(opportunities[0].territoryId)?.name : null;
