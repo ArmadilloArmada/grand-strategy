@@ -17,7 +17,7 @@ import { achievementManager, Achievement } from '../engine/AchievementManager';
 import { GameConfig, defaultConfig, checkVictory, TurnStyle, TURN_STYLE_INFO, UnitEra, UNIT_ERA_INFO, VictoryType } from '../engine/GameConfig';
 import { settings } from './Settings';
 import { escapeHtml } from './htmlEscape';
-import { getFactionOptionLabel, buildSetupPlanLine } from './setupSummaryText';
+import { getFactionOptionLabel, buildSetupPlanLine, describeSetupOpponents } from './setupSummaryText';
 import { getPhaseDisplayName as getPhaseDisplayNameFromStyle } from '../engine/TurnStyleManager';
 import { TechnologyManager } from '../engine/TechnologyManager';
 import { statisticsManager } from '../engine/StatisticsManager';
@@ -4234,20 +4234,7 @@ export class HUD {
       ? Array.from(opponentSelect.selectedOptions).map(o => o.value).filter(id => allCandidates.includes(id))
       : allCandidates;
     const countRaw = (document.getElementById('ai-opponent-count') as HTMLSelectElement | null)?.value ?? 'all';
-    const matchSetup = resolveMatchSetup({
-      mode: 'vs-ai',
-      humanFactionIds,
-      availableFactions: setupFactions,
-      pickedOpponentIds: pickedOpponents,
-      opponentCountRaw: countRaw,
-    });
-    if (matchSetup.aiOpponentIds.length === 0) return 'No AI opponents on this map';
-
-    const names = matchSetup.aiOpponentIds
-      .map(id => setupFactions.find(f => f.id === id)?.name ?? id)
-      .join(', ');
-    const countLabel = matchSetup.aiOpponentIds.length === 1 ? '1 AI opponent' : `${matchSetup.aiOpponentIds.length} AI opponents`;
-    return `${countLabel}: ${names}`;
+    return describeSetupOpponents(mode, setupFactions, humanFactionIds, pickedOpponents, countRaw);
   }
 
   private maybeOfferTutorial(): void {

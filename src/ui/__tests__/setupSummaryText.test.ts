@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getFactionOptionLabel, buildSetupPlanLine } from '../setupSummaryText';
+import { getFactionOptionLabel, buildSetupPlanLine, describeSetupOpponents } from '../setupSummaryText';
 import type { FactionData } from '../../data/Faction';
 
 function faction(overrides: Partial<FactionData>): FactionData {
@@ -17,6 +17,31 @@ describe('getFactionOptionLabel', () => {
   it('omits the dash when there is no playstyle', () => {
     expect(getFactionOptionLabel(faction({ name: 'Blue Command', playstyle: undefined })))
       .toBe('Blue Command');
+  });
+});
+
+describe('describeSetupOpponents', () => {
+  const factions: FactionData[] = [
+    faction({ id: 'a', name: 'Alpha', turnOrder: 1 }),
+    faction({ id: 'b', name: 'Bravo', turnOrder: 2 }),
+    faction({ id: 'c', name: 'Charlie', turnOrder: 3 }),
+    faction({ id: 'd', name: 'Delta', turnOrder: 4 }),
+  ];
+
+  it('returns empty string for non-vs-ai modes', () => {
+    expect(describeSetupOpponents('hotseat', factions, ['a'], ['b', 'c'], 'all')).toBe('');
+  });
+
+  it('lists all chosen AI opponents by name', () => {
+    const text = describeSetupOpponents('vs-ai', factions, ['a'], ['b', 'c', 'd'], 'all');
+    expect(text).toMatch(/^3 AI opponents: /);
+    expect(text).toContain('Bravo');
+    expect(text).toContain('Delta');
+  });
+
+  it('caps opponents by the requested count and uses singular wording', () => {
+    const text = describeSetupOpponents('vs-ai', factions, ['a'], ['b', 'c', 'd'], '1');
+    expect(text).toMatch(/^1 AI opponent: /);
   });
 });
 
