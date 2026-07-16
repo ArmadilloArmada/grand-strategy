@@ -7,6 +7,7 @@ import { GameState } from './engine/GameState';
 import { rng } from './engine/rng';
 import { buildSaveSlotsHtml } from './ui/saveSlotsView';
 import { buildCreditsHtml } from './ui/creditsView';
+import { buildSaveConfirmModalHtml } from './ui/saveConfirmModalView';
 import {
   SCENARIO_BRIEFINGS,
   buildScenarioBriefingHtml,
@@ -815,25 +816,7 @@ class Game {
     const modal = document.createElement('div');
     modal.id = 'save-confirm-modal';
     modal.className = 'modal';
-    modal.innerHTML = `
-      <div class="modal-content" style="text-align: center; max-width: 400px;">
-        <h2>💾 Save Current Game?</h2>
-        <p style="margin: 1rem 0; color: #aaa;">
-          You have a game in progress. Starting fresh will not load your autosave; it stays available from the Resume tab until another autosave replaces it.
-        </p>
-        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
-          <button id="btn-save-and-continue" class="primary" style="padding: 0.8rem;">
-            💾 Save and Continue
-          </button>
-          <button id="btn-discard-game" style="padding: 0.8rem; background: #dc2626;">
-            🗑️ Don't Save
-          </button>
-          <button id="btn-cancel-leave" style="padding: 0.8rem;">
-            ↩️ Cancel
-          </button>
-        </div>
-      </div>
-    `;
+    modal.innerHTML = buildSaveConfirmModalHtml();
     document.body.appendChild(modal);
 
     document.getElementById('btn-save-and-continue')?.addEventListener('click', () => {
