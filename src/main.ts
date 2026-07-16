@@ -5,6 +5,13 @@
 
 import { GameState } from './engine/GameState';
 import { rng } from './engine/rng';
+import { escapeHtml } from './ui/htmlEscape';
+import {
+  summarizeFactionForAI,
+  describeAITurnDelta,
+  describeAIDoctrine,
+  formatEventEffects,
+} from './ui/aiTurnNarration';
 import { mergePersistedGameConfig } from './engine/GameConfig';
 import { TurnManager } from './engine/TurnManager';
 import { AIController } from './engine/AIController';
@@ -516,7 +523,7 @@ class Game {
       title: 'Scenario',
       subtitle: 'A guided operation is ready.',
       goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End turns when your plan is complete.'],
-      doctrine: `AI doctrine: ${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
+      doctrine: `AI doctrine: ${describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
     };
 
     const overlay = document.createElement('div');
@@ -1287,7 +1294,7 @@ class Game {
       html += `
         <div class="save-slot ${isEmpty ? 'empty' : ''}" data-slot="${slot.id}">
           <div class="save-slot-info">
-            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : this.escapeHTML(slot.name)}</div>
+            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : escapeHtml(slot.name)}</div>
             <div class="save-slot-details">
               ${isEmpty 
                 ? 'No save data' 
@@ -1378,16 +1385,6 @@ class Game {
         });
       });
     });
-  }
-
-  private escapeHTML(value: string): string {
-    return value.replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    }[char] ?? char));
   }
 
   /**
@@ -2048,18 +2045,18 @@ class Game {
     }
     
     // Show AI indicator
-    this.hud.showToast(`${faction.name} is playing (${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
+    this.hud.showToast(`${faction.name} is playing (${describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
     
     // Wait so player can see
     await new Promise(resolve => setTimeout(resolve, settings.getAIDelay()));
     
-    const aiBefore = this.captureAISummary(faction.id);
+    const aiBefore = summarizeFactionForAI(this.state, faction.id);
 
     // Execute AI's full turn (all phases)
     await this.aiController.executeTurn();
     this.renderer.render();
     this.hud.renderMinimap();
-    const aiSummary = this.describeAITurn(faction.id, aiBefore);
+    const aiSummary = describeAITurnDelta(aiBefore, summarizeFactionForAI(this.state, faction.id));
     if (aiSummary) {
       battleLog.addAI(this.state.turnNumber, faction.name, faction.color, aiSummary, 'Turn recap');
       this.hud.showToast(`${faction.name}: ${aiSummary}`, 'info');
@@ -2075,17 +2072,6 @@ class Game {
     await new Promise(resolve => setTimeout(resolve, 200));
   }
 
-  private captureAISummary(factionId: string): { territories: number; units: number; ipcs: number; capitals: number } {
-    const faction = this.state.factionRegistry.get(factionId);
-    const territories = Array.from(this.state.territories.values()).filter(t => t.owner === factionId);
-    return {
-      territories: territories.length,
-      units: territories.reduce((sum, territory) => sum + territory.getTotalUnitCount(), 0),
-      ipcs: faction?.ipcs ?? 0,
-      capitals: territories.filter(t => t.isCapital).length,
-    };
-  }
-
   private focusMostRelevantAITerritory(factionId: string): void {
     const candidate = Array.from(this.state.territories.values())
       .filter(t => t.owner === factionId)
@@ -2097,32 +2083,6 @@ class Game {
     if (!candidate) return;
     this.renderer.centerOnTerritory(candidate.id);
     this.renderer.setAIPulseTerritory(candidate.id);
-  }
-
-  private describeAITurn(factionId: string, before: { territories: number; units: number; ipcs: number; capitals: number }): string {
-    const after = this.captureAISummary(factionId);
-    const territoryDelta = after.territories - before.territories;
-    const unitDelta = after.units - before.units;
-    const ipcDelta = after.ipcs - before.ipcs;
-    const parts: string[] = [];
-    if (territoryDelta > 0) parts.push(`captured ${territoryDelta} territor${territoryDelta === 1 ? 'y' : 'ies'}`);
-    if (territoryDelta < 0) parts.push(`lost ${Math.abs(territoryDelta)} territor${territoryDelta === -1 ? 'y' : 'ies'}`);
-    if (unitDelta > 0) parts.push(`added ${unitDelta} units`);
-    if (unitDelta < 0) parts.push(`lost ${Math.abs(unitDelta)} units`);
-    if (ipcDelta > 0) parts.push(`banked +${ipcDelta} IPC`);
-    if (ipcDelta < 0) parts.push(`spent ${Math.abs(ipcDelta)} IPC`);
-    if (after.capitals > before.capitals) parts.unshift('captured a capital');
-    return parts.length > 0 ? parts.slice(0, 3).join(', ') : 'held position and reorganized';
-  }
-
-  private describeAIDoctrine(personality?: string): string {
-    switch (personality) {
-      case 'aggressive': return 'aggressive';
-      case 'defensive': return 'defensive';
-      case 'economic': return 'economic';
-      case 'balanced': return 'balanced';
-      default: return 'standard';
-    }
   }
 
   /**
@@ -2162,7 +2122,7 @@ class Game {
 
       // Show effects summary
       if (event.type !== 'choice') {
-        effectsEl.innerHTML = this.formatEventEffects(event.effects);
+        effectsEl.innerHTML = formatEventEffects(event.effects);
         effectsEl.style.display = 'block';
         choicesEl.style.display = 'none';
         okContainer.style.display = 'block';
@@ -2182,7 +2142,7 @@ class Game {
             btn.innerHTML = `
               <div style="font-weight: bold;">${choice.text}</div>
               <div style="font-size: 0.8rem; color: #aaa; margin-top: 0.25rem;">
-                ${this.formatEventEffects(choice.effects)}
+                ${formatEventEffects(choice.effects)}
               </div>
             `;
             btn.addEventListener('click', () => {
@@ -2211,32 +2171,6 @@ class Game {
       soundManager.play('event');
     });
   }
-
-  /**
-   * Format event effects for display
-   */
-  private formatEventEffects(effects: { type: string; value?: number; unitType?: string; duration?: number }[]): string {
-    if (effects.length === 0) return '<span style="color: #666;">No immediate effects</span>';
-
-    return effects.map(e => {
-      const sign = (e.value ?? 0) >= 0 ? '+' : '';
-      switch (e.type) {
-        case 'ipc_bonus': return `<span style="color: #22c55e;">💰 ${sign}${e.value} IPCs</span>`;
-        case 'ipc_penalty': return `<span style="color: #ef4444;">💸 -${e.value} IPCs</span>`;
-        case 'unit_spawn': return `<span style="color: #22c55e;">🎖️ +${e.value} ${e.unitType || 'units'}</span>`;
-        case 'unit_loss': return `<span style="color: #ef4444;">☠️ -${e.value} ${e.unitType || 'units'}</span>`;
-        case 'attack_bonus': return `<span style="color: #f59e0b;">⚔️ +${e.value} attack${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'defense_bonus': return `<span style="color: #3b82f6;">🛡️ +${e.value} defense${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'movement_bonus': return `<span style="color: #8b5cf6;">🚀 ${sign}${e.value} movement${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'production_bonus': return `<span style="color: #22c55e;">🏭 +${e.value} production${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'factory_damage': return `<span style="color: #ef4444;">💥 Factory damaged</span>`;
-        case 'morale_boost': return `<span style="color: #22c55e;">✨ Morale boost</span>`;
-        case 'intel_reveal': return `<span style="color: #3b82f6;">🕵️ Enemy intel revealed</span>`;
-        default: return `<span>${e.type}</span>`;
-      }
-    }).join('<br>');
-  }
-
 
   /**
    * Auto save at end of each phase
