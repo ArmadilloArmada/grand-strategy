@@ -140,6 +140,9 @@ class Game {
 
     // Apply theme immediately from saved settings
     this.applyTheme(settings.getSetting('theme') ?? 'dark');
+    // Set the colorblind palette flag before any factions load so new games
+    // and loaded saves pick up the correct colors on first render.
+    this.state.factionRegistry.setColorblindMode(settings.getSetting('colorblindMode') ?? false);
 
     // Apply AI difficulty and speed from settings
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -1416,6 +1419,7 @@ class Game {
     (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
     (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
     (document.getElementById('setting-theme') as HTMLSelectElement).value = s.theme ?? 'dark';
+    (document.getElementById('setting-colorblind') as HTMLInputElement).checked = s.colorblindMode ?? false;
 
     // Sync fullscreen button label
     const fsBtn = document.getElementById('btn-toggle-fullscreen') as HTMLButtonElement | null;
@@ -1466,9 +1470,11 @@ class Game {
       dynamicWeather: (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked,
       fortifications: (document.getElementById('setting-fortifications') as HTMLInputElement).checked,
       theme: (document.getElementById('setting-theme') as HTMLSelectElement).value as 'dark' | 'light',
+      colorblindMode: (document.getElementById('setting-colorblind') as HTMLInputElement).checked,
     });
 
     this.applyTheme(settings.getSetting('theme'));
+    this.applyColorblindMode(settings.getSetting('colorblindMode'));
 
     // Apply AI difficulty and personality
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -1483,6 +1489,17 @@ class Game {
     document.body.classList.toggle('theme-light', theme === 'light');
     const btn = document.getElementById('btn-theme-toggle');
     if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+
+  /**
+   * Enable/disable the colorblind-safe faction palette and repaint the map so
+   * the change is visible immediately.
+   */
+  applyColorblindMode(enabled: boolean): void {
+    this.state.factionRegistry.setColorblindMode(enabled);
+    if (this.isGameStarted) {
+      this.hud.repaintMap();
+    }
   }
 
   /**

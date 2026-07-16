@@ -3661,6 +3661,15 @@ export class HUD {
   }
 
   /**
+   * Repaint the main map and minimap. Used when a display-only change (e.g. the
+   * colorblind palette toggle) needs to be reflected without mutating state.
+   */
+  repaintMap(): void {
+    this.renderer.render();
+    this.renderMinimap();
+  }
+
+  /**
    * Update turn order display
    */
   updateTurnOrder(): void {
