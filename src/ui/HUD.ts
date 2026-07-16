@@ -16,6 +16,8 @@ import { visualEffects } from './VisualEffects';
 import { achievementManager, Achievement } from '../engine/AchievementManager';
 import { GameConfig, defaultConfig, checkVictory, TurnStyle, TURN_STYLE_INFO, UnitEra, UNIT_ERA_INFO, VictoryType } from '../engine/GameConfig';
 import { settings } from './Settings';
+import { escapeHtml } from './htmlEscape';
+import { getFactionOptionLabel, buildSetupPlanLine } from './setupSummaryText';
 import { getPhaseDisplayName as getPhaseDisplayNameFromStyle } from '../engine/TurnStyleManager';
 import { TechnologyManager } from '../engine/TechnologyManager';
 import { statisticsManager } from '../engine/StatisticsManager';
@@ -233,7 +235,7 @@ export class HUD {
       getState: () => this.state,
       renderer: this.renderer,
       unitIcon: (id) => this.unitIcon(id),
-      escapeHtml: (value) => this.escapeHtml(value),
+      escapeHtml: (value) => escapeHtml(value),
       showToast: (msg, type) => this.showToast(msg, type),
       onStackChanged: () => this.updateSelectionInfo(),
       onValidMovesRefresh: () => this.updateValidMoves(),
@@ -339,7 +341,7 @@ export class HUD {
       overlayController: this.overlayController,
       mobilizationSystem: this.mobilizationSystem,
       stackCommand: this.stackCommand,
-      escapeHtml: (value) => this.escapeHtml(value),
+      escapeHtml: (value) => escapeHtml(value),
       onAfterUpdate: () => this.updateActionButtons(),
     });
     this.firstWarRoom = new FirstWarRoom({
@@ -2792,7 +2794,7 @@ export class HUD {
       const statusClass = adjacentEnemies ? 'at-risk' : 'safe';
       const statusText = adjacentEnemies ? '⚠ Under threat' : '✓ Secured';
       capitalHtml = `<div class="hq-capital-row ${statusClass}">
-        <span>⭐ ${this.escapeHtml(capital.name)}</span>
+        <span>⭐ ${escapeHtml(capital.name)}</span>
         <span style="margin-left:auto;font-size:0.7rem;">${statusText} · ${capitalUnits} unit${capitalUnits !== 1 ? 's' : ''}</span>
       </div>`;
     }
@@ -2810,8 +2812,8 @@ export class HUD {
 
     return `<div class="hq-faction-summary">
       <div class="hq-faction-banner">
-        <div class="hq-faction-dot" style="background:${this.escapeHtml(faction.color)};box-shadow:0 0 5px ${this.escapeHtml(faction.color)}44;"></div>
-        <span class="hq-faction-name" style="color:${this.escapeHtml(faction.colorLight ?? faction.color)};">${this.escapeHtml(faction.name)}</span>
+        <div class="hq-faction-dot" style="background:${escapeHtml(faction.color)};box-shadow:0 0 5px ${escapeHtml(faction.color)}44;"></div>
+        <span class="hq-faction-name" style="color:${escapeHtml(faction.colorLight ?? faction.color)};">${escapeHtml(faction.name)}</span>
       </div>
       <div class="hq-stat-grid">
         <div class="hq-stat-cell">
@@ -2861,7 +2863,7 @@ export class HUD {
           if (lines.length === 0) return null;
           const isFriendly = !sea.owner || sea.owner === faction.id;
           if (!isFriendly) return null;
-          return `${this.escapeHtml(sea.name)}: ${lines.map(l => `${l.count} ${l.label}`).join(', ')}`;
+          return `${escapeHtml(sea.name)}: ${lines.map(l => `${l.count} ${l.label}`).join(', ')}`;
         })
         .filter(Boolean);
 
@@ -2892,9 +2894,9 @@ export class HUD {
         ? fleetLines.map(line => `${line.count} ${line.label}`).join(' · ')
         : 'No fleet present';
       return `<div class="naval-status sea">
-        <strong>${owner ? `${this.escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
-        <span>${fleetHtml}${transports > 0 ? ` · ${transports} lift` : ''}${adjacentCoasts.length ? ` · Coasts: ${this.escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
-        ${fleetLines.length > 0 ? `<span class="naval-roles">${fleetLines.map(l => this.escapeHtml(`${l.label}: ${l.duty}`)).join(' · ')}</span>` : ''}
+        <strong>${owner ? `${escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
+        <span>${fleetHtml}${transports > 0 ? ` · ${transports} lift` : ''}${adjacentCoasts.length ? ` · Coasts: ${escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
+        ${fleetLines.length > 0 ? `<span class="naval-roles">${fleetLines.map(l => escapeHtml(`${l.label}: ${l.duty}`)).join(' · ')}</span>` : ''}
       </div>`;
     }
 
@@ -3092,7 +3094,7 @@ export class HUD {
                 ? (coastalStrike ? (t?.type === 'sea' ? 'Coastal fire' : 'Bombard') : 'Attack')
                 : viaTransport ? 'Amphibious' : 'Move';
               const className = viaTransport ? 'transport' : coastalStrike ? 'coastal-strike' : target.type;
-              return `<span class="drag-target-hint ${className}">${label}: ${this.escapeHtml(t?.name ?? target.id)}</span>`;
+              return `<span class="drag-target-hint ${className}">${label}: ${escapeHtml(t?.name ?? target.id)}</span>`;
             }).join('')}
           </div>`;
         }
@@ -3159,12 +3161,12 @@ export class HUD {
       <div class="simple-territory-card">
         <div class="simple-territory-owner">
           <span style="background:${ownerColor};"></span>
-          <strong>${this.escapeHtml(ownerName)}</strong>
+          <strong>${escapeHtml(ownerName)}</strong>
         </div>
-        <div class="simple-territory-tags">${tags.map(tag => `<span>${this.escapeHtml(tag)}</span>`).join('')}</div>
+        <div class="simple-territory-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>
         <div class="simple-territory-action">
           <small>Best Action</small>
-          <strong>${this.escapeHtml(action)}</strong>
+          <strong>${escapeHtml(action)}</strong>
         </div>
         <div class="simple-territory-grid">
           <div><small>Units</small><strong>${totalUnits}</strong></div>
@@ -4140,10 +4142,6 @@ export class HUD {
     };
   }
 
-  private getFactionOptionLabel(faction: FactionData): string {
-    return `${faction.name}${faction.playstyle ? ` - ${faction.playstyle}` : ''}`;
-  }
-
   private refreshSetupFactionOptions(): void {
     const { factions } = this.getSelectedSetupMap();
     const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
@@ -4159,7 +4157,7 @@ export class HUD {
 
     if (playerSelect) {
       playerSelect.innerHTML = [
-        ...playable.map(f => `<option value="${this.escapeHtml(f.id)}">${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`),
+        ...playable.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(getFactionOptionLabel(f))}</option>`),
         '<option value="random">Random playable faction</option>',
       ].join('');
       playerSelect.value = previousPlayer && (previousPlayer === 'random' || playable.some(f => f.id === previousPlayer))
@@ -4169,7 +4167,7 @@ export class HUD {
 
     if (hotseatSelect) {
       hotseatSelect.innerHTML = playable
-        .map((f, index) => `<option value="${this.escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`)
+        .map((f, index) => `<option value="${escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${escapeHtml(getFactionOptionLabel(f))}</option>`)
         .join('');
     }
 
@@ -4181,7 +4179,7 @@ export class HUD {
         .map(f => {
           const wasSelected = previousOpponents.has(f.id);
           const selected = previousOpponents.size === 0 || wasSelected ? ' selected' : '';
-          return `<option value="${this.escapeHtml(f.id)}"${selected}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`;
+          return `<option value="${escapeHtml(f.id)}"${selected}>${escapeHtml(getFactionOptionLabel(f))}</option>`;
         })
         .join('');
       // Hide the picker entirely when there are no opponents to choose from.
@@ -4213,7 +4211,7 @@ export class HUD {
           .map(p => ({ id: p.id, name: p.name, description: p.description })),
       ];
       aiPersonality.innerHTML = options
-        .map(p => `<option value="${this.escapeHtml(p.id)}" title="${this.escapeHtml(p.description)}">${this.escapeHtml(p.name)}</option>`)
+        .map(p => `<option value="${escapeHtml(p.id)}" title="${escapeHtml(p.description)}">${escapeHtml(p.name)}</option>`)
         .join('');
       aiPersonality.value = options.some(p => p.id === current) ? current : 'default';
     }
@@ -4247,11 +4245,11 @@ export class HUD {
 
     card.classList.remove('hidden');
     card.innerHTML = `
-      <div class="map-info-title">${this.escapeHtml(name)}</div>
-      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${this.escapeHtml(description)}</div>` : ''}
+      <div class="map-info-title">${escapeHtml(name)}</div>
+      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${escapeHtml(description)}</div>` : ''}
       <div class="map-info-tags">
-        <span>${this.escapeHtml(sizeTag)}</span>
-        <span>${this.escapeHtml(navalTag)}</span>
+        <span>${escapeHtml(sizeTag)}</span>
+        <span>${escapeHtml(navalTag)}</span>
         <span>${playable.length} factions</span>
       </div>
       <div class="map-info-stats">
@@ -4261,7 +4259,7 @@ export class HUD {
         <span>${startingUnits} units</span>
       </div>
       <div class="map-info-factions">
-        ${playable.map(f => `<span style="--faction-color:${this.escapeHtml(f.color)}">${this.escapeHtml(f.name)}</span>`).join('')}
+        ${playable.map(f => `<span style="--faction-color:${escapeHtml(f.color)}">${escapeHtml(f.name)}</span>`).join('')}
       </div>
     `;
   }
@@ -4405,7 +4403,7 @@ export class HUD {
     const doctrine = aiPersonality === 'default'
       ? 'balanced AI'
       : `${AI_PERSONALITIES.find(p => p.id === aiPersonality)?.name ?? aiPersonality} AI`;
-    const setupPlan = this.buildSetupPlanLine(mapId, victoryType, turnStyle, aiDifficulty, aiPersonality);
+    const setupPlan = buildSetupPlanLine(mapId, victoryType, turnStyle, aiDifficulty, aiPersonality);
     const mapStats = setupMap.data
       ? `${setupMap.data.territories.length} territories, ${playableCount} playable factions`
       : `${playableCount} playable factions`;
@@ -4417,8 +4415,8 @@ export class HUD {
       </div>
       <div>${mapName} · ${UNIT_ERA_INFO[unitEra]?.name ?? unitEra} · ${TURN_STYLE_INFO[turnStyle]?.name ?? turnStyle}</div>
       <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText} · ${mapStats}</div>
-      ${opponentSummary ? `<div style="color:#cbd5e1;margin-top:0.25rem;">${this.escapeHtml(opponentSummary)}</div>` : ''}
-      <div style="color:#bfdbfe;margin-top:0.35rem;">Plan: ${this.escapeHtml(setupPlan)} · ${aiDifficulty} ${this.escapeHtml(doctrine)}</div>
+      ${opponentSummary ? `<div style="color:#cbd5e1;margin-top:0.25rem;">${escapeHtml(opponentSummary)}</div>` : ''}
+      <div style="color:#bfdbfe;margin-top:0.35rem;">Plan: ${escapeHtml(setupPlan)} · ${aiDifficulty} ${escapeHtml(doctrine)}</div>
     `;
   }
 
@@ -4450,32 +4448,6 @@ export class HUD {
       .join(', ');
     const countLabel = matchSetup.aiOpponentIds.length === 1 ? '1 AI opponent' : `${matchSetup.aiOpponentIds.length} AI opponents`;
     return `${countLabel}: ${names}`;
-  }
-
-  private buildSetupPlanLine(mapId: string, victoryType: VictoryType, turnStyle: TurnStyle, aiDifficulty: string, aiPersonality: string): string {
-    const mapPlan = mapId.includes('mega')
-      ? 'expect broad fronts; use overlays and secure factories early'
-      : mapId.includes('pacific') || mapId.includes('archipelago')
-        ? 'control sea lanes before overcommitting land forces'
-        : mapId.includes('skirmish') || mapId === 'tutorial'
-          ? 'short opening; first captures decide tempo'
-          : 'balance capital defense with one early border attack';
-    const victoryPlan = victoryType === 'economic'
-      ? 'protect production'
-      : victoryType === 'domination'
-        ? 'expand steadily'
-        : victoryType === 'elimination'
-          ? 'preserve armies'
-          : 'watch enemy capitals';
-    const aiPlan = aiDifficulty === 'hard' || ['aggressive', 'blitz', 'adaptive'].includes(aiPersonality)
-      ? 'AI pressure will arrive early'
-      : aiPersonality === 'economic'
-        ? 'AI will build before striking'
-        : aiPersonality === 'defensive'
-          ? 'AI will punish weak attacks'
-          : 'AI posture is flexible';
-    const pace = turnStyle === 'classic' ? 'classic pacing' : turnStyle === 'quick' ? 'faster decisions' : 'variant pacing';
-    return `${mapPlan}; ${victoryPlan}; ${aiPlan}; ${pace}`;
   }
 
   private maybeOfferTutorial(): void {
@@ -5041,15 +5013,6 @@ export class HUD {
   trackIncome(factionId: string, amount: number): void {
     const current = this.gameConfig.totalIPCsEarned.get(factionId) || 0;
     this.gameConfig.totalIPCsEarned.set(factionId, current + amount);
-  }
-
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 
   private getTopThreats(factionId: string): TerritoryThreat[] {
