@@ -49,6 +49,26 @@ export async function startTutorialMatch(page: Page): Promise<void> {
   await page.locator('.ribbon-center #btn-end-phase').waitFor({ state: 'visible' });
 }
 
+export interface E2EMatchConfig {
+  mapId: string;
+  humanFactions?: string[];
+  aiOpponents?: string[];
+  turnStyle?: string;
+  victoryType?: string;
+  capitalsToWin?: number;
+  turnLimit?: number;
+}
+
+/** Start a deterministic custom match on any registered map (beyond the tutorial). */
+export async function startMatch(page: Page, config: E2EMatchConfig): Promise<void> {
+  await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
+  await page.evaluate((cfg) => {
+    (window as unknown as { __gsE2E: { startE2EMatch(c: unknown): void } }).__gsE2E.startE2EMatch(cfg);
+  }, config);
+  await page.locator('#game-canvas').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('.ribbon-center #btn-end-phase').waitFor({ state: 'visible' });
+}
+
 export async function startCampaignMission(page: Page, campaignId: string, missionId: string): Promise<void> {
   await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
   await page.evaluate(({ campaign, mission }) => {

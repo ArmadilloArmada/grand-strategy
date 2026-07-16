@@ -417,6 +417,7 @@ class Game {
       runE2EEndTurn: () => this.hud.runE2EEndTurn(),
       dismissE2EOverlays: () => this.hud.dismissE2EOverlays(),
       e2eBoostTerritory: (territoryId, unitTypeId, count) => this.hud.e2eBoostTerritory(territoryId, unitTypeId, count),
+      startE2EMatch: (config) => this.startE2EMatch(config),
       startE2ECampaignMission: (campaignId, missionId) => this.startE2ECampaignMission(campaignId, missionId),
       runE2EQuickSave: () => this.runE2EQuickSave(),
       runE2EQuickLoad: () => this.runE2EQuickLoad(),
@@ -2294,6 +2295,43 @@ class Game {
       victoryType: 'capitals',
       capitalsToWin: 1,
       turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
+  }
+
+  /**
+   * Deterministic custom match for Playwright on any registered map. Mirrors
+   * startE2ETutorialMatch but lets a spec pick the map, factions, and win rules,
+   * so e2e coverage can extend beyond the tutorial map.
+   */
+  startE2EMatch(config: import('./e2e/browserApi').E2EMatchConfig): void {
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: config.mapId,
+      mode: 'vs-ai',
+      humanFactions: config.humanFactions ?? this.hud.gameConfig.humanFactions,
+      aiOpponents: config.aiOpponents,
+      aiOpponentCount: config.aiOpponents ? config.aiOpponents.length : 0,
+      turnStyle: (config.turnStyle ?? 'quick') as import('./engine/GameConfig').TurnStyle,
+      simpleMode: true,
+      guidedOnboarding: false,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: (config.victoryType ?? 'capitals') as import('./engine/GameConfig').VictoryType,
+      capitalsToWin: config.capitalsToWin ?? 99,
+      turnLimit: config.turnLimit ?? 20,
     };
     this.startNewGame();
     this.hud.dismissE2EOverlays();

@@ -10,8 +10,19 @@ export interface E2ESnapshot {
   owners: Record<string, string | null>;
 }
 
+export interface E2EMatchConfig {
+  mapId: string;
+  humanFactions?: string[];
+  aiOpponents?: string[];
+  turnStyle?: string;
+  victoryType?: string;
+  capitalsToWin?: number;
+  turnLimit?: number;
+}
+
 export interface E2EHost {
   startE2ETutorialMatch(): void;
+  startE2EMatch(config: E2EMatchConfig): void;
   startE2ECampaignMission(campaignId: string, missionId: string): void;
   readE2ESnapshot(): E2ESnapshot;
   runE2EUnitAction(fromId: string, toId: string, allTypes?: boolean): 'move' | 'attack' | 'invalid';
