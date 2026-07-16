@@ -8,6 +8,7 @@ import { rng } from './engine/rng';
 import { buildSaveSlotsHtml } from './ui/saveSlotsView';
 import { buildCreditsHtml } from './ui/creditsView';
 import { buildSaveConfirmModalHtml } from './ui/saveConfirmModalView';
+import { resolveKeyboardShortcut, ShortcutAction } from './ui/keyboardShortcuts';
 import {
   SCENARIO_BRIEFINGS,
   buildScenarioBriefingHtml,
@@ -1733,92 +1734,67 @@ class Game {
             this.hideGameMenu();
           }
         }
+        return;
       }
 
-      // Ctrl+S - Quick save
-      if (e.key === 's' && e.ctrlKey) {
-        e.preventDefault();
+      // All other hotkeys resolve through a pure mapping; we perform the effects.
+      const resolution = resolveKeyboardShortcut(e, {
+        isGameStarted: this.isGameStarted,
+        phase: this.state.currentPhase as string,
+        isHumanTurn: this.state.getCurrentFaction()?.controlledBy === 'human',
+      });
+      if (!resolution) return;
+      if (resolution.preventDefault) e.preventDefault();
+      this.dispatchKeyboardShortcut(resolution.action);
+    });
+  }
+
+  /** Perform the side effect for a resolved keyboard shortcut action. */
+  private dispatchKeyboardShortcut(action: ShortcutAction): void {
+    switch (action) {
+      case 'quick-save':
         this.quickSaveWithFeedback();
-      }
-
-      // Ctrl+L - Quick load
-      if (e.key === 'l' && e.ctrlKey) {
-        e.preventDefault();
+        break;
+      case 'quick-load':
         this.quickLoadWithFeedback();
-      }
-
-      // Enter or Space - End phase
-      if ((e.key === 'Enter' || e.key === ' ') && this.isGameStarted) {
-        const faction = this.state.getCurrentFaction();
-        if (faction?.controlledBy === 'human') {
-          e.preventDefault();
-          document.getElementById('btn-end-phase')?.click();
-        }
-      }
-
-      // B - Open build menu (during build phases)
-      if (e.key === 'b' && this.isGameStarted) {
-        const phase = this.state.currentPhase as string;
-        if (['purchase', 'production', 'build', 'play'].includes(phase)) {
-          e.preventDefault();
-          document.getElementById('btn-build')?.click();
-        }
-      }
-
-      // P - Production placement (during production phase)
-      if (e.key === 'p' && this.isGameStarted) {
-        if (this.state.currentPhase === 'production') {
-          e.preventDefault();
-          document.getElementById('btn-build')?.click();
-        }
-      }
-
-      // A - Resolve combat (during combat phase)
-      if (e.key === 'a' && this.isGameStarted) {
-        if (this.state.currentPhase === 'combat') {
-          this.hud.resolveCombat();
-        }
-      }
-
-      // H - Help/Tutorial
-      if (e.key === 'h' && this.isGameStarted) {
+        break;
+      case 'end-phase':
+        document.getElementById('btn-end-phase')?.click();
+        break;
+      case 'open-build':
+        document.getElementById('btn-build')?.click();
+        break;
+      case 'resolve-combat':
+        this.hud.resolveCombat();
+        break;
+      case 'help':
         document.getElementById('help-button')?.click();
-      }
-
-      // F - Fit map to screen
-      if (e.key === 'f' && this.isGameStarted) {
+        break;
+      case 'reset-view':
         this.resetViewAndPanels();
         this.hud.showToast('View and panels reset', 'info');
-      }
-
-      // C - Center on capital
-      if (e.key === 'c' && this.isGameStarted) {
+        break;
+      case 'center-capital': {
         const faction = this.state.getCurrentFaction();
         if (faction) {
           this.renderer.centerOnTerritory(faction.capital);
           this.hud.showToast('Centered on capital', 'info');
         }
+        break;
       }
-
-      // Tab / Shift+Tab - Next/previous territory
-      if (e.key === 'Tab' && this.isGameStarted) {
-        e.preventDefault();
-        this.hud.cycleSelectedTerritory(e.shiftKey ? -1 : 1);
-      }
-
-      // O - Toggle map overlay (range / threat)
-      if (e.key === 'o' && this.isGameStarted) {
-        e.preventDefault();
+      case 'cycle-territory-next':
+        this.hud.cycleSelectedTerritory(1);
+        break;
+      case 'cycle-territory-prev':
+        this.hud.cycleSelectedTerritory(-1);
+        break;
+      case 'cycle-overlay':
         this.hud.cycleOverlay();
-      }
-
-      // ? - Keyboard shortcut cheat-sheet
-      if (e.key === '?' && this.isGameStarted) {
-        e.preventDefault();
+        break;
+      case 'toggle-shortcut-sheet':
         this.hud.toggleShortcutSheet();
-      }
-
-    });
+        break;
+    }
   }
 
   /**
