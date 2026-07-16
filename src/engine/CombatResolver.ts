@@ -607,7 +607,7 @@ export class CombatResolver {
 
     for (const cu of subs) {
       const activeCount = cu.count - cu.casualties;
-      let attackValue = cu.unitType.attack + 1; // surprise strike bonus
+      const attackValue = cu.unitType.attack + 1; // surprise strike bonus
       for (let i = 0; i < activeCount; i++) {
         const roll = this.rollDie(diceSides);
         const isHit = roll <= attackValue;
