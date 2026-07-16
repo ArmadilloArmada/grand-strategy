@@ -49,9 +49,9 @@ import {
   getBestMobilizationTarget,
   getBestMovementSource,
 } from './advisorRecommendations';
+import { getNavalStatusHtml } from './navalStatusView';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
-import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
-import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
+import { sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
 import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
 import { areTerritoriesNeighbors } from '../engine/gridAdjacency';
 import type { SpawnedUnit } from '../engine/MobilizationSystem';
@@ -2842,72 +2842,6 @@ export class HUD {
     </div>`;
   }
 
-  /**
-   * Update selection info panel
-   */
-  private getNavalStatusHtml(territory: import('../data/Territory').Territory): string {
-    const faction = this.state.getCurrentFaction();
-    if (!faction) return '';
-
-    if (territory.isLand() && territory.owner === faction.id && hasSeaAccess(this.state, territory)) {
-      const adjacentSeas = getAdjacentSeaZones(this.state, territory);
-      if (adjacentSeas.length === 0) return '';
-
-      const blockaded = this.supplySystem.isNavalBlockaded(territory.id, faction.id);
-      const openSeas = adjacentSeas.filter(sea =>
-        sea.owner === null ||
-        sea.owner === faction.id ||
-        sea.getTotalUnitCount() === 0 ||
-        !sea.owner ||
-        !faction.isEnemyOf(sea.owner)
-      ).length;
-
-      const fleetSummaries = adjacentSeas
-        .map(sea => {
-          const lines = summarizeFleet(this.state, sea);
-          if (lines.length === 0) return null;
-          const isFriendly = !sea.owner || sea.owner === faction.id;
-          if (!isFriendly) return null;
-          return `${escapeHtml(sea.name)}: ${lines.map(l => `${l.count} ${l.label}`).join(', ')}`;
-        })
-        .filter(Boolean);
-
-      const fleetHtml = fleetSummaries.length > 0
-        ? `<span class="naval-roles">Fleet: ${fleetSummaries.join(' · ')}</span>`
-        : `<span style="font-size:0.72rem;opacity:0.85;">Naval builds deploy to adjacent sea zones — select one to inspect your fleet.</span>`;
-
-      return `<div class="naval-status ${blockaded ? 'danger' : 'open'}">
-        <strong>${blockaded ? 'Naval blockade' : 'Sea access open'}</strong>
-        <span>${openSeas}/${adjacentSeas.length} adjacent sea zone${adjacentSeas.length === 1 ? '' : 's'} open</span>
-        ${fleetHtml}
-      </div>`;
-    }
-
-    if (territory.type === 'sea') {
-      const transports = faction
-        ? getTransportCapacityInSeaZone(this.state, territory.id, faction.id)
-        : 0;
-      const fleetLines = summarizeFleet(this.state, territory);
-      const adjacentCoasts = territory.adjacentTo
-        .map(id => this.state.territories.get(id))
-        .filter(t => t?.isLand())
-        .slice(0, 3)
-        .map(t => t?.name ?? '')
-        .filter(Boolean);
-      const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
-      const fleetHtml = fleetLines.length > 0
-        ? fleetLines.map(line => `${line.count} ${line.label}`).join(' · ')
-        : 'No fleet present';
-      return `<div class="naval-status sea">
-        <strong>${owner ? `${escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
-        <span>${fleetHtml}${transports > 0 ? ` · ${transports} lift` : ''}${adjacentCoasts.length ? ` · Coasts: ${escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
-        ${fleetLines.length > 0 ? `<span class="naval-roles">${fleetLines.map(l => escapeHtml(`${l.label}: ${l.duty}`)).join(' · ')}</span>` : ''}
-      </div>`;
-    }
-
-    return '';
-  }
-
   updateSelectionInfo(): void {
     const territory = this.state.getSelectedTerritory();
     const nameEl = document.getElementById('territory-name');
@@ -2985,7 +2919,7 @@ export class HUD {
       </div>`;
     }
 
-    html += this.getNavalStatusHtml(territory);
+    html += getNavalStatusHtml(this.state, this.supplySystem, territory);
 
     // Fortification level
     if (territory.isLand()) {
