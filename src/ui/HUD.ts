@@ -51,6 +51,7 @@ import {
 } from './advisorRecommendations';
 import { getNavalStatusHtml } from './navalStatusView';
 import { buildFactionSummaryHtml } from './factionSummaryView';
+import { buildSimpleTerritoryDetails } from './territoryDetailsView';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
 import { sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
 import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
@@ -2801,7 +2802,7 @@ export class HUD {
       if (detailsEl) {
         detailsEl.classList.remove('content-refresh');
         void detailsEl.offsetWidth;
-        detailsEl.innerHTML = this.buildSimpleTerritoryDetails(territory);
+        detailsEl.innerHTML = buildSimpleTerritoryDetails(this.state, territory, this.validMoveController.getValidMoves());
         detailsEl.classList.add('content-refresh');
       }
       this.refreshUnitStackSelector();
@@ -2994,56 +2995,6 @@ export class HUD {
 
     this.refreshUnitStackSelector();
     this.updateActionButtons();
-  }
-
-  private buildSimpleTerritoryDetails(territory: NonNullable<ReturnType<typeof this.state.getSelectedTerritory>>): string {
-    const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
-    const ownerName = owner?.name ?? 'Neutral';
-    const ownerColor = owner?.color ?? '#666';
-    const faction = this.state.getCurrentFaction();
-    const isOwned = territory.owner === faction?.id;
-    const phase = this.state.currentPhase;
-    const isMovement = isMovementPhase(phase);
-    const displayUnits = territory.units.filter(pu => {
-      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
-    });
-    const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
-    const readyUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
-    const attackTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => m.isAttack).length : 0;
-    const moveTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => !m.isAttack).length : 0;
-    const action = (() => {
-      if (isOwned && ['purchase', 'production', 'build'].includes(phase)) return territory.hasFactory ? 'Good place to mobilize.' : 'Select a factory territory to build.';
-      if (isOwned && attackTargets > 0) return `${attackTargets} attack target${attackTargets === 1 ? '' : 's'} in range.`;
-      if (isOwned && moveTargets > 0) return `${moveTargets} movement option${moveTargets === 1 ? '' : 's'} open.`;
-      if (!isOwned && owner) return owner.isEnemyOf(faction?.id ?? '') ? 'Enemy territory. Attack from an adjacent friendly territory.' : 'Not controlled by you.';
-      return 'No immediate action here.';
-    })();
-    const tags = [
-      territory.isCapital ? 'Capital' : '',
-      territory.hasFactory ? 'Factory' : '',
-      territory.isLand() ? `${territory.production} IPC` : 'Sea zone',
-    ].filter(Boolean);
-
-    return `
-      <div class="simple-territory-card">
-        <div class="simple-territory-owner">
-          <span style="background:${ownerColor};"></span>
-          <strong>${escapeHtml(ownerName)}</strong>
-        </div>
-        <div class="simple-territory-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>
-        <div class="simple-territory-action">
-          <small>Best Action</small>
-          <strong>${escapeHtml(action)}</strong>
-        </div>
-        <div class="simple-territory-grid">
-          <div><small>Units</small><strong>${totalUnits}</strong></div>
-          <div><small>Ready</small><strong>${readyUnits}</strong></div>
-          <div><small>Income</small><strong>${territory.isLand() ? `+${territory.production}` : '-'}</strong></div>
-        </div>
-        ${isOwned && readyUnits < totalUnits ? '<div class="acted-explainer">Acted units are already here, but cannot move again until your next turn.</div>' : ''}
-      </div>
-    `;
   }
 
   /**
