@@ -44,6 +44,11 @@ import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
 import { getTopThreats, getOpportunityTargets } from './advisorTargets';
+import {
+  getMobilizationAdvice,
+  getBestMobilizationTarget,
+  getBestMovementSource,
+} from './advisorRecommendations';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
 import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
 import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
@@ -5015,97 +5020,6 @@ export class HUD {
     this.gameConfig.totalIPCsEarned.set(factionId, current + amount);
   }
 
-  private getMobilizationAdvice(): string {
-    const navalHint = this.getNavalMobilizationAdvice();
-    if (navalHint) return navalHint;
-
-    const options = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize);
-    const best = options.sort((a, b) => {
-      const aValue = (a.territory.isCapital ? 8 : 0) + (a.territory.hasFactory ? 6 : 0) + a.units.reduce((s, u) => s + u.count, 0);
-      const bValue = (b.territory.isCapital ? 8 : 0) + (b.territory.hasFactory ? 6 : 0) + b.units.reduce((s, u) => s + u.count, 0);
-      return bValue - aValue || a.cost - b.cost;
-    })[0];
-    if (!best) return 'No affordable mobilization is available. Preserve IPCs or advance the phase.';
-    return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
-  }
-
-  private getNavalMobilizationAdvice(): string | null {
-    const mapId = this.gameConfig.mapId ?? 'grid';
-    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island') && !mapId.includes('world')) return null;
-    const coastal = this.mobilizationSystem.getMobilizationOptions()
-      .find(o => o.canMobilize && o.type === 'coastal');
-    if (!coastal) return null;
-    return `Mobilize marines at ${coastal.territory.name} (${coastal.cost} IPC) for island assaults. Ground units can cross oceans automatically.`;
-  }
-
-  private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {
-    const best = this.mobilizationSystem.getMobilizationOptions()
-      .filter(o => o.canMobilize)
-      .sort((a, b) => {
-        const aThreat = getTopThreats(this.state, a.territory.owner ?? '')[0]?.territoryId === a.territory.id ? 5 : 0;
-        const bThreat = getTopThreats(this.state, b.territory.owner ?? '')[0]?.territoryId === b.territory.id ? 5 : 0;
-        const aValue = aThreat + (a.territory.isCapital ? 10 : 0) + (a.territory.hasFactory ? 7 : 0) + a.territory.production + a.units.reduce((s, u) => s + u.count, 0);
-        const bValue = bThreat + (b.territory.isCapital ? 10 : 0) + (b.territory.hasFactory ? 7 : 0) + b.territory.production + b.units.reduce((s, u) => s + u.count, 0);
-        return bValue - aValue || a.cost - b.cost;
-      })[0];
-
-    if (!best) return null;
-    return {
-      territoryId: best.territory.id,
-      label: `Mobilize ${best.territory.name}`,
-      detail: `${best.type} package, ${best.cost} IPC`,
-    };
-  }
-
-  private getBestMovementSource(factionId: string): { territoryId: string; label: string; detail: string; attacks: number; moves: number } | null {
-    const phase = this.state.currentPhase;
-    const allowAttacks = isAttackMovePhase(phase);
-    const candidates: Array<{ territoryId: string; label: string; detail: string; attacks: number; moves: number; score: number }> = [];
-
-    for (const territory of this.state.territories.values()) {
-      if (territory.owner !== factionId || territory.isSea()) continue;
-
-      const moveTargets = new Set<string>();
-      const attackTargets = new Set<string>();
-      let readyUnits = 0;
-      let attackPower = 0;
-
-      for (const unit of territory.units) {
-        const ready = territory.getAvailableUnitCount(unit.unitTypeId);
-        if (ready <= 0) continue;
-        readyUnits += ready;
-        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
-        attackPower += ready * (unitType?.attack ?? 0);
-
-        for (const move of this.movementValidator.getValidMoves(unit.unitTypeId, territory.id, allowAttacks)) {
-          if (move.isAttack) attackTargets.add(move.territoryId);
-          else moveTargets.add(move.territoryId);
-        }
-      }
-
-      const attacks = attackTargets.size;
-      const moves = moveTargets.size;
-      if (readyUnits === 0 || (attacks + moves) === 0) continue;
-      const strongestTarget = Array.from(attackTargets)
-        .map(id => this.state.territories.get(id))
-        .filter((t): t is NonNullable<typeof t> => !!t)
-        .sort((a, b) => (b.production + (b.hasFactory ? 4 : 0) + (b.isCapital ? 8 : 0)) - (a.production + (a.hasFactory ? 4 : 0) + (a.isCapital ? 8 : 0)))[0];
-
-      candidates.push({
-        territoryId: territory.id,
-        label: attacks > 0 ? `Inspect attack from ${territory.name}` : `Move from ${territory.name}`,
-        detail: attacks > 0
-          ? `${readyUnits} ready units, ${attacks} attack target${attacks === 1 ? '' : 's'}${strongestTarget ? `, best: ${strongestTarget.name}` : ''}`
-          : `${readyUnits} ready units, ${moves} move target${moves === 1 ? '' : 's'}`,
-        attacks,
-        moves,
-        score: attacks * 8 + moves + attackPower,
-      });
-    }
-
-    return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
-  }
-
   private getMovementCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
     headline: string;
     detail: string;
@@ -5119,7 +5033,7 @@ export class HUD {
     const selectedReady = selected?.owner === faction.id
       ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
       : 0;
-    const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
+    const source = selectedReady > 0 ? selected : getBestMovementSource(this.state, this.movementValidator, faction.id);
 
     if (source && 'id' in source) {
       return {
@@ -5165,7 +5079,7 @@ export class HUD {
     const phase = this.state.currentPhase as string;
 
     if (phase === 'play') {
-      const target = this.getBestMobilizationTarget();
+      const target = getBestMobilizationTarget(this.mobilizationSystem, this.state);
       if (target) {
         return {
           headline: target.label,
@@ -5181,7 +5095,7 @@ export class HUD {
     }
 
     if (isBuildPhase(phase)) {
-      const target = this.getBestMobilizationTarget();
+      const target = getBestMobilizationTarget(this.mobilizationSystem, this.state);
       if (target) {
         return {
           headline: target.label,
@@ -5241,7 +5155,7 @@ export class HUD {
     if (action === 'recommended-action') {
       const phase = this.state.currentPhase as string;
       if (phase === 'play') {
-        const mobilizeTarget = this.getBestMobilizationTarget();
+        const mobilizeTarget = getBestMobilizationTarget(this.mobilizationSystem, this.state);
         if (mobilizeTarget) {
           this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
         } else if (isAttackMovePhase(phase)) {
@@ -5318,7 +5232,7 @@ export class HUD {
       opportunityLine,
       economyLine: `${faction.ipcs} IPC, +${income}/turn`,
       coach,
-      mobilizationAdvice: this.getMobilizationAdvice(),
+      mobilizationAdvice: getMobilizationAdvice(this.mobilizationSystem, this.gameConfig.mapId ?? 'grid'),
       simpleMode: this.gameConfig.simpleMode,
     });
   }
@@ -5340,7 +5254,7 @@ export class HUD {
       capitalName: capital?.name ?? 'Your capital',
       threatName: firstThreat ?? 'No urgent threat',
       pressureName: firstTarget ?? 'Nearest enemy border',
-      mobilizationAdvice: this.getMobilizationAdvice(),
+      mobilizationAdvice: getMobilizationAdvice(this.mobilizationSystem, this.gameConfig.mapId ?? 'grid'),
       coachHeadline: coach.headline,
       coachDetail: coach.detail,
       recommendedTerritoryId,
