@@ -54,7 +54,7 @@
     "@playwright/test": "^1.61.1",
     "concurrently": "^8.2.0",
     "cross-env": "^10.1.0",
-    "electron": "^28.3.3",
+    "electron": "^43.1.1",
     "electron-builder": "^24.9.1",
     "eslint": "^10.7.0",
     "jsdom": "^29.0.2",
