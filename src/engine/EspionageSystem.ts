@@ -4,6 +4,7 @@
  */
 
 import { GameState } from './GameState';
+import { rng } from './rng';
 import { battleLog } from '../ui/BattleLog';
 
 export type EspionageOpType =
@@ -160,9 +161,9 @@ export class EspionageSystem {
     // Target's counter-intelligence reduces success chance
     const counterIntel = target.bonuses?.counterIntelBonus ?? 0;
     const adjustedChance = op.successChance * (1 - counterIntel);
-    const success = Math.random() < adjustedChance;
+    const success = rng.next() < adjustedChance;
     // 15% exposure chance on failure
-    const exposed = !success && Math.random() < 0.15;
+    const exposed = !success && rng.next() < 0.15;
 
     let detail = '';
 
@@ -224,7 +225,7 @@ export class EspionageSystem {
         const factories = Array.from(this.state.territories.values())
           .filter(t => t.owner === targetFactionId && t.hasFactory);
         if (factories.length === 0) return `No factories found in ${target.name}.`;
-        const picked = factories[Math.floor(Math.random() * factories.length)];
+        const picked = factories[Math.floor(rng.next() * factories.length)];
         picked.bombedUntilTurn = this.state.turnNumber + 1;
         return `${picked.name}'s factory sabotaged for 1 turn.`;
       }
@@ -275,7 +276,7 @@ export class EspionageSystem {
         const count = Math.min(2, factories.length);
         const names: string[] = [];
         for (let i = 0; i < count; i++) {
-          const f = factories[Math.floor(Math.random() * factories.length)];
+          const f = factories[Math.floor(rng.next() * factories.length)];
           f.bombedUntilTurn = Math.max(f.bombedUntilTurn ?? 0, this.state.turnNumber + 2);
           names.push(f.name);
         }

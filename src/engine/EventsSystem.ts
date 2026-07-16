@@ -4,6 +4,7 @@
  */
 
 import { GameState } from './GameState';
+import { rng } from './rng';
 import { Territory } from '../data/Territory';
 import { Faction } from '../data/Faction';
 import { spawnUnitsOnTerritory } from './navalPlacement';
@@ -790,7 +791,7 @@ export class EventsSystem {
 
     // 30% base chance of an event each turn
     const eventChance = 0.30;
-    if (Math.random() > eventChance) return null;
+    if (rng.next() > eventChance) return null;
 
     // Get eligible events
     const eligibleEvents = STRATEGIC_EVENTS.filter(event => {
@@ -812,7 +813,7 @@ export class EventsSystem {
 
     // Weight-based selection
     const totalWeight = eligibleEvents.reduce((sum, e) => sum + e.weight, 0);
-    let roll = Math.random() * totalWeight;
+    let roll = rng.next() * totalWeight;
     
     for (const event of eligibleEvents) {
       roll -= event.weight;
@@ -895,7 +896,7 @@ export class EventsSystem {
       case 'factory_damage': {
         const factories = this.getFactoryTerritories(factionId);
         if (factories.length > 0) {
-          const target = factories[Math.floor(Math.random() * factories.length)];
+          const target = factories[Math.floor(rng.next() * factories.length)];
           target.bombedUntilTurn = this.state.turnNumber + 2;
         }
         break;
@@ -921,9 +922,9 @@ export class EventsSystem {
         const occupied = Array.from(this.state.territories.values()).filter(
           t => t.owner !== null && t.owner !== factionId && t.originalOwner === factionId && t.isLand()
         );
-        const count = Math.min(occupied.length, 1 + Math.floor(Math.random() * 2));
+        const count = Math.min(occupied.length, 1 + Math.floor(rng.next() * 2));
         for (let i = 0; i < count; i++) {
-          const t = occupied[Math.floor(Math.random() * occupied.length)];
+          const t = occupied[Math.floor(rng.next() * occupied.length)];
           t.addUnits('partisan', 1);
         }
         break;
@@ -935,7 +936,7 @@ export class EventsSystem {
           t => t.owner === factionId && !t.isCapital && t.isLand() && t.originalOwner && t.originalOwner !== factionId
         );
         if (revoltable.length > 0) {
-          const revolted = revoltable[Math.floor(Math.random() * revoltable.length)];
+          const revolted = revoltable[Math.floor(rng.next() * revoltable.length)];
           revolted.owner = revolted.originalOwner;
         }
         break;
@@ -953,7 +954,7 @@ export class EventsSystem {
           f => f.id !== factionId && !f.isDefeated
         );
         if (enemies.length > 0) {
-          const target = enemies[Math.floor(Math.random() * enemies.length)];
+          const target = enemies[Math.floor(rng.next() * enemies.length)];
           this.state.systems.espionageSystem?.revealFactionIntel?.(target.id, 3);
         }
         break;
@@ -985,13 +986,13 @@ export class EventsSystem {
           })
         );
         return frontline.length > 0 
-          ? frontline[Math.floor(Math.random() * frontline.length)]
+          ? frontline[Math.floor(rng.next() * frontline.length)]
           : ownedTerritories[0];
       }
 
       case 'random_territory':
       default:
-        return ownedTerritories[Math.floor(Math.random() * ownedTerritories.length)];
+        return ownedTerritories[Math.floor(rng.next() * ownedTerritories.length)];
     }
   }
 

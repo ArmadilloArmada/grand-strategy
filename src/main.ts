@@ -4,6 +4,22 @@
  */
 
 import { GameState } from './engine/GameState';
+import { rng } from './engine/rng';
+import { buildSaveSlotsHtml } from './ui/saveSlotsView';
+import { buildCreditsHtml } from './ui/creditsView';
+import { buildSaveConfirmModalHtml } from './ui/saveConfirmModalView';
+import { resolveKeyboardShortcut, ShortcutAction } from './ui/keyboardShortcuts';
+import {
+  SCENARIO_BRIEFINGS,
+  buildScenarioBriefingHtml,
+  buildSimpleCampaignBriefingHtml,
+} from './ui/scenarioBriefingView';
+import {
+  summarizeFactionForAI,
+  describeAITurnDelta,
+  describeAIDoctrine,
+  formatEventEffects,
+} from './ui/aiTurnNarration';
 import { mergePersistedGameConfig } from './engine/GameConfig';
 import { TurnManager } from './engine/TurnManager';
 import { AIController } from './engine/AIController';
@@ -140,6 +156,9 @@ class Game {
 
     // Apply theme immediately from saved settings
     this.applyTheme(settings.getSetting('theme') ?? 'dark');
+    // Set the colorblind palette flag before any factions load so new games
+    // and loaded saves pick up the correct colors on first render.
+    this.state.factionRegistry.setColorblindMode(settings.getSetting('colorblindMode') ?? false);
 
     // Apply AI difficulty and speed from settings
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -437,22 +456,7 @@ class Game {
     const overlay = document.createElement('div');
     overlay.id = 'scenario-briefing-overlay';
     overlay.className = 'scenario-briefing-overlay';
-    overlay.innerHTML = `
-      <div class="scenario-briefing-card">
-        <div class="scenario-briefing-kicker">Simple Campaign</div>
-        <h2>Your First Command</h2>
-        <p class="scenario-briefing-subtitle">One command phase per turn — mobilize, move, attack, then End Turn. The Co-Pilot will guide each step.</p>
-        <div class="scenario-briefing-goals">
-          <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
-          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack — use Play Tactical (T) on contested fights.</strong></div>
-          <div class="scenario-briefing-goal"><span>3</span><strong>Capture 2 enemy capitals before turn 25 to win.</strong></div>
-        </div>
-        <div class="scenario-briefing-doctrine">Easy AI · Favorable economy · Co-Pilot coaching enabled</div>
-        <div class="scenario-briefing-actions">
-          <button class="primary" id="btn-start-command">Begin Turn 1</button>
-        </div>
-      </div>
-    `;
+    overlay.innerHTML = buildSimpleCampaignBriefingHtml();
     document.body.appendChild(overlay);
     document.getElementById('btn-start-command')?.addEventListener('click', () => overlay.remove());
   }
@@ -487,57 +491,17 @@ class Game {
   private showScenarioBriefing(scenario: string): void {
     document.getElementById('scenario-briefing-overlay')?.remove();
 
-    const briefings: Record<string, { title: string; subtitle: string; goals: string[]; doctrine: string }> = {
-      'hold-capital': {
-        title: 'Hold the Capital',
-        subtitle: 'Protect Washington D.C. long enough to turn the front line.',
-        goals: ['Build defenders first.', 'Use the Threats overlay to spot danger.', 'End the turn when the co-pilot has no urgent warning.'],
-        doctrine: 'Defensive AI: reinforces strongholds and punishes exposed capitals.',
-      },
-      'factory-rush': {
-        title: 'Factory Rush',
-        subtitle: 'Win by turning production into unstoppable pressure.',
-        goals: ['Use Buy & Auto-Deploy in factory territories.', 'Protect production hubs.', 'Bank income when the front is stable.'],
-        doctrine: 'Economic AI: expands factories and tries to outproduce you.',
-      },
-      'first-war': {
-        title: 'First War',
-        subtitle: 'Learn the clean loop: build, move, fight, review.',
-        goals: ['Follow Do This Next.', 'Attack only when the preview looks favorable.', 'Watch moved units become ready next turn.'],
-        doctrine: 'Aggressive AI: looks for early attacks and weak borders.',
-      },
-    };
-
-    const briefing = briefings[scenario] ?? {
+    const briefing = SCENARIO_BRIEFINGS[scenario] ?? {
       title: 'Scenario',
       subtitle: 'A guided operation is ready.',
       goals: ['Follow the co-pilot.', 'Keep factories protected.', 'End turns when your plan is complete.'],
-      doctrine: `AI doctrine: ${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
+      doctrine: `AI doctrine: ${describeAIDoctrine(this.hud.gameConfig.aiPersonality)}.`,
     };
 
     const overlay = document.createElement('div');
     overlay.id = 'scenario-briefing-overlay';
     overlay.className = 'scenario-briefing-overlay';
-    overlay.innerHTML = `
-      <div class="scenario-briefing-card">
-        <div class="scenario-briefing-kicker">Operation Briefing</div>
-        <h2>${briefing.title}</h2>
-        <p class="scenario-briefing-subtitle">${briefing.subtitle}</p>
-        <div class="scenario-briefing-goals">
-          ${briefing.goals.map((goal, index) => `
-            <div class="scenario-briefing-goal">
-              <span>${index + 1}</span>
-              <strong>${goal}</strong>
-            </div>
-          `).join('')}
-        </div>
-        <div class="scenario-briefing-doctrine">${briefing.doctrine}</div>
-        <div class="scenario-briefing-actions">
-          <button class="primary" id="btn-start-command">Start Command</button>
-          <button id="btn-briefing-copilot">Show Co-Pilot</button>
-        </div>
-      </div>
-    `;
+    overlay.innerHTML = buildScenarioBriefingHtml(briefing);
     document.body.appendChild(overlay);
 
     const close = () => overlay.remove();
@@ -553,6 +517,10 @@ class Game {
    */
   startNewGame(): void {
     this.hud.resetVictoryState();
+    // Seed the RNG for reproducible games when a seed is provided; otherwise use
+    // non-deterministic randomness (rng falls back to Math.random when unseeded).
+    const configuredSeed = this.hud.gameConfig.seed?.trim();
+    rng.seed(configuredSeed ? configuredSeed : null);
     const mapId = this.hud.gameConfig.mapId ?? 'grid';
     const mapEntry = getMapEntry(mapId);
     const mapToLoad = mapEntry?.data ?? gridMapData;
@@ -849,25 +817,7 @@ class Game {
     const modal = document.createElement('div');
     modal.id = 'save-confirm-modal';
     modal.className = 'modal';
-    modal.innerHTML = `
-      <div class="modal-content" style="text-align: center; max-width: 400px;">
-        <h2>💾 Save Current Game?</h2>
-        <p style="margin: 1rem 0; color: #aaa;">
-          You have a game in progress. Starting fresh will not load your autosave; it stays available from the Resume tab until another autosave replaces it.
-        </p>
-        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
-          <button id="btn-save-and-continue" class="primary" style="padding: 0.8rem;">
-            💾 Save and Continue
-          </button>
-          <button id="btn-discard-game" style="padding: 0.8rem; background: #dc2626;">
-            🗑️ Don't Save
-          </button>
-          <button id="btn-cancel-leave" style="padding: 0.8rem;">
-            ↩️ Cancel
-          </button>
-        </div>
-      </div>
-    `;
+    modal.innerHTML = buildSaveConfirmModalHtml();
     document.body.appendChild(modal);
 
     document.getElementById('btn-save-and-continue')?.addEventListener('click', () => {
@@ -1117,68 +1067,7 @@ class Game {
       position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;
       display:flex;align-items:center;justify-content:center;
     `;
-    overlay.innerHTML = `
-      <div style="
-        background:#0f172a;border:1px solid #334155;border-radius:14px;
-        padding:2.5rem 3rem;max-width:540px;width:90%;color:#e2e8f0;
-        max-height:80vh;overflow-y:auto;box-shadow:0 0 60px rgba(0,0,0,0.8);
-      ">
-        <div style="text-align:center;margin-bottom:2rem;">
-          <div style="font-size:2.5rem;">🌍</div>
-          <h2 style="margin:0.5rem 0 0.25rem;color:#60a5fa;font-size:1.6rem;letter-spacing:0.05em;">
-            GRAND STRATEGY
-          </h2>
-          <p style="margin:0;color:#64748b;font-size:0.9rem;">Version 1.0.0</p>
-        </div>
-
-        <section style="margin-bottom:1.5rem;">
-          <h3 style="color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 0.75rem;">
-            Development
-          </h3>
-          <p style="margin:0 0 0.4rem;font-weight:bold;">ArmadilloArmada</p>
-          <p style="margin:0;color:#64748b;font-size:0.9rem;">Game design, programming, art</p>
-        </section>
-
-        <section style="margin-bottom:1.5rem;">
-          <h3 style="color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 0.75rem;">
-            Built With
-          </h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.9rem;color:#94a3b8;">
-            <span>⚡ Electron</span><span>🛠️ Vite</span>
-            <span>🔷 TypeScript</span><span>🎮 steamworks.js</span>
-            <span>🧪 Vitest</span><span>🎨 HTML5 Canvas</span>
-          </div>
-        </section>
-
-        <section style="margin-bottom:1.5rem;">
-          <h3 style="color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 0.75rem;">
-            Inspired By
-          </h3>
-          <p style="margin:0;color:#94a3b8;font-size:0.9rem;">
-            TripleA · Axis &amp; Allies · Hearts of Iron
-          </p>
-        </section>
-
-        <section style="margin-bottom:2rem;">
-          <h3 style="color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 0.75rem;">
-            Open Source Licenses
-          </h3>
-          <p style="margin:0;color:#64748b;font-size:0.85rem;line-height:1.6;">
-            This game uses open-source software. All third-party libraries
-            are used under their respective licenses (MIT, Apache 2.0, BSD).
-            Full license text is included in the installation directory
-            under <code style="color:#94a3b8;">licenses/</code>.
-          </p>
-        </section>
-
-        <div style="text-align:center;">
-          <button id="btn-close-credits" style="
-            background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;
-            border-radius:8px;padding:0.5rem 2rem;font-size:1rem;cursor:pointer;
-          ">Close</button>
-        </div>
-      </div>
-    `;
+    overlay.innerHTML = buildCreditsHtml();
     document.body.appendChild(overlay);
 
     const close = () => overlay.remove();
@@ -1268,40 +1157,12 @@ class Game {
     if (!container) return;
 
     const slots = this.saveManager.getSlots();
-    let html = '';
-
-    for (const slot of slots) {
-      const isEmpty = slot.isEmpty;
-      const factionName = slot.currentFaction 
-        ? this.state.factionRegistry.get(slot.currentFaction)?.name || slot.currentFaction
-        : '';
-
-      html += `
-        <div class="save-slot ${isEmpty ? 'empty' : ''}" data-slot="${slot.id}">
-          <div class="save-slot-info">
-            <div class="save-slot-name">${isEmpty ? `Empty Slot ${slot.id}` : this.escapeHTML(slot.name)}</div>
-            <div class="save-slot-details">
-              ${isEmpty 
-                ? 'No save data' 
-                : `Turn ${slot.turnNumber} • ${factionName} • ${this.saveManager.formatTimestamp(slot.timestamp)}`
-              }
-            </div>
-          </div>
-          <div class="save-slot-actions">
-            ${this.saveLoadMode === 'save' 
-              ? `<button class="btn-slot-save primary" data-slot="${slot.id}">Save</button>`
-              : isEmpty 
-                ? '' 
-                : `<button class="btn-slot-load primary" data-slot="${slot.id}">Load</button>`
-            }
-            ${!isEmpty ? `<button class="btn-slot-rename" data-slot="${slot.id}">Rename</button>` : ''}
-            ${!isEmpty ? `<button class="btn-slot-delete danger" data-slot="${slot.id}">🗑️</button>` : ''}
-          </div>
-        </div>
-      `;
-    }
-
-    container.innerHTML = html;
+    container.innerHTML = buildSaveSlotsHtml(
+      slots,
+      this.saveLoadMode,
+      (factionId) => this.state.factionRegistry.get(factionId)?.name || factionId,
+      (timestamp) => this.saveManager.formatTimestamp(timestamp),
+    );
 
     // Add event listeners
     container.querySelectorAll('.btn-slot-save').forEach(btn => {
@@ -1372,16 +1233,6 @@ class Game {
     });
   }
 
-  private escapeHTML(value: string): string {
-    return value.replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    }[char] ?? char));
-  }
-
   /**
    * Show settings modal
    */
@@ -1416,6 +1267,7 @@ class Game {
     (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked = s.dynamicWeather ?? true;
     (document.getElementById('setting-fortifications') as HTMLInputElement).checked = s.fortifications ?? true;
     (document.getElementById('setting-theme') as HTMLSelectElement).value = s.theme ?? 'dark';
+    (document.getElementById('setting-colorblind') as HTMLInputElement).checked = s.colorblindMode ?? false;
 
     // Sync fullscreen button label
     const fsBtn = document.getElementById('btn-toggle-fullscreen') as HTMLButtonElement | null;
@@ -1466,9 +1318,11 @@ class Game {
       dynamicWeather: (document.getElementById('setting-dynamic-weather') as HTMLInputElement).checked,
       fortifications: (document.getElementById('setting-fortifications') as HTMLInputElement).checked,
       theme: (document.getElementById('setting-theme') as HTMLSelectElement).value as 'dark' | 'light',
+      colorblindMode: (document.getElementById('setting-colorblind') as HTMLInputElement).checked,
     });
 
     this.applyTheme(settings.getSetting('theme'));
+    this.applyColorblindMode(settings.getSetting('colorblindMode'));
 
     // Apply AI difficulty and personality
     this.aiController.setDifficulty(settings.getSetting('aiDifficulty'));
@@ -1483,6 +1337,17 @@ class Game {
     document.body.classList.toggle('theme-light', theme === 'light');
     const btn = document.getElementById('btn-theme-toggle');
     if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+
+  /**
+   * Enable/disable the colorblind-safe faction palette and repaint the map so
+   * the change is visible immediately.
+   */
+  applyColorblindMode(enabled: boolean): void {
+    this.state.factionRegistry.setColorblindMode(enabled);
+    if (this.isGameStarted) {
+      this.hud.repaintMap();
+    }
   }
 
   /**
@@ -1869,92 +1734,67 @@ class Game {
             this.hideGameMenu();
           }
         }
+        return;
       }
 
-      // Ctrl+S - Quick save
-      if (e.key === 's' && e.ctrlKey) {
-        e.preventDefault();
+      // All other hotkeys resolve through a pure mapping; we perform the effects.
+      const resolution = resolveKeyboardShortcut(e, {
+        isGameStarted: this.isGameStarted,
+        phase: this.state.currentPhase as string,
+        isHumanTurn: this.state.getCurrentFaction()?.controlledBy === 'human',
+      });
+      if (!resolution) return;
+      if (resolution.preventDefault) e.preventDefault();
+      this.dispatchKeyboardShortcut(resolution.action);
+    });
+  }
+
+  /** Perform the side effect for a resolved keyboard shortcut action. */
+  private dispatchKeyboardShortcut(action: ShortcutAction): void {
+    switch (action) {
+      case 'quick-save':
         this.quickSaveWithFeedback();
-      }
-
-      // Ctrl+L - Quick load
-      if (e.key === 'l' && e.ctrlKey) {
-        e.preventDefault();
+        break;
+      case 'quick-load':
         this.quickLoadWithFeedback();
-      }
-
-      // Enter or Space - End phase
-      if ((e.key === 'Enter' || e.key === ' ') && this.isGameStarted) {
-        const faction = this.state.getCurrentFaction();
-        if (faction?.controlledBy === 'human') {
-          e.preventDefault();
-          document.getElementById('btn-end-phase')?.click();
-        }
-      }
-
-      // B - Open build menu (during build phases)
-      if (e.key === 'b' && this.isGameStarted) {
-        const phase = this.state.currentPhase as string;
-        if (['purchase', 'production', 'build', 'play'].includes(phase)) {
-          e.preventDefault();
-          document.getElementById('btn-build')?.click();
-        }
-      }
-
-      // P - Production placement (during production phase)
-      if (e.key === 'p' && this.isGameStarted) {
-        if (this.state.currentPhase === 'production') {
-          e.preventDefault();
-          document.getElementById('btn-build')?.click();
-        }
-      }
-
-      // A - Resolve combat (during combat phase)
-      if (e.key === 'a' && this.isGameStarted) {
-        if (this.state.currentPhase === 'combat') {
-          this.hud.resolveCombat();
-        }
-      }
-
-      // H - Help/Tutorial
-      if (e.key === 'h' && this.isGameStarted) {
+        break;
+      case 'end-phase':
+        document.getElementById('btn-end-phase')?.click();
+        break;
+      case 'open-build':
+        document.getElementById('btn-build')?.click();
+        break;
+      case 'resolve-combat':
+        this.hud.resolveCombat();
+        break;
+      case 'help':
         document.getElementById('help-button')?.click();
-      }
-
-      // F - Fit map to screen
-      if (e.key === 'f' && this.isGameStarted) {
+        break;
+      case 'reset-view':
         this.resetViewAndPanels();
         this.hud.showToast('View and panels reset', 'info');
-      }
-
-      // C - Center on capital
-      if (e.key === 'c' && this.isGameStarted) {
+        break;
+      case 'center-capital': {
         const faction = this.state.getCurrentFaction();
         if (faction) {
           this.renderer.centerOnTerritory(faction.capital);
           this.hud.showToast('Centered on capital', 'info');
         }
+        break;
       }
-
-      // Tab / Shift+Tab - Next/previous territory
-      if (e.key === 'Tab' && this.isGameStarted) {
-        e.preventDefault();
-        this.hud.cycleSelectedTerritory(e.shiftKey ? -1 : 1);
-      }
-
-      // O - Toggle map overlay (range / threat)
-      if (e.key === 'o' && this.isGameStarted) {
-        e.preventDefault();
+      case 'cycle-territory-next':
+        this.hud.cycleSelectedTerritory(1);
+        break;
+      case 'cycle-territory-prev':
+        this.hud.cycleSelectedTerritory(-1);
+        break;
+      case 'cycle-overlay':
         this.hud.cycleOverlay();
-      }
-
-      // ? - Keyboard shortcut cheat-sheet
-      if (e.key === '?' && this.isGameStarted) {
-        e.preventDefault();
+        break;
+      case 'toggle-shortcut-sheet':
         this.hud.toggleShortcutSheet();
-      }
-
-    });
+        break;
+    }
   }
 
   /**
@@ -2026,18 +1866,18 @@ class Game {
     }
     
     // Show AI indicator
-    this.hud.showToast(`${faction.name} is playing (${this.describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
+    this.hud.showToast(`${faction.name} is playing (${describeAIDoctrine(this.hud.gameConfig.aiPersonality)} doctrine)...`, 'info');
     
     // Wait so player can see
     await new Promise(resolve => setTimeout(resolve, settings.getAIDelay()));
     
-    const aiBefore = this.captureAISummary(faction.id);
+    const aiBefore = summarizeFactionForAI(this.state, faction.id);
 
     // Execute AI's full turn (all phases)
     await this.aiController.executeTurn();
     this.renderer.render();
     this.hud.renderMinimap();
-    const aiSummary = this.describeAITurn(faction.id, aiBefore);
+    const aiSummary = describeAITurnDelta(aiBefore, summarizeFactionForAI(this.state, faction.id));
     if (aiSummary) {
       battleLog.addAI(this.state.turnNumber, faction.name, faction.color, aiSummary, 'Turn recap');
       this.hud.showToast(`${faction.name}: ${aiSummary}`, 'info');
@@ -2053,17 +1893,6 @@ class Game {
     await new Promise(resolve => setTimeout(resolve, 200));
   }
 
-  private captureAISummary(factionId: string): { territories: number; units: number; ipcs: number; capitals: number } {
-    const faction = this.state.factionRegistry.get(factionId);
-    const territories = Array.from(this.state.territories.values()).filter(t => t.owner === factionId);
-    return {
-      territories: territories.length,
-      units: territories.reduce((sum, territory) => sum + territory.getTotalUnitCount(), 0),
-      ipcs: faction?.ipcs ?? 0,
-      capitals: territories.filter(t => t.isCapital).length,
-    };
-  }
-
   private focusMostRelevantAITerritory(factionId: string): void {
     const candidate = Array.from(this.state.territories.values())
       .filter(t => t.owner === factionId)
@@ -2075,32 +1904,6 @@ class Game {
     if (!candidate) return;
     this.renderer.centerOnTerritory(candidate.id);
     this.renderer.setAIPulseTerritory(candidate.id);
-  }
-
-  private describeAITurn(factionId: string, before: { territories: number; units: number; ipcs: number; capitals: number }): string {
-    const after = this.captureAISummary(factionId);
-    const territoryDelta = after.territories - before.territories;
-    const unitDelta = after.units - before.units;
-    const ipcDelta = after.ipcs - before.ipcs;
-    const parts: string[] = [];
-    if (territoryDelta > 0) parts.push(`captured ${territoryDelta} territor${territoryDelta === 1 ? 'y' : 'ies'}`);
-    if (territoryDelta < 0) parts.push(`lost ${Math.abs(territoryDelta)} territor${territoryDelta === -1 ? 'y' : 'ies'}`);
-    if (unitDelta > 0) parts.push(`added ${unitDelta} units`);
-    if (unitDelta < 0) parts.push(`lost ${Math.abs(unitDelta)} units`);
-    if (ipcDelta > 0) parts.push(`banked +${ipcDelta} IPC`);
-    if (ipcDelta < 0) parts.push(`spent ${Math.abs(ipcDelta)} IPC`);
-    if (after.capitals > before.capitals) parts.unshift('captured a capital');
-    return parts.length > 0 ? parts.slice(0, 3).join(', ') : 'held position and reorganized';
-  }
-
-  private describeAIDoctrine(personality?: string): string {
-    switch (personality) {
-      case 'aggressive': return 'aggressive';
-      case 'defensive': return 'defensive';
-      case 'economic': return 'economic';
-      case 'balanced': return 'balanced';
-      default: return 'standard';
-    }
   }
 
   /**
@@ -2140,7 +1943,7 @@ class Game {
 
       // Show effects summary
       if (event.type !== 'choice') {
-        effectsEl.innerHTML = this.formatEventEffects(event.effects);
+        effectsEl.innerHTML = formatEventEffects(event.effects);
         effectsEl.style.display = 'block';
         choicesEl.style.display = 'none';
         okContainer.style.display = 'block';
@@ -2160,7 +1963,7 @@ class Game {
             btn.innerHTML = `
               <div style="font-weight: bold;">${choice.text}</div>
               <div style="font-size: 0.8rem; color: #aaa; margin-top: 0.25rem;">
-                ${this.formatEventEffects(choice.effects)}
+                ${formatEventEffects(choice.effects)}
               </div>
             `;
             btn.addEventListener('click', () => {
@@ -2189,32 +1992,6 @@ class Game {
       soundManager.play('event');
     });
   }
-
-  /**
-   * Format event effects for display
-   */
-  private formatEventEffects(effects: { type: string; value?: number; unitType?: string; duration?: number }[]): string {
-    if (effects.length === 0) return '<span style="color: #666;">No immediate effects</span>';
-
-    return effects.map(e => {
-      const sign = (e.value ?? 0) >= 0 ? '+' : '';
-      switch (e.type) {
-        case 'ipc_bonus': return `<span style="color: #22c55e;">💰 ${sign}${e.value} IPCs</span>`;
-        case 'ipc_penalty': return `<span style="color: #ef4444;">💸 -${e.value} IPCs</span>`;
-        case 'unit_spawn': return `<span style="color: #22c55e;">🎖️ +${e.value} ${e.unitType || 'units'}</span>`;
-        case 'unit_loss': return `<span style="color: #ef4444;">☠️ -${e.value} ${e.unitType || 'units'}</span>`;
-        case 'attack_bonus': return `<span style="color: #f59e0b;">⚔️ +${e.value} attack${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'defense_bonus': return `<span style="color: #3b82f6;">🛡️ +${e.value} defense${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'movement_bonus': return `<span style="color: #8b5cf6;">🚀 ${sign}${e.value} movement${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'production_bonus': return `<span style="color: #22c55e;">🏭 +${e.value} production${e.duration ? ` (${e.duration} turns)` : ''}</span>`;
-        case 'factory_damage': return `<span style="color: #ef4444;">💥 Factory damaged</span>`;
-        case 'morale_boost': return `<span style="color: #22c55e;">✨ Morale boost</span>`;
-        case 'intel_reveal': return `<span style="color: #3b82f6;">🕵️ Enemy intel revealed</span>`;
-        default: return `<span>${e.type}</span>`;
-      }
-    }).join('<br>');
-  }
-
 
   /**
    * Auto save at end of each phase
@@ -2492,7 +2269,9 @@ class Game {
     this.hideMainMenu();
     settings.update({
       gameSpeed: 'fast',
-      tacticalBattles: false,
+      // Preserve the pre-configured tactical-battles setting so tests can opt in;
+      // it defaults to false (set by the E2E setup helper) for deterministic dice combat.
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
       battleAnimations: false,
       battleNarratives: false,
       confirmEndTurn: false,

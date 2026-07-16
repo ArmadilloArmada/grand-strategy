@@ -1,8 +1,27 @@
 import type { Page } from '@playwright/test';
 import type { E2ESnapshot } from '../src/e2e/browserApi';
 
+/**
+ * The single authoritative set of settings overrides applied to every E2E run.
+ * These keep smoke tests fast and deterministic (no animations, narratives, or
+ * random events). `tacticalBattles` is intentionally omitted here so it can be
+ * opted into per-test without being clobbered — see the note below.
+ */
+const FAST_E2E_SETTINGS: Record<string, unknown> = {
+  gameSpeed: 'fast',
+  battleAnimations: false,
+  battleNarratives: false,
+  confirmEndTurn: false,
+  midGameObjectives: false,
+  commanderProgression: false,
+};
+
 export async function setupFastE2E(page: Page, options?: { tacticalBattles?: boolean }): Promise<void> {
-  await page.addInitScript((opts) => {
+  // `tacticalBattles` is passed as null when not specified so a later call
+  // (e.g. a test opting in) is not overwritten by the default `beforeEach`
+  // setup. Init scripts run on every navigation and share one localStorage key,
+  // so we preserve any previously written value instead of forcing it back off.
+  await page.addInitScript(({ base, tacticalBattles }) => {
     const key = 'grand-strategy-settings';
     let settings: Record<string, unknown> = {};
     try {
@@ -10,19 +29,15 @@ export async function setupFastE2E(page: Page, options?: { tacticalBattles?: boo
     } catch {
       settings = {};
     }
+    const existingTactical = typeof settings.tacticalBattles === 'boolean' ? settings.tacticalBattles : false;
     localStorage.setItem(key, JSON.stringify({
       ...settings,
-      gameSpeed: 'fast',
-      tacticalBattles: opts?.tacticalBattles ?? false,
-      battleAnimations: false,
-      battleNarratives: false,
-      confirmEndTurn: false,
-      midGameObjectives: false,
-      commanderProgression: false,
+      ...base,
+      tacticalBattles: tacticalBattles === null ? existingTactical : tacticalBattles,
     }));
     // Keep strategic events from interrupting smoke tests.
     Math.random = () => 0.99;
-  }, { tacticalBattles: options?.tacticalBattles ?? false });
+  }, { base: FAST_E2E_SETTINGS, tacticalBattles: options?.tacticalBattles ?? null });
 }
 
 export async function startTutorialMatch(page: Page): Promise<void> {
