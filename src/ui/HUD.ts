@@ -52,6 +52,7 @@ import {
 import { getNavalStatusHtml } from './navalStatusView';
 import { buildFactionSummaryHtml } from './factionSummaryView';
 import { buildSimpleTerritoryDetails } from './territoryDetailsView';
+import { buildUnitTooltipHtml } from './unitTooltipView';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
 import { sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
 import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
@@ -3619,40 +3620,20 @@ export class HUD {
 
     const icon = this.unitIcon(unitTypeId);
 
-    // Tech bonuses for current faction
+    // Tech bonuses + morale for the current faction feed the tooltip display.
     const faction = this.state.getCurrentFaction();
     const techEffect = faction && this.state.systems.technologyManager
       ? this.state.systems.technologyManager.getTechEffect(faction.id)
       : null;
-    const techAtkBonus = techEffect?.attackBonus ?? 0;
-    const techDefBonus = techEffect?.defenseBonus ?? 0;
-    const atkDisplay = techAtkBonus
-      ? `${unitType.attack} <span style="color:#22c55e;font-size:0.8em;">(+${techAtkBonus} tech)</span>`
-      : String(unitType.attack);
-    const defDisplay = techDefBonus
-      ? `${unitType.defense} <span style="color:#22c55e;font-size:0.8em;">(+${techDefBonus} tech)</span>`
-      : String(unitType.defense);
-
-    // Morale combat modifier
     const morale = faction ? (faction.morale ?? (100 - (faction.warWeariness ?? 0))) : 100;
-    const moraleMod = morale >= 80 ? +1 : morale >= 50 ? 0 : morale >= 35 ? -1 : morale >= 20 ? -2 : -3;
-    const moraleColor = moraleMod > 0 ? '#22c55e' : moraleMod < 0 ? '#ef4444' : '#aaa';
-    const moraleStr = moraleMod > 0 ? `+${moraleMod}` : String(moraleMod);
 
-    content.innerHTML = `
-      <div class="tooltip-title">${icon} ${unitType.name}</div>
-      <div class="tooltip-stat"><span>Attack:</span><span>${atkDisplay}</span></div>
-      <div class="tooltip-stat"><span>Defense:</span><span>${defDisplay}</span></div>
-      <div class="tooltip-stat"><span>Movement:</span><span>${unitType.movement}</span></div>
-      <div class="tooltip-stat"><span>Cost:</span><span>${unitType.cost} IPCs</span></div>
-      <div class="tooltip-stat"><span>Domain:</span><span>${unitType.domain}</span></div>
-      ${unitType.hitPoints > 1 ? `<div class="tooltip-stat"><span>Hit Points:</span><span>${unitType.hitPoints}</span></div>` : ''}
-      ${moraleMod !== 0 ? `<div class="tooltip-stat"><span>Morale mod:</span><span style="color:${moraleColor}">${moraleStr} all rolls</span></div>` : ''}
-      ${unitType.canBlitz ? '<div style="color: #8b6914; margin-top: 0.5rem;">⚡ Can Blitz</div>' : ''}
-      ${unitType.canBombard ? '<div style="color: #2563a8; margin-top: 0.25rem;">💥 Bombardment</div>' : ''}
-      ${unitType.canStrategicBomb ? '<div style="color: #dc2626; margin-top: 0.25rem;">🏭 Strategic Bombing</div>' : ''}
-      ${unitType.requiredTransport ? '<div style="color: #6366f1; margin-top: 0.25rem;">⚓ Needs Transport</div>' : ''}
-    `;
+    content.innerHTML = buildUnitTooltipHtml(
+      unitType,
+      icon,
+      techEffect?.attackBonus ?? 0,
+      techEffect?.defenseBonus ?? 0,
+      morale,
+    );
 
     tooltip.style.left = `${x + 15}px`;
     tooltip.style.top = `${y + 15}px`;
