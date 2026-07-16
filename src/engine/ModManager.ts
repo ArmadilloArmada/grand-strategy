@@ -270,7 +270,7 @@ export class ModManager {
    * Get merged unit data from all enabled mods
    */
   getMergedUnits(baseUnits: any[]): any[] {
-    let units = [...baseUnits];
+    const units = [...baseUnits];
     
     for (const mod of this.getEnabledMods()) {
       for (const unit of mod.data.units) {
@@ -292,7 +292,7 @@ export class ModManager {
    * Get merged faction data from all enabled mods
    */
   getMergedFactions(baseFactions: any[]): any[] {
-    let factions = [...baseFactions];
+    const factions = [...baseFactions];
     
     for (const mod of this.getEnabledMods()) {
       for (const faction of mod.data.factions) {
@@ -349,7 +349,7 @@ export class ModManager {
    * Get all maps including mod maps
    */
   getMergedMaps(baseMaps: any[]): any[] {
-    let maps = [...baseMaps];
+    const maps = [...baseMaps];
     
     for (const mod of this.getEnabledMods()) {
       maps.push(...mod.data.maps);

@@ -36,6 +36,11 @@ export default defineConfig({
           const normalizedId = id.replace(/\\/g, '/');
           if (normalizedId.includes('/assets/maps/')) return 'maps';
           if (normalizedId.includes('/assets/units/')) return 'units';
+          // Split large, cohesive subsystems into their own chunks so they can be
+          // cached independently of the frequently-changing core game logic.
+          if (normalizedId.includes('/src/audio/')) return 'audio';
+          if (normalizedId.includes('/src/editor/')) return 'editor';
+          if (normalizedId.includes('/src/ui/TacticalBattleUI')) return 'tactical';
         },
       },
     },

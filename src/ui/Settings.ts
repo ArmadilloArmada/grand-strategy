@@ -21,6 +21,7 @@ export interface GameSettings {
   musicVolume: number;
   // Display
   theme: 'dark' | 'light';        // Dark war-room or light accessibility theme
+  colorblindMode: boolean;        // Remap faction colors to a colorblind-safe palette
   // Dynamic Features (can be toggled independently)
   battleNarratives: boolean;      // Story blurbs after each battle
   commanderAbilities: boolean;    // Active commander skills with cooldowns
@@ -38,6 +39,7 @@ export interface GameSettings {
 
 const DEFAULT_SETTINGS: GameSettings = {
   theme: 'dark',
+  colorblindMode: false,
   gameSpeed: 'normal',
   aiDifficulty: 'medium',
   aiPersonality: 'default',

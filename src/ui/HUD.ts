@@ -16,6 +16,8 @@ import { visualEffects } from './VisualEffects';
 import { achievementManager, Achievement } from '../engine/AchievementManager';
 import { GameConfig, defaultConfig, checkVictory, TurnStyle, TURN_STYLE_INFO, UnitEra, UNIT_ERA_INFO, VictoryType } from '../engine/GameConfig';
 import { settings } from './Settings';
+import { escapeHtml } from './htmlEscape';
+import { getFactionOptionLabel, buildSetupPlanLine, describeSetupOpponents } from './setupSummaryText';
 import { getPhaseDisplayName as getPhaseDisplayNameFromStyle } from '../engine/TurnStyleManager';
 import { TechnologyManager } from '../engine/TechnologyManager';
 import { statisticsManager } from '../engine/StatisticsManager';
@@ -41,10 +43,18 @@ import { FactionAbilityManager, factionAbilityManager, FACTION_ABILITIES, applyF
 import { getAITaunt } from '../engine/AITaunts';
 import { SupplySystem } from '../engine/SupplySystem';
 import { getLevel, xpToNextLevel, ALL_TRAITS } from '../engine/CommanderProgression';
-import { calculateTerritoryThreat, TerritoryThreat } from '../engine/ThreatAnalyzer';
+import { getTopThreats, getOpportunityTargets } from './advisorTargets';
+import {
+  getMobilizationAdvice,
+  getBestMobilizationTarget,
+  getBestMovementSource,
+} from './advisorRecommendations';
+import { getNavalStatusHtml } from './navalStatusView';
+import { buildFactionSummaryHtml } from './factionSummaryView';
+import { buildSimpleTerritoryDetails } from './territoryDetailsView';
+import { buildUnitTooltipHtml } from './unitTooltipView';
 import { getMaxCapturableCapitals, normalizeCapitalsToWin, normalizeCapitalsToWinForMatch, resolveMatchSetup } from '../engine/SetupValidation';
-import { getTransportCapacityInSeaZone, summarizeFleet } from '../engine/NavalSystem';
-import { getAdjacentSeaZones, hasSeaAccess, sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
+import { sanitizeNavalUnitPlacement, claimSeaZoneForFaction } from '../engine/navalPlacement';
 import { canIssueOrdersFromTerritory, territoryHasAvailableUnits } from '../engine/territoryControl';
 import { areTerritoriesNeighbors } from '../engine/gridAdjacency';
 import type { SpawnedUnit } from '../engine/MobilizationSystem';
@@ -233,7 +243,7 @@ export class HUD {
       getState: () => this.state,
       renderer: this.renderer,
       unitIcon: (id) => this.unitIcon(id),
-      escapeHtml: (value) => this.escapeHtml(value),
+      escapeHtml: (value) => escapeHtml(value),
       showToast: (msg, type) => this.showToast(msg, type),
       onStackChanged: () => this.updateSelectionInfo(),
       onValidMovesRefresh: () => this.updateValidMoves(),
@@ -339,7 +349,7 @@ export class HUD {
       overlayController: this.overlayController,
       mobilizationSystem: this.mobilizationSystem,
       stackCommand: this.stackCommand,
-      escapeHtml: (value) => this.escapeHtml(value),
+      escapeHtml: (value) => escapeHtml(value),
       onAfterUpdate: () => this.updateActionButtons(),
     });
     this.firstWarRoom = new FirstWarRoom({
@@ -1786,7 +1796,7 @@ export class HUD {
     if (!faction) return;
 
     const recap = this.ensureTurnRecap(faction.id);
-    const topThreat = this.getTopThreats(faction.id)[0];
+    const topThreat = getTopThreats(this.state, faction.id)[0];
     const nextObjective = this.objectiveSystem.getActive(faction.id)[0];
 
     this.turnRecapPanel.showTurn({
@@ -2410,7 +2420,7 @@ export class HUD {
     // Refresh the faction summary if no territory is currently selected
     if (!this.state.getSelectedTerritory()) {
       const detailsEl = document.getElementById('territory-details');
-      if (detailsEl) detailsEl.innerHTML = this.buildFactionSummaryHtml();
+      if (detailsEl) detailsEl.innerHTML = buildFactionSummaryHtml(this.state);
     }
   }
 
@@ -2763,144 +2773,6 @@ export class HUD {
     this.renderer.render();
   }
 
-  /** Faction overview shown inside HQ when no territory is selected. */
-  private buildFactionSummaryHtml(): string {
-    const faction = this.state.getCurrentFaction();
-    if (!faction) {
-      return `<p style="color:#6b7280;font-style:italic;font-size:0.78rem;text-align:center;padding:0.5rem 0;">Click any territory to inspect it.</p>`;
-    }
-
-    // Owned territory count and income
-    const ownedTerritories = Array.from(this.state.territories.values())
-      .filter(t => t.owner === faction.id);
-    const income = this.state.calculateIncome(faction.id);
-
-    // Total unit strength
-    let totalUnits = 0;
-    for (const t of ownedTerritories) totalUnits += t.getTotalUnitCount();
-
-    // Capital status
-    const capital = ownedTerritories.find(t => t.isCapital);
-    let capitalHtml = '';
-    if (capital) {
-      const capitalUnits = capital.getTotalUnitCount();
-      // Check if enemy units are adjacent to our capital
-      const adjacentEnemies = capital.adjacentTo.some(adjId => {
-        const adj = this.state.territories.get(adjId);
-        return adj && adj.owner && faction.isEnemyOf(adj.owner) && adj.getTotalUnitCount() > 0;
-      });
-      const statusClass = adjacentEnemies ? 'at-risk' : 'safe';
-      const statusText = adjacentEnemies ? '⚠ Under threat' : '✓ Secured';
-      capitalHtml = `<div class="hq-capital-row ${statusClass}">
-        <span>⭐ ${this.escapeHtml(capital.name)}</span>
-        <span style="margin-left:auto;font-size:0.7rem;">${statusText} · ${capitalUnits} unit${capitalUnits !== 1 ? 's' : ''}</span>
-      </div>`;
-    }
-
-    // Threat count (enemy-adjacent territories we own)
-    const threatenedCount = ownedTerritories.filter(t =>
-      t.adjacentTo.some(adjId => {
-        const adj = this.state.territories.get(adjId);
-        return adj && adj.owner && faction.isEnemyOf(adj.owner) && adj.getTotalUnitCount() > 0;
-      })
-    ).length;
-
-    const incomeClass = income >= 20 ? 'positive' : income >= 8 ? 'warning' : 'danger';
-    const unitsClass  = totalUnits >= 10 ? 'positive' : totalUnits >= 4 ? 'warning' : 'danger';
-
-    return `<div class="hq-faction-summary">
-      <div class="hq-faction-banner">
-        <div class="hq-faction-dot" style="background:${this.escapeHtml(faction.color)};box-shadow:0 0 5px ${this.escapeHtml(faction.color)}44;"></div>
-        <span class="hq-faction-name" style="color:${this.escapeHtml(faction.colorLight ?? faction.color)};">${this.escapeHtml(faction.name)}</span>
-      </div>
-      <div class="hq-stat-grid">
-        <div class="hq-stat-cell">
-          <span class="hq-stat-label">Territories</span>
-          <span class="hq-stat-value">${ownedTerritories.length}</span>
-        </div>
-        <div class="hq-stat-cell">
-          <span class="hq-stat-label">Income</span>
-          <span class="hq-stat-value ${incomeClass}">+${income}</span>
-        </div>
-        <div class="hq-stat-cell">
-          <span class="hq-stat-label">Units</span>
-          <span class="hq-stat-value ${unitsClass}">${totalUnits}</span>
-        </div>
-        <div class="hq-stat-cell">
-          <span class="hq-stat-label">Threatened</span>
-          <span class="hq-stat-value ${threatenedCount > 0 ? 'danger' : 'positive'}">${threatenedCount}</span>
-        </div>
-      </div>
-      ${capitalHtml}
-    </div>`;
-  }
-
-  /**
-   * Update selection info panel
-   */
-  private getNavalStatusHtml(territory: import('../data/Territory').Territory): string {
-    const faction = this.state.getCurrentFaction();
-    if (!faction) return '';
-
-    if (territory.isLand() && territory.owner === faction.id && hasSeaAccess(this.state, territory)) {
-      const adjacentSeas = getAdjacentSeaZones(this.state, territory);
-      if (adjacentSeas.length === 0) return '';
-
-      const blockaded = this.supplySystem.isNavalBlockaded(territory.id, faction.id);
-      const openSeas = adjacentSeas.filter(sea =>
-        sea.owner === null ||
-        sea.owner === faction.id ||
-        sea.getTotalUnitCount() === 0 ||
-        !sea.owner ||
-        !faction.isEnemyOf(sea.owner)
-      ).length;
-
-      const fleetSummaries = adjacentSeas
-        .map(sea => {
-          const lines = summarizeFleet(this.state, sea);
-          if (lines.length === 0) return null;
-          const isFriendly = !sea.owner || sea.owner === faction.id;
-          if (!isFriendly) return null;
-          return `${this.escapeHtml(sea.name)}: ${lines.map(l => `${l.count} ${l.label}`).join(', ')}`;
-        })
-        .filter(Boolean);
-
-      const fleetHtml = fleetSummaries.length > 0
-        ? `<span class="naval-roles">Fleet: ${fleetSummaries.join(' · ')}</span>`
-        : `<span style="font-size:0.72rem;opacity:0.85;">Naval builds deploy to adjacent sea zones — select one to inspect your fleet.</span>`;
-
-      return `<div class="naval-status ${blockaded ? 'danger' : 'open'}">
-        <strong>${blockaded ? 'Naval blockade' : 'Sea access open'}</strong>
-        <span>${openSeas}/${adjacentSeas.length} adjacent sea zone${adjacentSeas.length === 1 ? '' : 's'} open</span>
-        ${fleetHtml}
-      </div>`;
-    }
-
-    if (territory.type === 'sea') {
-      const transports = faction
-        ? getTransportCapacityInSeaZone(this.state, territory.id, faction.id)
-        : 0;
-      const fleetLines = summarizeFleet(this.state, territory);
-      const adjacentCoasts = territory.adjacentTo
-        .map(id => this.state.territories.get(id))
-        .filter(t => t?.isLand())
-        .slice(0, 3)
-        .map(t => t?.name ?? '')
-        .filter(Boolean);
-      const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
-      const fleetHtml = fleetLines.length > 0
-        ? fleetLines.map(line => `${line.count} ${line.label}`).join(' · ')
-        : 'No fleet present';
-      return `<div class="naval-status sea">
-        <strong>${owner ? `${this.escapeHtml(owner.name)} sea control` : 'Neutral sea zone'}</strong>
-        <span>${fleetHtml}${transports > 0 ? ` · ${transports} lift` : ''}${adjacentCoasts.length ? ` · Coasts: ${this.escapeHtml(adjacentCoasts.join(', '))}` : ''}</span>
-        ${fleetLines.length > 0 ? `<span class="naval-roles">${fleetLines.map(l => this.escapeHtml(`${l.label}: ${l.duty}`)).join(' · ')}</span>` : ''}
-      </div>`;
-    }
-
-    return '';
-  }
-
   updateSelectionInfo(): void {
     const territory = this.state.getSelectedTerritory();
     const nameEl = document.getElementById('territory-name');
@@ -2909,7 +2781,7 @@ export class HUD {
     if (!territory) {
       if (nameEl) nameEl.textContent = 'No Territory Selected';
       if (detailsEl) {
-        detailsEl.innerHTML = this.buildFactionSummaryHtml();
+        detailsEl.innerHTML = buildFactionSummaryHtml(this.state);
       }
       this.validMoveController.clear();
       this.stackCommand.clearSelection();
@@ -2931,7 +2803,7 @@ export class HUD {
       if (detailsEl) {
         detailsEl.classList.remove('content-refresh');
         void detailsEl.offsetWidth;
-        detailsEl.innerHTML = this.buildSimpleTerritoryDetails(territory);
+        detailsEl.innerHTML = buildSimpleTerritoryDetails(this.state, territory, this.validMoveController.getValidMoves());
         detailsEl.classList.add('content-refresh');
       }
       this.refreshUnitStackSelector();
@@ -2978,7 +2850,7 @@ export class HUD {
       </div>`;
     }
 
-    html += this.getNavalStatusHtml(territory);
+    html += getNavalStatusHtml(this.state, this.supplySystem, territory);
 
     // Fortification level
     if (territory.isLand()) {
@@ -3092,7 +2964,7 @@ export class HUD {
                 ? (coastalStrike ? (t?.type === 'sea' ? 'Coastal fire' : 'Bombard') : 'Attack')
                 : viaTransport ? 'Amphibious' : 'Move';
               const className = viaTransport ? 'transport' : coastalStrike ? 'coastal-strike' : target.type;
-              return `<span class="drag-target-hint ${className}">${label}: ${this.escapeHtml(t?.name ?? target.id)}</span>`;
+              return `<span class="drag-target-hint ${className}">${label}: ${escapeHtml(t?.name ?? target.id)}</span>`;
             }).join('')}
           </div>`;
         }
@@ -3124,56 +2996,6 @@ export class HUD {
 
     this.refreshUnitStackSelector();
     this.updateActionButtons();
-  }
-
-  private buildSimpleTerritoryDetails(territory: NonNullable<ReturnType<typeof this.state.getSelectedTerritory>>): string {
-    const owner = territory.owner ? this.state.factionRegistry.get(territory.owner) : null;
-    const ownerName = owner?.name ?? 'Neutral';
-    const ownerColor = owner?.color ?? '#666';
-    const faction = this.state.getCurrentFaction();
-    const isOwned = territory.owner === faction?.id;
-    const phase = this.state.currentPhase;
-    const isMovement = isMovementPhase(phase);
-    const displayUnits = territory.units.filter(pu => {
-      const unitType = this.state.unitRegistry.get(pu.unitTypeId);
-      return unitType && !(unitType.domain === 'sea' && territory.type !== 'sea');
-    });
-    const totalUnits = displayUnits.reduce((sum, pu) => sum + pu.count, 0);
-    const readyUnits = displayUnits.reduce((sum, pu) => sum + territory.getAvailableUnitCount(pu.unitTypeId), 0);
-    const attackTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => m.isAttack).length : 0;
-    const moveTargets = isOwned && isMovement ? this.validMoveController.getValidMoves().filter(m => !m.isAttack).length : 0;
-    const action = (() => {
-      if (isOwned && ['purchase', 'production', 'build'].includes(phase)) return territory.hasFactory ? 'Good place to mobilize.' : 'Select a factory territory to build.';
-      if (isOwned && attackTargets > 0) return `${attackTargets} attack target${attackTargets === 1 ? '' : 's'} in range.`;
-      if (isOwned && moveTargets > 0) return `${moveTargets} movement option${moveTargets === 1 ? '' : 's'} open.`;
-      if (!isOwned && owner) return owner.isEnemyOf(faction?.id ?? '') ? 'Enemy territory. Attack from an adjacent friendly territory.' : 'Not controlled by you.';
-      return 'No immediate action here.';
-    })();
-    const tags = [
-      territory.isCapital ? 'Capital' : '',
-      territory.hasFactory ? 'Factory' : '',
-      territory.isLand() ? `${territory.production} IPC` : 'Sea zone',
-    ].filter(Boolean);
-
-    return `
-      <div class="simple-territory-card">
-        <div class="simple-territory-owner">
-          <span style="background:${ownerColor};"></span>
-          <strong>${this.escapeHtml(ownerName)}</strong>
-        </div>
-        <div class="simple-territory-tags">${tags.map(tag => `<span>${this.escapeHtml(tag)}</span>`).join('')}</div>
-        <div class="simple-territory-action">
-          <small>Best Action</small>
-          <strong>${this.escapeHtml(action)}</strong>
-        </div>
-        <div class="simple-territory-grid">
-          <div><small>Units</small><strong>${totalUnits}</strong></div>
-          <div><small>Ready</small><strong>${readyUnits}</strong></div>
-          <div><small>Income</small><strong>${territory.isLand() ? `+${territory.production}` : '-'}</strong></div>
-        </div>
-        ${isOwned && readyUnits < totalUnits ? '<div class="acted-explainer">Acted units are already here, but cannot move again until your next turn.</div>' : ''}
-      </div>
-    `;
   }
 
   /**
@@ -3661,6 +3483,17 @@ export class HUD {
   }
 
   /**
+   * Repaint the main map and minimap. Used when a display-only change (e.g. the
+   * colorblind palette toggle) needs to be reflected without mutating state.
+   * Invalidates the renderer's static cache so faction color changes show.
+   */
+  repaintMap(): void {
+    this.renderer.markStaticDirty();
+    this.renderer.render();
+    this.renderMinimap();
+  }
+
+  /**
    * Update turn order display
    */
   updateTurnOrder(): void {
@@ -3787,40 +3620,20 @@ export class HUD {
 
     const icon = this.unitIcon(unitTypeId);
 
-    // Tech bonuses for current faction
+    // Tech bonuses + morale for the current faction feed the tooltip display.
     const faction = this.state.getCurrentFaction();
     const techEffect = faction && this.state.systems.technologyManager
       ? this.state.systems.technologyManager.getTechEffect(faction.id)
       : null;
-    const techAtkBonus = techEffect?.attackBonus ?? 0;
-    const techDefBonus = techEffect?.defenseBonus ?? 0;
-    const atkDisplay = techAtkBonus
-      ? `${unitType.attack} <span style="color:#22c55e;font-size:0.8em;">(+${techAtkBonus} tech)</span>`
-      : String(unitType.attack);
-    const defDisplay = techDefBonus
-      ? `${unitType.defense} <span style="color:#22c55e;font-size:0.8em;">(+${techDefBonus} tech)</span>`
-      : String(unitType.defense);
-
-    // Morale combat modifier
     const morale = faction ? (faction.morale ?? (100 - (faction.warWeariness ?? 0))) : 100;
-    const moraleMod = morale >= 80 ? +1 : morale >= 50 ? 0 : morale >= 35 ? -1 : morale >= 20 ? -2 : -3;
-    const moraleColor = moraleMod > 0 ? '#22c55e' : moraleMod < 0 ? '#ef4444' : '#aaa';
-    const moraleStr = moraleMod > 0 ? `+${moraleMod}` : String(moraleMod);
 
-    content.innerHTML = `
-      <div class="tooltip-title">${icon} ${unitType.name}</div>
-      <div class="tooltip-stat"><span>Attack:</span><span>${atkDisplay}</span></div>
-      <div class="tooltip-stat"><span>Defense:</span><span>${defDisplay}</span></div>
-      <div class="tooltip-stat"><span>Movement:</span><span>${unitType.movement}</span></div>
-      <div class="tooltip-stat"><span>Cost:</span><span>${unitType.cost} IPCs</span></div>
-      <div class="tooltip-stat"><span>Domain:</span><span>${unitType.domain}</span></div>
-      ${unitType.hitPoints > 1 ? `<div class="tooltip-stat"><span>Hit Points:</span><span>${unitType.hitPoints}</span></div>` : ''}
-      ${moraleMod !== 0 ? `<div class="tooltip-stat"><span>Morale mod:</span><span style="color:${moraleColor}">${moraleStr} all rolls</span></div>` : ''}
-      ${unitType.canBlitz ? '<div style="color: #8b6914; margin-top: 0.5rem;">⚡ Can Blitz</div>' : ''}
-      ${unitType.canBombard ? '<div style="color: #2563a8; margin-top: 0.25rem;">💥 Bombardment</div>' : ''}
-      ${unitType.canStrategicBomb ? '<div style="color: #dc2626; margin-top: 0.25rem;">🏭 Strategic Bombing</div>' : ''}
-      ${unitType.requiredTransport ? '<div style="color: #6366f1; margin-top: 0.25rem;">⚓ Needs Transport</div>' : ''}
-    `;
+    content.innerHTML = buildUnitTooltipHtml(
+      unitType,
+      icon,
+      techEffect?.attackBonus ?? 0,
+      techEffect?.defenseBonus ?? 0,
+      morale,
+    );
 
     tooltip.style.left = `${x + 15}px`;
     tooltip.style.top = `${y + 15}px`;
@@ -4002,6 +3815,7 @@ export class HUD {
     const simpleMode = (document.getElementById('simple-mode') as HTMLInputElement)?.checked ?? true;
     const aiDifficulty = ((document.getElementById('setup-ai-difficulty') as HTMLSelectElement)?.value || settings.getSetting('aiDifficulty')) as 'easy' | 'medium' | 'hard';
     const aiPersonality = (document.getElementById('setup-ai-personality') as HTMLSelectElement)?.value || settings.getSetting('aiPersonality') || 'default';
+    const seed = (document.getElementById('game-seed') as HTMLInputElement)?.value?.trim() || undefined;
 
     const setupFactions = this.getSetupFactionsForMap(mapId);
     const playableSetupFactions = setupFactions.filter(f => f.isPlayable);
@@ -4062,6 +3876,7 @@ export class HUD {
       aiOpponentCount: matchSetup.aiOpponentCount,
       activeFactionIds: matchSetup.activeFactionIds,
       turnStyle: turnStyle as TurnStyle,
+      seed,
       victoryType: victoryType as VictoryType,
       capitalsToWin: normalizeCapitalsToWinForMatch(
         capitalsToWin,
@@ -4127,10 +3942,6 @@ export class HUD {
     };
   }
 
-  private getFactionOptionLabel(faction: FactionData): string {
-    return `${faction.name}${faction.playstyle ? ` - ${faction.playstyle}` : ''}`;
-  }
-
   private refreshSetupFactionOptions(): void {
     const { factions } = this.getSelectedSetupMap();
     const playable = factions.filter(f => f.isPlayable).sort((a, b) => a.turnOrder - b.turnOrder);
@@ -4146,7 +3957,7 @@ export class HUD {
 
     if (playerSelect) {
       playerSelect.innerHTML = [
-        ...playable.map(f => `<option value="${this.escapeHtml(f.id)}">${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`),
+        ...playable.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(getFactionOptionLabel(f))}</option>`),
         '<option value="random">Random playable faction</option>',
       ].join('');
       playerSelect.value = previousPlayer && (previousPlayer === 'random' || playable.some(f => f.id === previousPlayer))
@@ -4156,7 +3967,7 @@ export class HUD {
 
     if (hotseatSelect) {
       hotseatSelect.innerHTML = playable
-        .map((f, index) => `<option value="${this.escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`)
+        .map((f, index) => `<option value="${escapeHtml(f.id)}"${previousHotseat.has(f.id) || (previousHotseat.size === 0 && index === 0) ? ' selected' : ''}>${escapeHtml(getFactionOptionLabel(f))}</option>`)
         .join('');
     }
 
@@ -4168,7 +3979,7 @@ export class HUD {
         .map(f => {
           const wasSelected = previousOpponents.has(f.id);
           const selected = previousOpponents.size === 0 || wasSelected ? ' selected' : '';
-          return `<option value="${this.escapeHtml(f.id)}"${selected}>${this.escapeHtml(this.getFactionOptionLabel(f))}</option>`;
+          return `<option value="${escapeHtml(f.id)}"${selected}>${escapeHtml(getFactionOptionLabel(f))}</option>`;
         })
         .join('');
       // Hide the picker entirely when there are no opponents to choose from.
@@ -4200,7 +4011,7 @@ export class HUD {
           .map(p => ({ id: p.id, name: p.name, description: p.description })),
       ];
       aiPersonality.innerHTML = options
-        .map(p => `<option value="${this.escapeHtml(p.id)}" title="${this.escapeHtml(p.description)}">${this.escapeHtml(p.name)}</option>`)
+        .map(p => `<option value="${escapeHtml(p.id)}" title="${escapeHtml(p.description)}">${escapeHtml(p.name)}</option>`)
         .join('');
       aiPersonality.value = options.some(p => p.id === current) ? current : 'default';
     }
@@ -4234,11 +4045,11 @@ export class HUD {
 
     card.classList.remove('hidden');
     card.innerHTML = `
-      <div class="map-info-title">${this.escapeHtml(name)}</div>
-      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${this.escapeHtml(description)}</div>` : ''}
+      <div class="map-info-title">${escapeHtml(name)}</div>
+      ${description ? `<div class="map-info-desc" style="color:#94a3b8;font-size:0.85rem;margin:0.35rem 0 0.5rem;">${escapeHtml(description)}</div>` : ''}
       <div class="map-info-tags">
-        <span>${this.escapeHtml(sizeTag)}</span>
-        <span>${this.escapeHtml(navalTag)}</span>
+        <span>${escapeHtml(sizeTag)}</span>
+        <span>${escapeHtml(navalTag)}</span>
         <span>${playable.length} factions</span>
       </div>
       <div class="map-info-stats">
@@ -4248,7 +4059,7 @@ export class HUD {
         <span>${startingUnits} units</span>
       </div>
       <div class="map-info-factions">
-        ${playable.map(f => `<span style="--faction-color:${this.escapeHtml(f.color)}">${this.escapeHtml(f.name)}</span>`).join('')}
+        ${playable.map(f => `<span style="--faction-color:${escapeHtml(f.color)}">${escapeHtml(f.name)}</span>`).join('')}
       </div>
     `;
   }
@@ -4392,7 +4203,7 @@ export class HUD {
     const doctrine = aiPersonality === 'default'
       ? 'balanced AI'
       : `${AI_PERSONALITIES.find(p => p.id === aiPersonality)?.name ?? aiPersonality} AI`;
-    const setupPlan = this.buildSetupPlanLine(mapId, victoryType, turnStyle, aiDifficulty, aiPersonality);
+    const setupPlan = buildSetupPlanLine(mapId, victoryType, turnStyle, aiDifficulty, aiPersonality);
     const mapStats = setupMap.data
       ? `${setupMap.data.territories.length} territories, ${playableCount} playable factions`
       : `${playableCount} playable factions`;
@@ -4404,8 +4215,8 @@ export class HUD {
       </div>
       <div>${mapName} · ${UNIT_ERA_INFO[unitEra]?.name ?? unitEra} · ${TURN_STYLE_INFO[turnStyle]?.name ?? turnStyle}</div>
       <div style="color:#94a3b8;margin-top:0.25rem;">${playerText} · ${victoryText} · ${turnLimitText} · ${mapStats}</div>
-      ${opponentSummary ? `<div style="color:#cbd5e1;margin-top:0.25rem;">${this.escapeHtml(opponentSummary)}</div>` : ''}
-      <div style="color:#bfdbfe;margin-top:0.35rem;">Plan: ${this.escapeHtml(setupPlan)} · ${aiDifficulty} ${this.escapeHtml(doctrine)}</div>
+      ${opponentSummary ? `<div style="color:#cbd5e1;margin-top:0.25rem;">${escapeHtml(opponentSummary)}</div>` : ''}
+      <div style="color:#bfdbfe;margin-top:0.35rem;">Plan: ${escapeHtml(setupPlan)} · ${aiDifficulty} ${escapeHtml(doctrine)}</div>
     `;
   }
 
@@ -4423,46 +4234,7 @@ export class HUD {
       ? Array.from(opponentSelect.selectedOptions).map(o => o.value).filter(id => allCandidates.includes(id))
       : allCandidates;
     const countRaw = (document.getElementById('ai-opponent-count') as HTMLSelectElement | null)?.value ?? 'all';
-    const matchSetup = resolveMatchSetup({
-      mode: 'vs-ai',
-      humanFactionIds,
-      availableFactions: setupFactions,
-      pickedOpponentIds: pickedOpponents,
-      opponentCountRaw: countRaw,
-    });
-    if (matchSetup.aiOpponentIds.length === 0) return 'No AI opponents on this map';
-
-    const names = matchSetup.aiOpponentIds
-      .map(id => setupFactions.find(f => f.id === id)?.name ?? id)
-      .join(', ');
-    const countLabel = matchSetup.aiOpponentIds.length === 1 ? '1 AI opponent' : `${matchSetup.aiOpponentIds.length} AI opponents`;
-    return `${countLabel}: ${names}`;
-  }
-
-  private buildSetupPlanLine(mapId: string, victoryType: VictoryType, turnStyle: TurnStyle, aiDifficulty: string, aiPersonality: string): string {
-    const mapPlan = mapId.includes('mega')
-      ? 'expect broad fronts; use overlays and secure factories early'
-      : mapId.includes('pacific') || mapId.includes('archipelago')
-        ? 'control sea lanes before overcommitting land forces'
-        : mapId.includes('skirmish') || mapId === 'tutorial'
-          ? 'short opening; first captures decide tempo'
-          : 'balance capital defense with one early border attack';
-    const victoryPlan = victoryType === 'economic'
-      ? 'protect production'
-      : victoryType === 'domination'
-        ? 'expand steadily'
-        : victoryType === 'elimination'
-          ? 'preserve armies'
-          : 'watch enemy capitals';
-    const aiPlan = aiDifficulty === 'hard' || ['aggressive', 'blitz', 'adaptive'].includes(aiPersonality)
-      ? 'AI pressure will arrive early'
-      : aiPersonality === 'economic'
-        ? 'AI will build before striking'
-        : aiPersonality === 'defensive'
-          ? 'AI will punish weak attacks'
-          : 'AI posture is flexible';
-    const pace = turnStyle === 'classic' ? 'classic pacing' : turnStyle === 'quick' ? 'faster decisions' : 'variant pacing';
-    return `${mapPlan}; ${victoryPlan}; ${aiPlan}; ${pace}`;
+    return describeSetupOpponents(mode, setupFactions, humanFactionIds, pickedOpponents, countRaw);
   }
 
   private maybeOfferTutorial(): void {
@@ -5030,153 +4802,6 @@ export class HUD {
     this.gameConfig.totalIPCsEarned.set(factionId, current + amount);
   }
 
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  private getTopThreats(factionId: string): TerritoryThreat[] {
-    const faction = this.state.factionRegistry.get(factionId);
-    if (!faction) return [];
-
-    return Array.from(this.state.territories.values())
-      .filter(t => t.owner === factionId && t.isLand())
-      .map(t => calculateTerritoryThreat(this.state, t, faction))
-      .filter(t => t.threatLevel > 0)
-      .sort((a, b) => b.defenseGap - a.defenseGap || b.threatLevel - a.threatLevel)
-      .slice(0, 3);
-  }
-
-  private getOpportunityTargets(factionId: string): Array<{ territoryId: string; score: number; reason: string }> {
-    const faction = this.state.factionRegistry.get(factionId);
-    if (!faction) return [];
-
-    const opportunities = new Map<string, { territoryId: string; score: number; reason: string }>();
-    for (const owned of this.state.territories.values()) {
-      if (owned.owner !== factionId || !owned.isLand()) continue;
-      const availableAttack = owned.units.reduce((sum, unit) => {
-        const type = this.state.unitRegistry.get(unit.unitTypeId);
-        return sum + (type?.attack ?? 0) * owned.getAvailableUnitCount(unit.unitTypeId);
-      }, 0);
-      if (availableAttack <= 0) continue;
-
-      for (const adjacentId of owned.adjacentTo) {
-        const target = this.state.territories.get(adjacentId);
-        if (!target?.owner || !faction.isEnemyOf(target.owner) || target.isSea()) continue;
-        const defense = target.units.reduce((sum, unit) => {
-          const type = this.state.unitRegistry.get(unit.unitTypeId);
-          return sum + (type?.defense ?? 0) * unit.count;
-        }, 0);
-        const strategicValue = target.production + (target.isCapital ? 8 : 0) + (target.hasFactory ? 5 : 0);
-        const score = availableAttack - defense + strategicValue;
-        const existing = opportunities.get(target.id);
-        if (!existing || score > existing.score) {
-          const reason = target.isCapital ? 'enemy capital' : target.hasFactory ? 'factory target' : `+${target.production} IPC`;
-          opportunities.set(target.id, { territoryId: target.id, score, reason });
-        }
-      }
-    }
-
-    return Array.from(opportunities.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-  }
-
-  private getMobilizationAdvice(): string {
-    const navalHint = this.getNavalMobilizationAdvice();
-    if (navalHint) return navalHint;
-
-    const options = this.mobilizationSystem.getMobilizationOptions().filter(o => o.canMobilize);
-    const best = options.sort((a, b) => {
-      const aValue = (a.territory.isCapital ? 8 : 0) + (a.territory.hasFactory ? 6 : 0) + a.units.reduce((s, u) => s + u.count, 0);
-      const bValue = (b.territory.isCapital ? 8 : 0) + (b.territory.hasFactory ? 6 : 0) + b.units.reduce((s, u) => s + u.count, 0);
-      return bValue - aValue || a.cost - b.cost;
-    })[0];
-    if (!best) return 'No affordable mobilization is available. Preserve IPCs or advance the phase.';
-    return `Mobilize ${best.territory.name}: ${best.type} package for ${best.cost} IPC.`;
-  }
-
-  private getNavalMobilizationAdvice(): string | null {
-    const mapId = this.gameConfig.mapId ?? 'grid';
-    if (!mapId.includes('archipelago') && !mapId.includes('pacific') && !mapId.includes('island') && !mapId.includes('world')) return null;
-    const coastal = this.mobilizationSystem.getMobilizationOptions()
-      .find(o => o.canMobilize && o.type === 'coastal');
-    if (!coastal) return null;
-    return `Mobilize marines at ${coastal.territory.name} (${coastal.cost} IPC) for island assaults. Ground units can cross oceans automatically.`;
-  }
-
-  private getBestMobilizationTarget(): { territoryId: string; label: string; detail: string } | null {
-    const best = this.mobilizationSystem.getMobilizationOptions()
-      .filter(o => o.canMobilize)
-      .sort((a, b) => {
-        const aThreat = this.getTopThreats(a.territory.owner ?? '')[0]?.territoryId === a.territory.id ? 5 : 0;
-        const bThreat = this.getTopThreats(b.territory.owner ?? '')[0]?.territoryId === b.territory.id ? 5 : 0;
-        const aValue = aThreat + (a.territory.isCapital ? 10 : 0) + (a.territory.hasFactory ? 7 : 0) + a.territory.production + a.units.reduce((s, u) => s + u.count, 0);
-        const bValue = bThreat + (b.territory.isCapital ? 10 : 0) + (b.territory.hasFactory ? 7 : 0) + b.territory.production + b.units.reduce((s, u) => s + u.count, 0);
-        return bValue - aValue || a.cost - b.cost;
-      })[0];
-
-    if (!best) return null;
-    return {
-      territoryId: best.territory.id,
-      label: `Mobilize ${best.territory.name}`,
-      detail: `${best.type} package, ${best.cost} IPC`,
-    };
-  }
-
-  private getBestMovementSource(factionId: string): { territoryId: string; label: string; detail: string; attacks: number; moves: number } | null {
-    const phase = this.state.currentPhase;
-    const allowAttacks = isAttackMovePhase(phase);
-    const candidates: Array<{ territoryId: string; label: string; detail: string; attacks: number; moves: number; score: number }> = [];
-
-    for (const territory of this.state.territories.values()) {
-      if (territory.owner !== factionId || territory.isSea()) continue;
-
-      const moveTargets = new Set<string>();
-      const attackTargets = new Set<string>();
-      let readyUnits = 0;
-      let attackPower = 0;
-
-      for (const unit of territory.units) {
-        const ready = territory.getAvailableUnitCount(unit.unitTypeId);
-        if (ready <= 0) continue;
-        readyUnits += ready;
-        const unitType = this.state.unitRegistry.get(unit.unitTypeId);
-        attackPower += ready * (unitType?.attack ?? 0);
-
-        for (const move of this.movementValidator.getValidMoves(unit.unitTypeId, territory.id, allowAttacks)) {
-          if (move.isAttack) attackTargets.add(move.territoryId);
-          else moveTargets.add(move.territoryId);
-        }
-      }
-
-      const attacks = attackTargets.size;
-      const moves = moveTargets.size;
-      if (readyUnits === 0 || (attacks + moves) === 0) continue;
-      const strongestTarget = Array.from(attackTargets)
-        .map(id => this.state.territories.get(id))
-        .filter((t): t is NonNullable<typeof t> => !!t)
-        .sort((a, b) => (b.production + (b.hasFactory ? 4 : 0) + (b.isCapital ? 8 : 0)) - (a.production + (a.hasFactory ? 4 : 0) + (a.isCapital ? 8 : 0)))[0];
-
-      candidates.push({
-        territoryId: territory.id,
-        label: attacks > 0 ? `Inspect attack from ${territory.name}` : `Move from ${territory.name}`,
-        detail: attacks > 0
-          ? `${readyUnits} ready units, ${attacks} attack target${attacks === 1 ? '' : 's'}${strongestTarget ? `, best: ${strongestTarget.name}` : ''}`
-          : `${readyUnits} ready units, ${moves} move target${moves === 1 ? '' : 's'}`,
-        attacks,
-        moves,
-        score: attacks * 8 + moves + attackPower,
-      });
-    }
-
-    return candidates.sort((a, b) => b.score - a.score)[0] ?? null;
-  }
-
   private getMovementCoach(faction: NonNullable<ReturnType<typeof this.state.getCurrentFaction>>): {
     headline: string;
     detail: string;
@@ -5190,7 +4815,7 @@ export class HUD {
     const selectedReady = selected?.owner === faction.id
       ? selected.units.reduce((sum, unit) => sum + selected.getAvailableUnitCount(unit.unitTypeId), 0)
       : 0;
-    const source = selectedReady > 0 ? selected : this.getBestMovementSource(faction.id);
+    const source = selectedReady > 0 ? selected : getBestMovementSource(this.state, this.movementValidator, faction.id);
 
     if (source && 'id' in source) {
       return {
@@ -5236,7 +4861,7 @@ export class HUD {
     const phase = this.state.currentPhase as string;
 
     if (phase === 'play') {
-      const target = this.getBestMobilizationTarget();
+      const target = getBestMobilizationTarget(this.mobilizationSystem, this.state);
       if (target) {
         return {
           headline: target.label,
@@ -5252,7 +4877,7 @@ export class HUD {
     }
 
     if (isBuildPhase(phase)) {
-      const target = this.getBestMobilizationTarget();
+      const target = getBestMobilizationTarget(this.mobilizationSystem, this.state);
       if (target) {
         return {
           headline: target.label,
@@ -5312,7 +4937,7 @@ export class HUD {
     if (action === 'recommended-action') {
       const phase = this.state.currentPhase as string;
       if (phase === 'play') {
-        const mobilizeTarget = this.getBestMobilizationTarget();
+        const mobilizeTarget = getBestMobilizationTarget(this.mobilizationSystem, this.state);
         if (mobilizeTarget) {
           this.productionUI.showFactoryHub(this.gameConfig.simpleMode ? 'balanced' : undefined);
         } else if (isAttackMovePhase(phase)) {
@@ -5353,8 +4978,8 @@ export class HUD {
       return;
     }
 
-    const topThreat = this.getTopThreats(faction.id)[0];
-    const topOpportunity = this.getOpportunityTargets(faction.id)[0];
+    const topThreat = getTopThreats(this.state, faction.id)[0];
+    const topOpportunity = getOpportunityTargets(this.state, faction.id)[0];
     const activeObjective = this.objectiveSystem.getActive(faction.id)[0];
     const income = this.state.calculateIncome(faction.id);
     const coach = this.getTurnCoach(faction);
@@ -5389,7 +5014,7 @@ export class HUD {
       opportunityLine,
       economyLine: `${faction.ipcs} IPC, +${income}/turn`,
       coach,
-      mobilizationAdvice: this.getMobilizationAdvice(),
+      mobilizationAdvice: getMobilizationAdvice(this.mobilizationSystem, this.gameConfig.mapId ?? 'grid'),
       simpleMode: this.gameConfig.simpleMode,
     });
   }
@@ -5398,8 +5023,8 @@ export class HUD {
     const faction = this.state.factionRegistry.get(factionId);
     if (!faction || faction.controlledBy !== 'human') return;
 
-    const threats = this.getTopThreats(factionId);
-    const opportunities = this.getOpportunityTargets(factionId);
+    const threats = getTopThreats(this.state, factionId);
+    const opportunities = getOpportunityTargets(this.state, factionId);
     const capital = this.state.territories.get(faction.capital);
     const firstThreat = threats[0] ? this.state.territories.get(threats[0].territoryId)?.name : null;
     const firstTarget = opportunities[0] ? this.state.territories.get(opportunities[0].territoryId)?.name : null;
@@ -5411,7 +5036,7 @@ export class HUD {
       capitalName: capital?.name ?? 'Your capital',
       threatName: firstThreat ?? 'No urgent threat',
       pressureName: firstTarget ?? 'Nearest enemy border',
-      mobilizationAdvice: this.getMobilizationAdvice(),
+      mobilizationAdvice: getMobilizationAdvice(this.mobilizationSystem, this.gameConfig.mapId ?? 'grid'),
       coachHeadline: coach.headline,
       coachDetail: coach.detail,
       recommendedTerritoryId,
