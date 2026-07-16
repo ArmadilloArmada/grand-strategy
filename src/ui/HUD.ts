@@ -3663,8 +3663,10 @@ export class HUD {
   /**
    * Repaint the main map and minimap. Used when a display-only change (e.g. the
    * colorblind palette toggle) needs to be reflected without mutating state.
+   * Invalidates the renderer's static cache so faction color changes show.
    */
   repaintMap(): void {
+    this.renderer.markStaticDirty();
     this.renderer.render();
     this.renderMinimap();
   }
