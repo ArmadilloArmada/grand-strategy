@@ -2492,7 +2492,9 @@ class Game {
     this.hideMainMenu();
     settings.update({
       gameSpeed: 'fast',
-      tacticalBattles: false,
+      // Preserve the pre-configured tactical-battles setting so tests can opt in;
+      // it defaults to false (set by the E2E setup helper) for deterministic dice combat.
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
       battleAnimations: false,
       battleNarratives: false,
       confirmEndTurn: false,
