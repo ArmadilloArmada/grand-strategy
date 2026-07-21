@@ -1,0 +1,11 @@
+{
+  "id": "example-naval-skirmish",
+  "name": "Naval Skirmish",
+  "version": "1.0.0",
+  "author": "Grand Strategy Team",
+  "description": "Coastal territories mobilize extra naval units for island-hopping scenarios.",
+  "rules": {
+    "coastalNavalBonus": 1,
+    "recommendedMapId": "islands"
+  }
+}

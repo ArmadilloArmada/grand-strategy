@@ -92,6 +92,11 @@ test.describe('Tutorial smoke', () => {
         __gsE2E: { e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void };
       }).__gsE2E.e2eBoostTerritory('contested_territory', 'tank', 8);
     });
+    await page.evaluate(() => {
+      (window as unknown as {
+        __gsE2E: { e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void };
+      }).__gsE2E.e2eBoostTerritory('enemy_capital', 'infantry', 4);
+    });
 
     const attackKind = await e2eMove(page, 'contested_territory', 'enemy_capital', true);
     expect(attackKind).toBe('attack');

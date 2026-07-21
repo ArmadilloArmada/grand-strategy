@@ -619,6 +619,34 @@ export class AIController {
     const faction = this.state.getCurrentFaction();
     if (!faction) return evaluations;
 
+    const landCount = Array.from(this.state.territories.values()).filter(t => t.type !== 'sea').length;
+    const megaMap = landCount > 400;
+
+    if (megaMap) {
+      const owned = new Set(this.state.getTerritoriesOwnedBy(faction.id).map(t => t.id));
+      const neighborIds = new Set<string>();
+      for (const id of owned) {
+        neighborIds.add(id);
+        const territory = this.state.territories.get(id);
+        if (!territory) continue;
+        for (const adj of territory.adjacentTo ?? []) {
+          neighborIds.add(adj);
+        }
+      }
+      for (const territoryId of neighborIds) {
+        const territory = this.state.territories.get(territoryId);
+        if (!territory || territory.type === 'sea') continue;
+        evaluations.set(territory.id, {
+          territory,
+          strategicValue: this.calculateStrategicValue(territory, faction),
+          threatLevel: this.calculateThreatLevel(territory, faction),
+          defenseStrength: this.calculateDefenseStrength(territory),
+          nearbyEnemyStrength: this.calculateNearbyEnemyStrength(territory, faction),
+        });
+      }
+      return evaluations;
+    }
+
     for (const territory of this.state.territories.values()) {
       evaluations.set(territory.id, {
         territory,

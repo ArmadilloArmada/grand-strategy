@@ -19,13 +19,18 @@
   "asarUnpack": [
     "**/*.node"
   ],
+  "forceCodeSigning": false,
   "win": {
     "target": [
       { "target": "nsis", "arch": ["x64"] }
     ],
     "icon": "assets/icon.ico",
     "publisherName": "ArmadilloArmada",
-    "legalTrademarks": "Grand Strategy"
+    "legalTrademarks": "Grand Strategy",
+    "executableName": "Grand Strategy",
+    "signAndEditExecutable": false,
+    "signDlls": false,
+    "verifyUpdateCodeSignature": false
   },
   "nsis": {
     "oneClick": true,

@@ -203,6 +203,66 @@ export const SCENARIOS: ScenarioData[] = [
     ],
   },
 
+  // ── 6. Tactical Tutorial — 20-minute session ───────────────────────────
+  {
+    id: 'tactical_tutorial_20',
+    name: 'Tactical Tutorial',
+    description: 'Learn contested fights with tactical battles enabled. ~20 minutes.',
+    mapId: 'tutorial',
+    victoryType: 'capitals',
+    turnLimit: 12,
+    capitalsToWin: 1,
+    period: 'Modern',
+    difficulty: 1,
+    briefing:
+      'Use Play Tactical (T) on your first contested attack. Win the skirmish, then capture the enemy capital.',
+    humanFactions: ['atlantic_alliance'],
+    factions: [
+      { factionId: 'atlantic_alliance', controlledBy: 'human', startingIPCs: 35 },
+      { factionId: 'eastern_bloc', controlledBy: 'ai', startingIPCs: 30 },
+    ],
+  },
+
+  // ── 7. Naval Skirmish — 20-minute coastal fight ────────────────────────
+  {
+    id: 'naval_skirmish_20',
+    name: 'Naval Skirmish',
+    description: 'Island-hopping with coastal mobilization. ~20 minutes.',
+    mapId: 'archipelago',
+    victoryType: 'capitals',
+    turnLimit: 14,
+    capitalsToWin: 1,
+    period: 'Modern',
+    difficulty: 2,
+    briefing:
+      'Control coastal territories to mobilize naval units. Seize the enemy capital before turn 14.',
+    humanFactions: ['atlantic_alliance'],
+    factions: [
+      { factionId: 'atlantic_alliance', controlledBy: 'human', startingIPCs: 40 },
+      { factionId: 'eastern_bloc', controlledBy: 'ai', startingIPCs: 35 },
+    ],
+  },
+
+  // ── 8. Factory Rush — 20-minute economic blitz ─────────────────────────
+  {
+    id: 'factory_rush_20',
+    name: 'Factory Rush (20 min)',
+    description: 'Race to outproduce the AI with factories and mobilization. ~20 minutes.',
+    mapId: 'skirmish',
+    victoryType: 'economic',
+    turnLimit: 16,
+    economicTarget: 150,
+    period: 'World War II',
+    difficulty: 2,
+    briefing:
+      'Capture factory territories early, mobilize every turn, and hit the economic victory target before time runs out.',
+    humanFactions: ['allies'],
+    factions: [
+      { factionId: 'allies', controlledBy: 'human', startingIPCs: 45 },
+      { factionId: 'axis', controlledBy: 'ai', startingIPCs: 40 },
+    ],
+  },
+
   // ── 5. World at War — Full Global Conflict ─────────────────────────────
   {
     id: 'world_at_war',

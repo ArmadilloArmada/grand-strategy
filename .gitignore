@@ -4,6 +4,7 @@ release/
 release-*/
 test-results/
 playwright-report/
+tmp/
 *.log
 .DS_Store
 Thumbs.db

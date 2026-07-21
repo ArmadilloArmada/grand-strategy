@@ -40,6 +40,9 @@ jobs:
       - name: Validate maps
         run: npm run validate:maps
 
+      - name: Steam structure preflight
+        run: npm run steam:preflight:structure
+
       - name: Build Windows release (unsigned)
         if: github.event_name != 'workflow_dispatch' || inputs.signed_build != true
         run: npm run dist

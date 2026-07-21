@@ -1,0 +1,11 @@
+{
+  "id": "example-fast-economy",
+  "name": "Fast Economy",
+  "version": "1.0.0",
+  "author": "Grand Strategy Team",
+  "description": "Raises starting IPCs and factory output for shorter skirmishes.",
+  "rules": {
+    "startingIPCBonus": 5,
+    "factoryOutputMultiplier": 1.25
+  }
+}
