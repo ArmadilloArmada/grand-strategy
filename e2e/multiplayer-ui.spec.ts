@@ -3,6 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { spawn, type ChildProcess } from 'child_process';
+import net from 'net';
 import path from 'path';
 import { setupFastE2E } from './helpers';
 
@@ -13,13 +14,12 @@ function waitForPort(port: number, timeoutMs = 15_000): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}`);
-      ws.addEventListener('open', () => {
-        ws.close();
+      const socket = net.connect({ port, host: '127.0.0.1' }, () => {
+        socket.end();
         resolve();
       });
-      ws.addEventListener('error', () => {
-        ws.close();
+      socket.once('error', () => {
+        socket.destroy();
         if (Date.now() - start > timeoutMs) {
           reject(new Error(`Multiplayer server did not open on ${port}`));
           return;
