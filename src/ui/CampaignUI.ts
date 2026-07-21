@@ -3,6 +3,7 @@
  */
 
 import { campaignManager, CampaignMission } from '../engine/CampaignManager';
+import { statisticsManager } from '../engine/StatisticsManager';
 
 class CampaignUI {
   private container: HTMLElement | null = null;
@@ -133,6 +134,17 @@ class CampaignUI {
     const resultLabel = won ? '✓ MISSION COMPLETE' : '✗ MISSION FAILED';
     const debriefText = won ? mission.debriefingWin : mission.debriefingLoss;
 
+    const humanFaction = mission.faction;
+    const playerStats = humanFaction ? statisticsManager.getFactionStats(humanFaction) : undefined;
+    const tacticalWon = playerStats?.tacticalBattlesWon ?? 0;
+    const tacticalPlayed = playerStats?.tacticalBattlesPlayed ?? 0;
+    const tacticalHtml = tacticalPlayed > 0
+      ? `<div style="margin:1rem 0;padding:0.75rem;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:8px;">
+           <div style="color:#60a5fa;font-size:0.8rem;text-transform:uppercase;margin-bottom:0.35rem;">Tactical Debrief</div>
+           <div style="color:#e2e8f0;font-size:0.9rem;">🎯 ${tacticalWon} tactical ${tacticalWon === 1 ? 'victory' : 'victories'} of ${tacticalPlayed} battle${tacticalPlayed === 1 ? '' : 's'}</div>
+         </div>`
+      : '';
+
     const rewardsHtml =
       won && appliedRewards.length > 0
         ? `<div style="margin:1rem 0;padding:0.9rem;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:8px;">
@@ -170,6 +182,7 @@ class CampaignUI {
 
         <p style="color:#94a3b8;font-style:italic;border-left:3px solid #334155;padding-left:1rem;margin:0 0 1rem;">"${debriefText}"</p>
 
+        ${tacticalHtml}
         ${rewardsHtml}
         ${nextHtml}
 

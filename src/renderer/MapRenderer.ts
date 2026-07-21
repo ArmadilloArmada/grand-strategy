@@ -425,13 +425,15 @@ export class MapRenderer {
       this.ctx.closePath();
       this.ctx.fill();
 
-      // IPC label at territory center
-      const [cx, cy] = territory.center;
-      this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      this.ctx.font = `bold ${Math.max(10, Math.round(10 + intensity * 4))}px sans-serif`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillText(`${territory.production}`, cx, cy);
+      // IPC label at territory center (skip when zoomed out for perf)
+      if (this.scale >= 0.55) {
+        const [cx, cy] = territory.center;
+        this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        this.ctx.font = `bold ${Math.max(10, Math.round(10 + intensity * 4))}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(`${territory.production}`, cx, cy);
+      }
     }
   }
 

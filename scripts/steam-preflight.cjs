@@ -30,6 +30,8 @@ function ensurePathExists(relPath, name) {
 }
 
 function main() {
+  const structureOnly = process.argv.includes('--structure-only');
+
   const appBuild = readText('steam/app_build.vdf');
   const depotBuild = readText('steam/depot_build_win.vdf');
 
@@ -37,8 +39,13 @@ function main() {
   const depotId = extractQuotedValue(depotBuild, 'DepotID');
   ensurePositiveNumeric(appId, 'AppID');
   ensurePositiveNumeric(depotId, 'DepotID');
-  ensureNotPlaceholder(appId, '480', 'AppID');
-  ensureNotPlaceholder(depotId, '481', 'DepotID');
+
+  if (!structureOnly) {
+    ensureNotPlaceholder(appId, '480', 'AppID');
+    ensureNotPlaceholder(depotId, '481', 'DepotID');
+  } else {
+    console.log('Steam preflight: structure-only mode (placeholder AppID allowed)');
+  }
 
   ensurePathExists('electron-builder-steam.json', 'Steam builder config');
   ensurePathExists('steam/app_build.vdf', 'Steam app build VDF');
@@ -54,7 +61,7 @@ function main() {
   }
 
   console.log('Steam preflight OK');
-  console.log(`- AppID: ${appId}`);
+  console.log(`- AppID: ${appId}${structureOnly && appId === '480' ? ' (placeholder — replace before store upload)' : ''}`);
   console.log(`- DepotID: ${depotId}`);
 }
 

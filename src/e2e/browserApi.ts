@@ -2,6 +2,8 @@
  * Dev / Playwright automation hooks. Attached when `?e2e=1` or in Vite dev builds.
  */
 
+import type { FunnelEvent } from '../engine/FunnelTracker';
+
 export interface E2ESnapshot {
   turnNumber: number;
   phase: string;
@@ -12,15 +14,19 @@ export interface E2ESnapshot {
 
 export interface E2EHost {
   startE2ETutorialMatch(): void;
+  startE2ETwoFactionMatch(): void;
   startE2ECampaignMission(campaignId: string, missionId: string): void;
   readE2ESnapshot(): E2ESnapshot;
+  readE2EActiveFactionCount(): number;
   runE2EUnitAction(fromId: string, toId: string, allTypes?: boolean): 'move' | 'attack' | 'invalid';
   runE2EConfirmAttack(): void;
   runE2EEndTurn(): void;
+  runE2EMobilize(): 'mobilized' | 'none' | 'failed';
   dismissE2EOverlays(): void;
   e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void;
   runE2EQuickSave(): boolean;
   runE2EQuickLoad(): boolean;
+  readFunnelEvents(): readonly FunnelEvent[];
 }
 
 export function shouldAttachE2EBrowserApi(): boolean {

@@ -34,6 +34,15 @@ export async function startTutorialMatch(page: Page): Promise<void> {
   await page.locator('.ribbon-center #btn-end-phase').waitFor({ state: 'visible' });
 }
 
+export async function startTwoFactionMatch(page: Page): Promise<void> {
+  await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
+  await page.evaluate(() => {
+    (window as unknown as { __gsE2E: { startE2ETwoFactionMatch(): void } }).__gsE2E.startE2ETwoFactionMatch();
+  });
+  await page.locator('#game-canvas').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('#turn-order .turn-order-item').first().waitFor({ state: 'visible', timeout: 10_000 });
+}
+
 export async function startCampaignMission(page: Page, campaignId: string, missionId: string): Promise<void> {
   await page.waitForFunction(() => Boolean((window as unknown as { __gsE2E?: unknown }).__gsE2E));
   await page.evaluate(({ campaign, mission }) => {
@@ -124,5 +133,17 @@ export async function e2eEndTurn(page: Page): Promise<void> {
     }).__gsE2E;
     api.dismissE2EOverlays();
     api.runE2EEndTurn();
+  });
+}
+
+export async function runE2EMobilize(page: Page): Promise<'mobilized' | 'none' | 'failed'> {
+  return page.evaluate(() => {
+    return (window as unknown as { __gsE2E: { runE2EMobilize(): 'mobilized' | 'none' | 'failed' } }).__gsE2E.runE2EMobilize();
+  });
+}
+
+export async function readE2EActiveFactionCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    return (window as unknown as { __gsE2E: { readE2EActiveFactionCount(): number } }).__gsE2E.readE2EActiveFactionCount();
   });
 }

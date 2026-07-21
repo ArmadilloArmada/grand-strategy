@@ -1,0 +1,11 @@
+{
+  "id": "example-tactical-focus",
+  "name": "Tactical Focus",
+  "version": "1.0.0",
+  "author": "Grand Strategy Team",
+  "description": "Enables tactical battles by default and boosts infantry defense in contested fights.",
+  "rules": {
+    "defaultTacticalBattles": true,
+    "infantryDefenseBonus": 1
+  }
+}

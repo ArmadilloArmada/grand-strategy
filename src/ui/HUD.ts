@@ -23,7 +23,10 @@ import { turnLog } from '../engine/TurnLog';
 import { getMapEntry, getMapList } from '../data/mapRegistry';
 import type { FactionData } from '../data/Faction';
 import type { MapData } from '../loaders/MapLoader';
-import { ESPIONAGE_OPS } from '../engine/EspionageSystem';
+import { EspionagePanel } from './hud/EspionagePanel';
+import { FactionPanelController } from './hud/FactionPanelController';
+import { HUDE2EHost } from '../e2e/HUDE2EHost';
+import { funnelTracker } from '../engine/FunnelTracker';
 import { getUnitIcon } from './hudConstants';
 import { CombatUI } from './CombatUI';
 import { ProductionUI } from './ProductionUI';
@@ -116,6 +119,9 @@ export class HUD {
   private tutorialController!: TutorialController;
   private undoController!: UndoController;
   private overlayController!: OverlayController;
+  private factionPanelController!: FactionPanelController;
+  private espionagePanel!: EspionagePanel;
+  private e2eHost!: HUDE2EHost;
 
   // Faction panel collapsed state
   private factionPanelCollapsed: boolean = false;
@@ -266,6 +272,25 @@ export class HUD {
       ),
     };
     this.combatUI = new CombatUI(state, renderer, this.combatResolver, combatCallbacks);
+
+    this.factionPanelController = new FactionPanelController(state);
+    this.espionagePanel = new EspionagePanel({
+      state,
+      showToast: (msg, type) => this.showToast(msg, type),
+    });
+    this.e2eHost = new HUDE2EHost({
+      state,
+      mobilizationSystem: this.mobilizationSystem,
+      renderer: this.renderer,
+      focusTerritory: (id) => this.focusTerritory(id),
+      selectAllUnitTypes: (all) => this.stackCommand.selectAllUnitTypes(all),
+      prepareUnitDrag: (fromId) => this.prepareUnitDrag(fromId),
+      getUnitDropKind: (from, to) => this.getUnitDropKind(from, to),
+      handleUnitDragDrop: (from, to) => this.handleUnitDragDrop(from, to),
+      confirmAttackFromPreview: (force) => this.combatUI.confirmAttackFromPreview(force),
+      endPhase: () => this.onEndPhaseClick(),
+      renderMinimap: () => this.renderMinimap(),
+    });
 
     const productionCallbacks = {
       showToast: (msg: string, type: 'success' | 'info' | 'error') => this.showToast(msg, type),
@@ -1194,6 +1219,7 @@ export class HUD {
       const data = e.data as { territoryId?: string; territoryName?: string };
       soundManager.play('tactical_start');
       soundManager.playMusic('tactical_combat');
+      funnelTracker.track('first_tactical', { once: true });
       if (data.territoryId) {
         this.renderer.setAIPulseTerritory(data.territoryId);
         const territory = this.state.territories.get(data.territoryId);
@@ -1209,6 +1235,9 @@ export class HUD {
       if (!combat) return;
       const humanIds = new Set(this.state.factionRegistry.getAll().filter(f => f.controlledBy === 'human').map(f => f.id));
       if (!humanIds.has(combat.attackingFactionId) && !humanIds.has(combat.defendingFactionId)) return;
+      if (humanIds.has(combat.attackingFactionId)) {
+        funnelTracker.track('first_attack', { once: true });
+      }
       soundManager.play('combat_start');
       soundManager.playMusic('combat');
       const territory = this.state.territories.get(combat.territoryId);
@@ -1262,6 +1291,9 @@ export class HUD {
       const data = e.data as { territoryId: string; units: Array<{ unitTypeId: string; count: number }>; cost: number };
       const faction = this.state.getCurrentFaction();
       if (!faction) return;
+      if (faction.controlledBy === 'human') {
+        funnelTracker.track('first_mobilize', { once: true });
+      }
       const recap = this.ensureTurnRecap(faction.id);
       recap.mobilizations++;
       const unitsCount = data.units.reduce((sum, unit) => sum + unit.count, 0);
@@ -2611,28 +2643,32 @@ export class HUD {
     
     if (!container || !barsEl) return;
     
-    const rules = this.state.rules;
+    // Prefer match GameConfig (same source as checkVictory) over legacy GameRules.
+    const config = this.gameConfig;
     const factions = this.state.factionRegistry.getActive();
+    const landTerritories = Array.from(this.state.territories.values()).filter(t => t.type === 'land');
+    const landCount = Math.max(landTerritories.length, 1);
     
-    // Determine victory condition text
     let conditionText = '';
     let maxProgress = 1;
     
-    switch (rules.victoryType) {
-      case 'capital':
-        conditionText = `Capture ${rules.victoryCapitalsRequired} enemy capitals`;
-        maxProgress = rules.victoryCapitalsRequired;
+    switch (config.victoryType) {
+      case 'capitals':
+        conditionText = `Capture ${config.capitalsToWin} enemy capitals`;
+        maxProgress = Math.max(config.capitalsToWin, 1);
         break;
       case 'economic':
-        conditionText = `Reach ${rules.victoryIPCThreshold} IPCs`;
-        maxProgress = rules.victoryIPCThreshold;
+        conditionText = `Earn ${config.economicTarget} IPCs total`;
+        maxProgress = Math.max(config.economicTarget, 1);
         break;
-      case 'territorial':
-        conditionText = `Control ${rules.victoryTerritoryCount} territories`;
-        maxProgress = rules.victoryTerritoryCount;
+      case 'domination':
+        conditionText = `Control ${config.territoriesPercent}% of land`;
+        maxProgress = 100;
         break;
+      case 'elimination':
       default:
         conditionText = 'Defeat all enemies';
+        maxProgress = Math.max(factions.length - 1, 1);
     }
     
     if (conditionEl) conditionEl.textContent = conditionText;
@@ -2643,8 +2679,8 @@ export class HUD {
       let progress = 0;
       let displayValue = '';
 
-      switch (rules.victoryType) {
-        case 'capital': {
+      switch (config.victoryType) {
+        case 'capitals': {
           let capitalsControlled = 0;
           // Only count capitals belonging to factions actually in this game.
           for (const other of this.state.factionRegistry.getActiveIncludingDefeated()) {
@@ -2657,14 +2693,26 @@ export class HUD {
           displayValue = `${capitalsControlled}/${maxProgress}`;
           break;
         }
-        case 'economic':
-          progress = Math.min(faction.ipcs / maxProgress, 1);
-          displayValue = `${faction.ipcs}`;
+        case 'economic': {
+          const earned = config.totalIPCsEarned.get(faction.id) || 0;
+          progress = Math.min(earned / maxProgress, 1);
+          displayValue = `${earned}`;
           break;
-        case 'territorial': {
-          const territories = this.state.getTerritoriesOwnedBy(faction.id);
-          progress = Math.min(territories.length / maxProgress, 1);
-          displayValue = `${territories.length}`;
+        }
+        case 'domination': {
+          const owned = landTerritories.filter(t => t.owner === faction.id).length;
+          const percent = (owned / landCount) * 100;
+          progress = Math.min(percent / maxProgress, 1);
+          displayValue = `${Math.round(percent)}%`;
+          break;
+        }
+        case 'elimination':
+        default: {
+          const defeatedEnemies = this.state.factionRegistry.getActiveIncludingDefeated()
+            .filter(o => o.id !== faction.id && faction.isEnemyOf(o.id) && o.isDefeated)
+            .length;
+          progress = defeatedEnemies / maxProgress;
+          displayValue = `${defeatedEnemies}/${maxProgress}`;
           break;
         }
       }
@@ -3664,98 +3712,14 @@ export class HUD {
    * Update turn order display
    */
   updateTurnOrder(): void {
-    const container = document.getElementById('turn-order');
-    if (!container) return;
-
-    // Only show factions actually playing this game (active + alive).
-    const factions = this.state.factionRegistry.getActive();
-    const currentId = this.state.currentFactionId;
-    const currentIdx = factions.findIndex(f => f.id === currentId);
-
-    let html = '';
-    factions.forEach((faction, idx) => {
-      const isCurrent = faction.id === currentId;
-      const isNext = idx === (currentIdx + 1) % factions.length;
-      const statusClass = isCurrent ? 'current' : (isNext ? 'next' : '');
-      const displayName = isCurrent ? faction.name : faction.name.split(' ')[0];
-
-      html += `
-        <div class="turn-order-item ${statusClass}" title="${faction.name}">
-          <div class="faction-emblem turn-order-emblem" data-faction="${faction.id}" style="--faction-color:${faction.color};${isCurrent ? `box-shadow:0 0 0 2px ${faction.color},0 0 8px ${faction.color}88;` : ''}"></div>
-          <span>${displayName}</span>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
+    this.factionPanelController.updateTurnOrder();
   }
 
   /**
    * Update faction panel
    */
   updateFactionPanel(): void {
-    const container = document.getElementById('faction-panel-content');
-    if (!container) return;
-
-    // Mirror turn-order: scoreboard only shows participants in the current game.
-    const factions = this.state.factionRegistry.getActive();
-    const currentId = this.state.currentFactionId;
-
-    // Pre-compute max values for relative bar widths
-    const allTerr = factions.map(f => this.state.getTerritoriesOwnedBy(f.id).length);
-    const allUnits = factions.map(f => this.state.getTerritoriesOwnedBy(f.id).reduce((s, t) => s + t.getTotalUnitCount(), 0));
-    const maxTerr = Math.max(...allTerr, 1);
-    const maxUnits = Math.max(...allUnits, 1);
-
-    let html = '';
-    for (let i = 0; i < factions.length; i++) {
-      const faction = factions[i];
-      const territories = this.state.getTerritoriesOwnedBy(faction.id);
-      const totalUnits = allUnits[i];
-      const isCurrent = faction.id === currentId;
-      const isDefeated = faction.isDefeated;
-
-      const terrPct = Math.round((territories.length / maxTerr) * 100);
-      const unitsPct = Math.round((totalUnits / maxUnits) * 100);
-      const color = faction.color;
-      const income = this.state.calculateIncome(faction.id);
-
-      html += `
-        <div class="faction-row ${isCurrent ? 'current' : ''} ${isDefeated ? 'defeated' : ''}">
-          <div class="faction-emblem faction-panel-emblem" data-faction="${faction.id}" style="--faction-color:${color};"></div>
-          <div class="faction-info">
-            <div class="faction-name">${faction.name}</div>
-            <div class="faction-bars">
-              <div class="fb-row" title="${territories.length} territories">
-                <span class="fb-icon">🗺️</span>
-                <div class="fb-track"><div class="fb-fill" style="width:${terrPct}%;background:${color};"></div></div>
-                <span class="fb-val">${territories.length}</span>
-              </div>
-              <div class="fb-row" title="${totalUnits} units">
-                <span class="fb-icon">⚔️</span>
-                <div class="fb-track"><div class="fb-fill" style="width:${unitsPct}%;background:${color};"></div></div>
-                <span class="fb-val">${totalUnits}</span>
-              </div>
-              <div class="fb-row fb-ipc" title="${faction.ipcs} IPCs (${income > 0 ? '+' : ''}${income}/turn)">
-                <span class="fb-icon">💰</span>
-                <span class="fb-val">${faction.ipcs} <span style="color:#4ade80;font-size:0.72em;opacity:0.85;">+${income}</span></span>
-              </div>
-              ${faction.warWeariness > 0 ? (() => {
-                const ww = faction.warWeariness;
-                const wwColor = ww < 33 ? '#22c55e' : ww < 66 ? '#fbbf24' : '#ef4444';
-                return `<div class="fb-row" title="War Weariness: ${ww}%">
-                  <span class="fb-icon">😰</span>
-                  <div class="fb-track"><div class="fb-fill" style="width:${ww}%;background:${wwColor};"></div></div>
-                  <span class="fb-val" style="color:${wwColor}">${ww}%</span>
-                </div>`;
-              })() : ''}
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    container.innerHTML = html;
+    this.factionPanelController.updateFactionPanel();
   }
 
   /**
@@ -4798,121 +4762,7 @@ export class HUD {
    * Show the espionage operations modal.
    */
   showEspionageModal(): void {
-    const faction = this.state.getCurrentFaction();
-    if (!faction || faction.controlledBy !== 'human') return;
-
-    const espionageSystem = this.state.systems.espionageSystem;
-    if (!espionageSystem) {
-      this.showToast('Espionage system not available', 'info');
-      return;
-    }
-
-    const enemies = this.state.factionRegistry.getActive().filter(
-      f => f.id !== faction.id &&
-           this.state.diplomacyManager.getRelation(faction.id, f.id) === 'war'
-    );
-
-    let modal = document.getElementById('espionage-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'espionage-modal';
-      modal.className = 'modal-overlay';
-      document.body.appendChild(modal);
-    }
-
-    const cooldownUntil = espionageSystem.getCooldownUntil?.(faction.id) ?? 0;
-    const onCooldown = this.state.turnNumber < cooldownUntil;
-    const turnsLeft = cooldownUntil - this.state.turnNumber;
-    const recentHistory = espionageSystem.getHistory?.(faction.id, 5) ?? [];
-    const historyHtml = recentHistory.length === 0
-      ? '<p style="color:#4b5563;font-size:0.8rem;margin:0">No recent operations.</p>'
-      : recentHistory.map(h => {
-          const fName = this.state.factionRegistry.get(h.targetFactionId)?.name ?? h.targetFactionId;
-          const icon = h.success ? '✓' : (h.exposed ? '⚠' : '✗');
-          const col = h.success ? '#4ade80' : (h.exposed ? '#fbbf24' : '#f87171');
-          return `<div style="display:flex;gap:6px;align-items:baseline;font-size:0.78rem;padding:2px 0;border-bottom:1px solid #1e293b;">
-            <span style="color:${col};font-weight:bold;min-width:14px">${icon}</span>
-            <span style="color:#94a3b8;min-width:28px">T${h.turn}</span>
-            <span style="flex:1;color:#cbd5e1">${ESPIONAGE_OPS.find(o => o.type === h.opType)?.label ?? h.opType}</span>
-            <span style="color:#64748b">→ ${fName}</span>
-          </div>`;
-        }).join('');
-
-    modal.innerHTML = `
-      <div class="modal-container" style="max-width:500px;">
-        <div class="modal-header">
-          <h2>🕵️ Espionage Operations</h2>
-          <button id="btn-close-espionage" class="modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-            <span style="color:#94a3b8">Treasury: <strong style="color:#fbbf24">${faction.ipcs} IPCs</strong></span>
-            ${onCooldown
-              ? `<span style="color:#f87171;font-size:0.85rem;">⏳ Agents recover in <strong>${turnsLeft}</strong> turn${turnsLeft !== 1 ? 's' : ''}</span>`
-              : `<span style="color:#4ade80;font-size:0.85rem;">✓ Agents ready</span>`}
-          </div>
-
-          ${enemies.length === 0
-            ? '<p style="color:#f87171">No enemies at war to target.</p>'
-            : enemies.map(enemy => {
-                const enemyCI = (enemy as any).bonuses?.counterIntelBonus ?? 0;
-                return `<div style="margin-bottom:1.2rem;border:1px solid #334155;border-radius:6px;padding:0.8rem;">
-                  <div style="font-weight:bold;color:${enemy.color};margin-bottom:0.6rem;">${enemy.name}</div>
-                  ${ESPIONAGE_OPS.map(op => {
-                    const adjustedChance = Math.round(op.successChance * (1 - enemyCI) * 100);
-                    const affordable = faction.ipcs >= op.cost;
-                    const disabled = !affordable || onCooldown;
-                    const disabledStyle = disabled ? 'opacity:0.5;cursor:not-allowed;' : 'cursor:pointer;';
-                    return `<button
-                      class="esp-op-btn"
-                      data-faction-id="${faction.id}"
-                      data-enemy-id="${enemy.id}"
-                      data-op-type="${op.type}"
-                      ${disabled ? 'disabled' : ''}
-                      style="display:block;width:100%;margin-bottom:0.4rem;padding:0.45rem 0.7rem;
-                             background:#0f172a;border:1px solid #475569;border-radius:4px;
-                             color:#e2e8f0;text-align:left;${disabledStyle}">
-                      <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <span>${op.label}</span>
-                        <span style="display:flex;gap:8px;align-items:center;">
-                          <span style="color:#fbbf24;font-size:0.8rem;">${op.cost} IPCs</span>
-                          <span style="color:${adjustedChance >= 55 ? '#4ade80' : adjustedChance >= 35 ? '#fbbf24' : '#f87171'};font-size:0.78rem;">${adjustedChance}%</span>
-                        </span>
-                      </div>
-                      <div style="color:#64748b;font-size:0.75rem;margin-top:2px">${op.description}</div>
-                    </button>`;
-                  }).join('')}
-                </div>`;
-              }).join('')}
-
-          <details style="margin-top:0.8rem;">
-            <summary style="color:#64748b;font-size:0.8rem;cursor:pointer;user-select:none;">📜 Recent Operations</summary>
-            <div style="margin-top:0.5rem;padding:0.5rem;background:#0f172a;border-radius:4px;">
-              ${historyHtml}
-            </div>
-          </details>
-        </div>
-      </div>
-    `;
-
-    modal.classList.remove('hidden');
-
-    document.getElementById('btn-close-espionage')?.addEventListener('click', () => {
-      modal?.classList.add('hidden');
-    });
-
-    modal.querySelectorAll<HTMLButtonElement>('.esp-op-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const fId = btn.dataset.factionId!;
-        const eId = btn.dataset.enemyId!;
-        const opType = btn.dataset.opType as any;
-        const result = espionageSystem.executeOperation?.(fId, eId, opType) ?? { success: false, exposed: false, detail: 'Unavailable' };
-        modal?.classList.add('hidden');
-        const icon = result.success ? '✓' : (result.exposed ? '⚠' : '✗');
-        const kind = result.success ? 'success' : 'error';
-        this.showToast(`${icon} ${result.detail}`, kind);
-      });
-    });
+    this.espionagePanel.show();
   }
 
   // ==================== NUCLEAR ====================
@@ -5595,56 +5445,38 @@ export class HUD {
 
   /** Playwright / dev automation — not used by production UI. */
   runE2EUnitAction(fromId: string, toId: string, allTypes = false): 'move' | 'attack' | 'invalid' {
-    this.focusTerritory(fromId);
-    if (allTypes) {
-      this.stackCommand.selectAllUnitTypes(false);
-    }
-    this.prepareUnitDrag(fromId);
-    const kind = this.getUnitDropKind(fromId, toId);
-    if (kind === 'invalid') return 'invalid';
-    this.handleUnitDragDrop(fromId, toId);
-    return kind;
+    return this.e2eHost.runE2EUnitAction(fromId, toId, allTypes);
   }
 
   runE2EConfirmAttack(): void {
-    this.combatUI.confirmAttackFromPreview(true);
+    this.e2eHost.runE2EConfirmAttack();
   }
 
   runE2EEndTurn(): void {
-    this.onEndPhaseClick();
+    this.e2eHost.runE2EEndTurn();
+  }
+
+  runE2EMobilize(): 'mobilized' | 'none' | 'failed' {
+    const result = this.e2eHost.runE2EMobilize();
+    if (result === 'mobilized') {
+      funnelTracker.track('first_mobilize', { once: true });
+    }
+    return result;
+  }
+
+  readE2EActiveFactionCount(): number {
+    return this.e2eHost.readE2EActiveFactionCount();
   }
 
   readE2ESnapshot(): import('../e2e/browserApi').E2ESnapshot {
-    const faction = this.state.getCurrentFaction();
-    const owners: Record<string, string | null> = {};
-    for (const [id, territory] of this.state.territories) {
-      owners[id] = territory.owner;
-    }
-    return {
-      turnNumber: this.state.turnNumber,
-      phase: this.state.currentPhase,
-      currentFactionId: this.state.currentFactionId,
-      isHumanTurn: faction?.controlledBy === 'human',
-      owners,
-    };
+    return this.e2eHost.readE2ESnapshot();
   }
 
   dismissE2EOverlays(): void {
-    document.getElementById('scenario-briefing-overlay')?.remove();
-    document.getElementById('turn-recap-card')?.remove();
-    document.getElementById('phase-recap-card')?.remove();
-    document.getElementById('event-modal')?.classList.add('hidden');
-    document.getElementById('campaign-briefing-overlay')?.remove();
-    document.getElementById('campaign-debriefing-overlay')?.remove();
-    document.getElementById('first-war-room')?.remove();
-    document.getElementById('victory-modal')?.remove();
+    this.e2eHost.dismissE2EOverlays();
   }
 
   e2eBoostTerritory(territoryId: string, unitTypeId: string, count: number): void {
-    const territory = this.state.territories.get(territoryId);
-    if (!territory || count <= 0) return;
-    territory.addUnits(unitTypeId, count);
-    this.renderer.render();
-    this.renderMinimap();
+    this.e2eHost.e2eBoostTerritory(territoryId, unitTypeId, count);
   }
 }

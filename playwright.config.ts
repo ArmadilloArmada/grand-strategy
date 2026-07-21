@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // Electron desktop smoke has its own config (`playwright.electron.config.ts`)
+  // and needs a real display / packaged app — keep it out of browser CI e2e.
+  testIgnore: ['**/electron-desktop.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

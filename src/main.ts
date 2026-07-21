@@ -46,6 +46,9 @@ import type { Commander, CommanderTraitId } from './data/Territory';
 import type { UnitTypeData } from './data/Unit';
 import { bootstrapGame } from './app/bootstrap';
 import { attachE2EBrowserApi } from './e2e/browserApi';
+import { showSimpleCampaignBriefing } from './ui/BriefingController';
+import { funnelTracker } from './engine/FunnelTracker';
+import { MultiplayerUI } from './ui/MultiplayerUI';
 
 // Export managers for external access
 export { campaignManager, replayManager };
@@ -120,6 +123,7 @@ class Game {
   private lastGameWinnerFaction: string | null = null;
   // Cleanup handles for per-game event listeners (prevents leaks on New Game)
   private unsubCampaignListeners: Array<() => void> = [];
+  private multiplayerUI = new MultiplayerUI();
 
   constructor() {
     // Initialize core systems
@@ -392,15 +396,19 @@ class Game {
 
     attachE2EBrowserApi({
       startE2ETutorialMatch: () => this.startE2ETutorialMatch(),
+      startE2ETwoFactionMatch: () => this.startE2ETwoFactionMatch(),
       readE2ESnapshot: () => this.hud.readE2ESnapshot(),
       runE2EUnitAction: (fromId, toId, allTypes) => this.hud.runE2EUnitAction(fromId, toId, allTypes),
       runE2EConfirmAttack: () => this.hud.runE2EConfirmAttack(),
       runE2EEndTurn: () => this.hud.runE2EEndTurn(),
+      runE2EMobilize: () => this.hud.runE2EMobilize(),
+      readE2EActiveFactionCount: () => this.hud.readE2EActiveFactionCount(),
       dismissE2EOverlays: () => this.hud.dismissE2EOverlays(),
       e2eBoostTerritory: (territoryId, unitTypeId, count) => this.hud.e2eBoostTerritory(territoryId, unitTypeId, count),
       startE2ECampaignMission: (campaignId, missionId) => this.startE2ECampaignMission(campaignId, missionId),
       runE2EQuickSave: () => this.runE2EQuickSave(),
       runE2EQuickLoad: () => this.runE2EQuickLoad(),
+      readFunnelEvents: () => funnelTracker.getEvents(),
     });
 
     // Set up drag for panels visible on the main menu screen
@@ -427,34 +435,8 @@ class Game {
 
     this.startNewGame();
     if (isQuick) {
-      this.showSimpleCampaignBriefing();
+      showSimpleCampaignBriefing();
     }
-  }
-
-  private showSimpleCampaignBriefing(): void {
-    document.getElementById('scenario-briefing-overlay')?.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'scenario-briefing-overlay';
-    overlay.className = 'scenario-briefing-overlay';
-    overlay.innerHTML = `
-      <div class="scenario-briefing-card">
-        <div class="scenario-briefing-kicker">Simple Campaign</div>
-        <h2>Your First Command</h2>
-        <p class="scenario-briefing-subtitle">One command phase per turn — mobilize, move, attack, then End Turn. The Co-Pilot will guide each step.</p>
-        <div class="scenario-briefing-goals">
-          <div class="scenario-briefing-goal"><span>1</span><strong>Mobilize your capital or a factory to raise troops.</strong></div>
-          <div class="scenario-briefing-goal"><span>2</span><strong>Move into a neighboring enemy territory and attack — use Play Tactical (T) on contested fights.</strong></div>
-          <div class="scenario-briefing-goal"><span>3</span><strong>Capture 2 enemy capitals before turn 25 to win.</strong></div>
-        </div>
-        <div class="scenario-briefing-doctrine">Easy AI · Favorable economy · Co-Pilot coaching enabled</div>
-        <div class="scenario-briefing-actions">
-          <button class="primary" id="btn-start-command">Begin Turn 1</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    document.getElementById('btn-start-command')?.addEventListener('click', () => overlay.remove());
   }
 
   private startScenario(scenario: string): void {
@@ -540,7 +522,10 @@ class Game {
     `;
     document.body.appendChild(overlay);
 
-    const close = () => overlay.remove();
+    const close = () => {
+      funnelTracker.track('briefing_dismiss', { once: true });
+      overlay.remove();
+    };
     document.getElementById('btn-start-command')?.addEventListener('click', close);
     document.getElementById('btn-briefing-copilot')?.addEventListener('click', () => {
       close();
@@ -789,6 +774,7 @@ class Game {
    * Show main menu
    */
   showMainMenu(): void {
+    funnelTracker.track('menu_start', { once: true });
     steamManager.clearRichPresence();
     const modal = document.getElementById('main-menu-modal');
     if (modal) modal.classList.remove('hidden');
@@ -1078,6 +1064,9 @@ class Game {
       );
 
       nextMission = campaignManager.completeMission(campaignId, bonusCompleted);
+      if (won && mission.id === 'tutorial_1') {
+        funnelTracker.track('mission_1_complete', { once: true });
+      }
     }
 
     // Clear active campaign state
@@ -1539,6 +1528,10 @@ class Game {
         this.hideMainMenu();
         this.hud.showNewGameModal();
       }));
+    });
+
+    document.getElementById('btn-online-multiplayer')?.addEventListener('click', () => {
+      runMenuAction(() => this.multiplayerUI.show());
     });
 
     // Listen for game started event from HUD
@@ -2448,7 +2441,7 @@ class Game {
     this.hideMainMenu();
     settings.update({
       gameSpeed: 'fast',
-      tacticalBattles: false,
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
       battleAnimations: false,
       battleNarratives: false,
       confirmEndTurn: false,
@@ -2492,7 +2485,42 @@ class Game {
     this.hideMainMenu();
     settings.update({
       gameSpeed: 'fast',
-      tacticalBattles: false,
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
+      battleAnimations: false,
+      battleNarratives: false,
+      confirmEndTurn: false,
+      midGameObjectives: false,
+      commanderProgression: false,
+    });
+    this.hud.gameConfig = {
+      ...this.hud.gameConfig,
+      mapId: 'tutorial',
+      mode: 'vs-ai',
+      humanFactions: ['atlantic_alliance'],
+      aiOpponents: ['eastern_bloc'],
+      aiOpponentCount: 1,
+      turnStyle: 'quick',
+      simpleMode: true,
+      guidedOnboarding: false,
+      fogOfWar: false,
+      autoSave: false,
+      aiDifficulty: 'easy',
+      victoryType: 'capitals',
+      capitalsToWin: 1,
+      turnLimit: 15,
+    };
+    this.startNewGame();
+    this.hud.dismissE2EOverlays();
+  }
+
+  /**
+   * Two-faction match for Playwright — exactly one human + one AI opponent.
+   */
+  startE2ETwoFactionMatch(): void {
+    this.hideMainMenu();
+    settings.update({
+      gameSpeed: 'fast',
+      tacticalBattles: settings.getSetting('tacticalBattles') ?? false,
       battleAnimations: false,
       battleNarratives: false,
       confirmEndTurn: false,

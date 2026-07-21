@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 // Keep a global reference of the window object
 let mainWindow = null;
@@ -81,14 +82,20 @@ function createWindow() {
   });
 
   // Load the app
+  const e2eMode = process.env.GS_E2E === '1';
   if (isDev) {
     // In development, load from Vite dev server
-    mainWindow.loadURL('http://localhost:19123');
-    mainWindow.webContents.openDevTools();
+    const devUrl = e2eMode ? 'http://localhost:19123/?e2e=1' : 'http://localhost:19123';
+    mainWindow.loadURL(devUrl);
+    if (!e2eMode) mainWindow.webContents.openDevTools();
   } else {
     // In production, load from dist folder
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
-    mainWindow.loadFile(indexPath);
+    if (e2eMode) {
+      mainWindow.loadURL(`${pathToFileURL(indexPath).href}?e2e=1`);
+    } else {
+      mainWindow.loadFile(indexPath);
+    }
   }
 
   // Security: never allow renderer to navigate away or open arbitrary popups.
